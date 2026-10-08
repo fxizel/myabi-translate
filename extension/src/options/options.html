@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MyAB Translation Inspector</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <main>
+        <h1>MyAB Translation Inspector</h1>
+        <p class="muted" data-i18n="optIntro"></p>
+
+        <form id="form" novalidate autocomplete="off">
+            <section>
+                <h2 data-i18n="optSectionApi"></h2>
+                <div class="field">
+                    <label for="apiUrl" data-i18n="optApiUrl"></label>
+                    <input id="apiUrl" type="url" inputmode="url" spellcheck="false" placeholder="https://translations.example.test/api/browser-extension">
+                    <small data-i18n="optApiUrlHelp"></small>
+                </div>
+                <div class="field">
+                    <label for="token" data-i18n="optToken"></label>
+                    <input id="token" type="password" spellcheck="false" autocomplete="new-password">
+                    <small id="tokenState"></small>
+                    <small data-i18n="optTokenHelp"></small>
+                    <label class="inline"><input id="clearToken" type="checkbox"> <span data-i18n="optTokenClear"></span></label>
+                </div>
+                <div class="field">
+                    <label for="tokenPersistence" data-i18n="optTokenPersistence"></label>
+                    <select id="tokenPersistence">
+                        <option value="local" data-i18n="optPersistLocal"></option>
+                        <option value="session" data-i18n="optPersistSession"></option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="appUrl" data-i18n="optAppUrl"></label>
+                    <input id="appUrl" type="url" inputmode="url" spellcheck="false" placeholder="https://translations.example.test">
+                    <small data-i18n="optAppUrlHelp"></small>
+                </div>
+            </section>
+
+            <section>
+                <h2 data-i18n="optSectionMyab"></h2>
+                <div class="field">
+                    <label for="domains" data-i18n="optDomains"></label>
+                    <textarea id="domains" rows="4" spellcheck="false" placeholder="myab.example.test"></textarea>
+                    <small data-i18n="optDomainsHelp"></small>
+                </div>
+            </section>
+
+            <section>
+                <h2 data-i18n="optSectionBehavior"></h2>
+                <div class="grid">
+                    <div class="field">
+                        <label for="uiLanguage" data-i18n="optLanguage"></label>
+                        <select id="uiLanguage">
+                            <option value="auto" data-i18n="optLangAuto"></option>
+                            <option value="fr">Français</option>
+                            <option value="de">Deutsch</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="activationModifier" data-i18n="optModifier"></label>
+                        <select id="activationModifier">
+                            <option value="alt" data-i18n="modifierAlt"></option>
+                            <option value="altShift" data-i18n="modifierAltShift"></option>
+                            <option value="altCtrl" data-i18n="modifierAltCtrl"></option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="maxResults" data-i18n="optMaxResults"></label>
+                        <input id="maxResults" type="number" min="1" max="20" step="1">
+                    </div>
+                    <div class="field">
+                        <label for="timeoutSeconds" data-i18n="optTimeout"></label>
+                        <input id="timeoutSeconds" type="number" min="1" max="30" step="1">
+                    </div>
+                </div>
+                <div class="field">
+                    <span class="label" data-i18n="optShortcut"></span>
+                    <code id="shortcut"></code>
+                    <small data-i18n="optShortcutHelp"></small>
+                </div>
+                <div class="field">
+                    <label class="inline"><input id="collectContext" type="checkbox"> <span data-i18n="optCollect"></span></label>
+                    <small data-i18n="optCollectHelp"></small>
+                </div>
+                <div class="field">
+                    <label for="urlMode" data-i18n="optUrlMode"></label>
+                    <select id="urlMode">
+                        <option value="noQuery" data-i18n="optUrlNoQuery"></option>
+                        <option value="full" data-i18n="optUrlFull"></option>
+                        <option value="origin" data-i18n="optUrlOrigin"></option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="inline"><input id="feedbackEnabled" type="checkbox"> <span data-i18n="optFeedback"></span></label>
+                </div>
+            </section>
+
+            <details>
+                <summary data-i18n="optSectionAdvanced"></summary>
+                <p class="muted" data-i18n="optAdvancedHelp"></p>
+                <div class="field">
+                    <label for="selectorBreadcrumb" data-i18n="optSelBreadcrumb"></label>
+                    <input id="selectorBreadcrumb" type="text" spellcheck="false" placeholder=".breadcrumb">
+                </div>
+                <div class="field">
+                    <label for="selectorDialog" data-i18n="optSelDialog"></label>
+                    <input id="selectorDialog" type="text" spellcheck="false" placeholder=".modal-container">
+                </div>
+                <div class="field">
+                    <label for="selectorSection" data-i18n="optSelSection"></label>
+                    <input id="selectorSection" type="text" spellcheck="false" placeholder=".panel-title">
+                </div>
+                <div class="field">
+                    <label for="selectorIgnore" data-i18n="optSelIgnore"></label>
+                    <input id="selectorIgnore" type="text" spellcheck="false" placeholder=".user-name, .tooltip">
+                </div>
+                <div class="field">
+                    <label for="manualSearchUrlTemplate" data-i18n="optManualTemplate"></label>
+                    <input id="manualSearchUrlTemplate" type="text" spellcheck="false">
+                    <small data-i18n="optManualTemplateHelp"></small>
+                </div>
+            </details>
+
+            <ul id="errors" class="errors" role="alert" hidden></ul>
+            <p id="status" class="status" role="status"></p>
+
+            <div class="buttons">
+                <button type="submit" id="save" class="primary" data-i18n="optSave"></button>
+                <button type="button" id="test" data-i18n="optTest"></button>
+                <button type="button" id="importButton" data-i18n="optImport"></button>
+                <button type="button" id="exportButton" data-i18n="optExport"></button>
+                <input id="importFile" type="file" accept="application/json,.json" hidden>
+            </div>
+        </form>
+    </main>
+    <script src="options.js"></script>
+</body>
+</html>

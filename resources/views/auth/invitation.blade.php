@@ -1,0 +1,5 @@
+@extends('layouts.app')
+@section('title', __('ui.invitation'))
+@section('content')
+<div class="auth-panel"><p class="eyebrow">ARGE-ABI / myABI</p><h1>{{ __('ui.invitation') }}</h1><p class="lede">{{ __('ui.invitation_description') }}</p><section class="surface"><form method="post" action="{{ route('invitation.accept',$token) }}">@csrf<label class="field"><span>{{ __('ui.email') }}</span><input class="input" type="email" name="email" value="{{ $user->email }}" readonly required autocomplete="username"></label><label class="field"><span>{{ __('ui.password') }}</span><input class="input" type="password" name="password" required minlength="{{ config('auth.password_min_length') }}" autocomplete="new-password"></label><label class="field"><span>{{ __('ui.password_confirmation') }}</span><input class="input" type="password" name="password_confirmation" required minlength="{{ config('auth.password_min_length') }}" autocomplete="new-password"></label><button class="button primary">{{ __('ui.activate') }} →</button></form></section></div>
+@endsection

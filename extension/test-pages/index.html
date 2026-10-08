@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Page de test — MyAB Translation Inspector</title>
+    <style>
+        body { font: 15px/1.5 system-ui, sans-serif; margin: 0; color: #1f2328; }
+        header.bar { background: #1f2328; color: #fff; padding: 10px 24px; display: flex; gap: 24px; align-items: center; }
+        header.bar a { color: #9ecbff; }
+        main { max-width: 900px; margin: 0 auto; padding: 16px 24px 64px; }
+        section { margin: 28px 0; padding-top: 8px; border-top: 1px solid #d1d9e0; }
+        h2 { margin: 0 0 8px; font-size: 17px; }
+        table { border-collapse: collapse; }
+        th, td { border: 1px solid #d1d9e0; padding: 4px 10px; text-align: left; }
+        .badge { display: inline-block; background: #ddf4ff; border-radius: 999px; padding: 0 8px; margin-left: 6px; font-size: 12px; }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .icon { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; }
+        #counter { position: fixed; left: 12px; bottom: 12px; background: #fff8c5; border: 1px solid #d4a72c; border-radius: 8px; padding: 6px 10px; font-size: 13px; z-index: 5; }
+        .aria-modal { position: fixed; inset: 20% 25%; background: #fff; border: 2px solid #1f2328; border-radius: 8px; padding: 16px; z-index: 10; }
+        .aria-modal[hidden] { display: none; }
+        .note { color: #59636e; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <header class="bar">
+        <strong>Page de test</strong>
+        <nav aria-label="Fil d'Ariane" class="breadcrumb">
+            <ol style="display:flex;gap:8px;list-style:none;margin:0;padding:0">
+                <li><a href="#">Accueil</a></li>
+                <li><a href="#">Achats</a></li>
+                <li aria-current="page">Commandes fournisseurs</li>
+            </ol>
+        </nav>
+    </header>
+
+    <main>
+        <p class="note">
+            Mode d’emploi : ajoutez <code>localhost</code> aux domaines autorisés, activez le mode inspecteur, rechargez cette page,
+            puis Alt+clic sur chaque élément. Le compteur en bas à gauche ne doit <strong>pas</strong> bouger lors d’un Alt+clic
+            (la page ne doit rien voir) et doit augmenter lors d’un clic normal. Échap ferme le panneau.
+        </p>
+
+        <section aria-labelledby="t-simple">
+            <h2 id="t-simple">1. Texte simple</h2>
+            <p>Commande</p>
+            <p>Une phrase avec un <strong>mot en gras</strong> au milieu : le texte attendu est la phrase entière.</p>
+        </section>
+
+        <section>
+            <h2>2. Boutons et liens</h2>
+            <button type="button" id="save">Enregistrer</button>
+            <button type="button" id="save-now">Enregistrer <b>maintenant</b></button>
+            <button type="button" id="icon-only" aria-label="Supprimer la ligne" title="Supprimer"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2"/></svg></button>
+            <button type="button"><span class="material-icons" aria-hidden="true">delete</span> Supprimer</button>
+            <a href="#lien" id="link">Voir le détail</a>
+            <input type="button" value="Valider">
+        </section>
+
+        <section>
+            <h2>3. Libellés et champs</h2>
+            <p>
+                <label for="supplier">Fournisseur</label>
+                <input id="supplier" name="supplier" type="text" value="Valeur saisie confidentielle">
+            </p>
+            <p>
+                <label>Date de livraison <input name="delivery" type="date"></label>
+            </p>
+            <p><input type="text" name="search" placeholder="Rechercher un article" aria-label="Recherche d'article"></p>
+            <p>
+                <label for="status-select">Statut</label>
+                <select id="status-select"><option>Ouvert (donnée métier)</option><option>Clôturé</option></select>
+            </p>
+        </section>
+
+        <section>
+            <h2>4. Tableau</h2>
+            <table>
+                <caption>Commandes ouvertes</caption>
+                <thead><tr><th id="h-ref">Référence</th><th id="h-supplier">Fournisseur</th><th id="h-status">Statut</th></tr></thead>
+                <tbody>
+                    <tr><td headers="h-ref">BC-2026-0412</td><td headers="h-supplier">Muster AG</td><td headers="h-status"><span>Validé</span></td></tr>
+                    <tr><td headers="h-ref">BC-2026-0413</td><td headers="h-supplier">Exemple SA</td><td headers="h-status"><span>Commande</span><span class="badge">3</span></td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>5. Éléments imbriqués</h2>
+            <div class="card"><div><div><span>Commande <em>fournisseur</em></span></div></div></div>
+            <ul>
+                <li><a href="#a"><span>Livraisons</span><span class="badge">12</span></a></li>
+                <li><span>Rappel&nbsp;:</span> <span>Échéance proche</span></li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>6. Fenêtres modales</h2>
+            <button type="button" id="open-dialog">Ouvrir un &lt;dialog&gt; natif</button>
+            <button type="button" id="open-aria">Ouvrir une modale ARIA</button>
+            <dialog id="native-dialog" aria-labelledby="native-title">
+                <h3 id="native-title">Confirmer la commande</h3>
+                <p>Voulez-vous vraiment confirmer cette commande&nbsp;?</p>
+                <button type="button" id="close-dialog">Annuler</button>
+            </dialog>
+            <div class="aria-modal" id="aria-dialog" role="dialog" aria-modal="true" aria-labelledby="aria-title" hidden>
+                <h3 id="aria-title" class="modal-title">Supprimer l’article</h3>
+                <p>Cette action est définitive.</p>
+                <button type="button" id="close-aria">Annuler</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>7. Texte répété</h2>
+            <p>Commande</p>
+            <button type="button">Commande</button>
+            <table><tr><td>Commande</td><td>Commande</td></tr></table>
+            <p class="note">Le contexte (titre de section, parent, colonne) doit permettre à l’API de les distinguer.</p>
+        </section>
+
+        <section>
+            <h2>8. Shadow DOM</h2>
+            <div id="shadow-host"></div>
+        </section>
+
+        <section>
+            <h2>9. Iframe (même origine)</h2>
+            <iframe src="iframe.html" title="Cadre de test" style="width:100%;height:140px;border:1px solid #d1d9e0"></iframe>
+        </section>
+
+        <section>
+            <h2>10. Éléments à ne pas détecter</h2>
+            <span class="sr-only">Texte réservé aux lecteurs d’écran</span>
+            <span>»</span> <span>×</span> <span aria-hidden="true">Texte aria-hidden</span>
+            <p class="note">Alt+clic sur « » » ou « × » : « Aucun texte exploitable ».</p>
+        </section>
+    </main>
+
+    <div id="counter" role="status">Clics reçus par la page : <span id="count">0</span></div>
+
+    <script>
+        // Écouteurs « agressifs » comme dans une application React/Angular/Vue : document, bubbling et capture.
+        var count = 0;
+        function bump() { document.getElementById('count').textContent = String(++count); }
+        document.addEventListener('click', bump);
+        window.addEventListener('click', function () {}, true);
+        document.getElementById('link').addEventListener('click', function (e) { e.preventDefault(); });
+        document.getElementById('save').addEventListener('click', function () { console.log('save'); });
+
+        var nativeDialog = document.getElementById('native-dialog');
+        document.getElementById('open-dialog').addEventListener('click', function () { nativeDialog.showModal(); });
+        document.getElementById('close-dialog').addEventListener('click', function () { nativeDialog.close(); });
+        var ariaDialog = document.getElementById('aria-dialog');
+        document.getElementById('open-aria').addEventListener('click', function () { ariaDialog.hidden = false; });
+        document.getElementById('close-aria').addEventListener('click', function () { ariaDialog.hidden = true; });
+        // Comme beaucoup de modales : un clic à l'extérieur ferme.
+        document.addEventListener('mousedown', function (e) {
+            if (!ariaDialog.hidden && !ariaDialog.contains(e.target)) { ariaDialog.hidden = true; }
+        });
+
+        var root = document.getElementById('shadow-host').attachShadow({ mode: 'open' });
+        root.innerHTML = '<style>p{margin:0}</style><p><label>Libellé dans un Shadow DOM</label> <button type="button">Bouton Shadow</button></p>';
+    </script>
+</body>
+</html>

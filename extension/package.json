@@ -1,0 +1,35 @@
+{
+    "name": "myab-translation-inspector",
+    "version": "0.1.0",
+    "private": true,
+    "license": "AGPL-3.0-only",
+    "type": "module",
+    "description": "Extension navigateur (Chrome / Firefox) qui retrouve la clé de traduction d'un texte affiché dans MyAB.",
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "build": "node scripts/build.mjs --target all",
+        "build:chrome": "node scripts/build.mjs --target chrome",
+        "build:firefox": "node scripts/build.mjs --target firefox",
+        "dev:chrome": "node scripts/build.mjs --target chrome --watch",
+        "dev:firefox": "node scripts/build.mjs --target firefox --watch",
+        "package": "node scripts/build.mjs --target all --zip",
+        "package:chrome": "node scripts/build.mjs --target chrome --zip",
+        "package:firefox": "node scripts/build.mjs --target firefox --zip",
+        "serve:test": "node scripts/serve-test-page.mjs",
+        "serve:mock": "node scripts/mock-api.mjs",
+        "test:manual": "node scripts/serve-test-page.mjs --mock",
+        "check": "npm run typecheck && npm test && npm run build"
+    },
+    "devDependencies": {
+        "esbuild": "^0.28.2",
+        "fflate": "^0.8.2",
+        "jsdom": "^25.0.1",
+        "typescript": "^5.6.3",
+        "vitest": "^4.1.11"
+    }
+}

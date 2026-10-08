@@ -1,0 +1,10 @@
+[Unit]
+Description=myABI - check pending operations every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Unit=myabi-docker-work.service
+
+[Install]
+WantedBy=timers.target

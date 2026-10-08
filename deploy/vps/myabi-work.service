@@ -1,0 +1,27 @@
+# Install in /etc/systemd/system. Enable the TIMER, not this oneshot service.
+[Unit]
+Description=myABI one resumable import, publication or validation operation
+After=network.target
+ConditionPathExists=/srv/myabi/current/artisan
+ConditionPathExists=!/srv/myabi/shared/storage/framework/down
+
+[Service]
+Type=oneshot
+User=myabi-web
+Group=myabi-web
+UMask=0007
+WorkingDirectory=/srv/myabi/current
+ExecStart=/usr/bin/php8.4 -d memory_limit=256M artisan referentiel:work --once --no-interaction
+# A 35-minute deployment lock wait may fail while work is still progressing.
+# Do not abort productive work to force a deployment through.
+TimeoutStartSec=2h
+TimeoutStopSec=60s
+KillSignal=SIGTERM
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/myabi/shared/storage /srv/myabi/releases
+NoNewPrivileges=true
+# Errors may include business values: keep them in private, rotated files.
+StandardOutput=append:/srv/myabi/shared/storage/logs/worker.log
+StandardError=append:/srv/myabi/shared/storage/logs/worker.log

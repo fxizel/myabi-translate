@@ -1,0 +1,32 @@
+# Install in /etc/systemd/system; adapt PHP binary path to the inspected OS.
+# The master is root only to create the socket and switch children to myabi-web.
+# Do not replace/restart a PHP-FPM service that serves other sites.
+[Unit]
+Description=myABI dedicated PHP 8.4 FPM
+After=network.target
+
+[Service]
+Type=simple
+UMask=0007
+RuntimeDirectory=myabi-php
+RuntimeDirectoryMode=0755
+ExecStartPre=/usr/sbin/php-fpm8.4 --test --fpm-config /etc/myabi/php-fpm.conf
+ExecStart=/usr/sbin/php-fpm8.4 --nodaemonize --fpm-config /etc/myabi/php-fpm.conf
+ExecReload=/bin/kill -USR2 $MAINPID
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGQUIT
+TimeoutStopSec=150s
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+# Allow this stable parent in the mount namespace; Unix permissions permit the
+# myabi-web children to write only each release's bootstrap/cache, not its code.
+# A path through /current would remain bound to the old release after a switch.
+ReadWritePaths=/run/myabi-php /var/log/myabi-php /srv/myabi/shared/storage /srv/myabi/releases
+NoNewPrivileges=true
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

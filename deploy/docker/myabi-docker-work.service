@@ -1,0 +1,14 @@
+[Unit]
+Description=myABI - one resumable operation in Docker
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/myabi/deploy/docker
+ExecCondition=/usr/bin/test ! -f /opt/myabi/deploy/docker/data/storage/framework/down
+# Docker access is administrative. No Docker socket is mounted in the application.
+ExecStart=/usr/bin/docker compose --env-file compose.env run --rm --no-deps -T cli php artisan referentiel:work --once
+TimeoutStartSec=2h
+TimeoutStopSec=60
+UMask=0007

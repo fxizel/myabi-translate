@@ -1,0 +1,11 @@
+[Unit]
+Description=Send the myABI digest at 07:00 Swiss time
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 Europe/Zurich
+AccuracySec=1s
+Persistent=true
+Unit=myabi-notifications.service
+
+[Install]
+WantedBy=timers.target

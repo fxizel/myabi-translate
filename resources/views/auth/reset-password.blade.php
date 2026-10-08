@@ -1,0 +1,5 @@
+@extends('layouts.app')
+@section('title', __('ui.reset_password'))
+@section('content')
+<div class="auth-panel"><p class="eyebrow">ARGE-ABI / myABI</p><h1>{{ __('ui.reset_password') }}</h1><section class="surface section"><form method="post" action="{{ route('password.update') }}">@csrf<input type="hidden" name="token" value="{{ $request->route('token') }}"><label class="field"><span>{{ __('ui.email') }}</span><input class="input" type="email" name="email" value="{{ old('email',$request->email) }}" required autocomplete="username"></label><label class="field"><span>{{ __('ui.password') }}</span><input class="input" type="password" name="password" required minlength="{{ config('auth.password_min_length') }}" autocomplete="new-password"></label><label class="field"><span>{{ __('ui.password_confirmation') }}</span><input class="input" type="password" name="password_confirmation" required minlength="{{ config('auth.password_min_length') }}" autocomplete="new-password"></label><button class="button primary">{{ __('ui.reset_password') }} →</button></form></section></div>
+@endsection

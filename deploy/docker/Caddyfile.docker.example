@@ -1,0 +1,21 @@
+# Ajouter ce bloc au Caddyfile du conteneur Caddy existant, ou l'importer
+# depuis ce fichier. Conserver tous les autres sites et les options globales.
+# Ne pas recharger ce fragment seul : valider puis recharger le Caddyfile complet.
+#
+# Prerequis : le service web de myABI et Caddy partagent le reseau Docker
+# externe choisi dans compose.caddy.yml. L'alias myabi-translate-web doit etre
+# unique sur ce reseau. Aucun port public supplementaire n'est necessaire.
+# HTTPS et les certificats restent geres par le Caddy existant.
+#
+# Caddy conserve Host et definit X-Forwarded-For / Proto / Host par defaut :
+# https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
+# Validation / rechargement du Caddyfile complet dans le conteneur existant :
+# caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+# caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+# Adapter ce chemin au montage et les options a l'instance existante.
+# https://caddyserver.com/docs/command-line#caddy-validate
+# https://caddyserver.com/docs/command-line#caddy-reload
+
+myabi.example.org {
+	reverse_proxy myabi-translate-web:8080
+}

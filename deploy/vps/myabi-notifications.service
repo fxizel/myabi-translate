@@ -1,0 +1,27 @@
+[Unit]
+Description=myABI daily notification digest
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/srv/myabi/current/artisan
+ConditionPathExists=!/srv/myabi/shared/storage/framework/down
+
+[Service]
+Type=oneshot
+User=myabi-web
+Group=myabi-web
+UMask=0007
+WorkingDirectory=/srv/myabi/current
+# Wait behind imports/deployments, then resolve current again and recheck
+# maintenance. A deployment may have switched the release while we waited.
+ExecStart=/usr/bin/flock --shared /srv/myabi/shared/storage/app/private/operations.lock /bin/sh -c 'if [ -f /srv/myabi/shared/storage/framework/down ]; then exit 0; fi; cd /srv/myabi/current && exec /usr/bin/php8.4 -d memory_limit=256M artisan notifications:daily --no-interaction'
+TimeoutStartSec=2h
+TimeoutStopSec=60s
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+# The release may change while waiting for the lock; Unix permissions allow
+# myabi-web to write bootstrap/cache only, not the release code.
+ReadWritePaths=/srv/myabi/shared/storage /srv/myabi/releases
+NoNewPrivileges=true
+StandardOutput=append:/srv/myabi/shared/storage/logs/notifications.log
+StandardError=append:/srv/myabi/shared/storage/logs/notifications.log

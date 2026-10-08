@@ -1,0 +1,5 @@
+@extends('layouts.app')
+@section('title', __('ui.login'))
+@section('content')
+<div class="auth-panel"><p class="eyebrow">ARGE-ABI / myABI</p><h1>{{ __('ui.login') }}</h1><p class="lede">{{ __('ui.login_description') }}</p><section class="surface"><form action="{{ route('login.store') }}" method="post">@csrf<label class="field"><span>{{ __('ui.email') }}</span><input class="input" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username" maxlength="255"></label><label class="field"><span>{{ __('ui.password') }}</span><input class="input" type="password" name="password" required autocomplete="current-password"></label><div class="row"><label class="check-label"><input type="checkbox" name="remember" value="1">{{ __('ui.remember_me') }}</label></div><div class="form-actions"><button class="button primary">{{ __('ui.sign_in') }} →</button></div></form><p class="section"><a href="{{ route('password.request') }}"><small>{{ __('ui.forgot_password') }}</small></a></p></section></div>
+@endsection

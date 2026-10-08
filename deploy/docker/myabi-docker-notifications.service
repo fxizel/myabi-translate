@@ -1,0 +1,13 @@
+[Unit]
+Description=myABI - daily digest in Docker
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/myabi/deploy/docker
+# Acquire before resolving Compose/image, so an upgrade cannot leave a waiting old image.
+ExecStart=/usr/bin/flock -s -w 7200 data/storage/app/private/operations.lock /bin/sh -c 'test ! -f data/storage/framework/down || exit 0; exec /usr/bin/docker compose --env-file compose.env run --rm --no-deps -T cli php artisan notifications:daily'
+TimeoutStartSec=3h
+TimeoutStopSec=60
+UMask=0007

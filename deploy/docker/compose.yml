@@ -1,0 +1,136 @@
+name: myabi-translate
+
+x-app: &app
+  image: ${MYABI_IMAGE:-myabi-translate-app}:${RELEASE_TAG:?Set an immutable release tag}
+  build:
+    context: ../..
+    dockerfile: deploy/docker/Dockerfile
+    target: app
+    args:
+      APP_REVISION: ${APP_REVISION:?Set the full Git commit}
+      APP_VERSION: ${RELEASE_TAG}
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=64m,mode=1777
+    - /var/www/html/bootstrap/cache:rw,nosuid,nodev,size=16m,uid=10001,gid=10001,mode=0770
+  volumes:
+    - type: bind
+      source: ./secrets/app.env
+      target: /var/www/html/.env
+      read_only: true
+      bind: {create_host_path: false}
+    - type: bind
+      source: ./data/storage
+      target: /var/www/html/storage
+      bind: {create_host_path: false}
+  networks: [backend, application]
+  logging: &logging
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: myabi
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    secrets: [db_root_password]
+    command: [--innodb-buffer-pool-size=512M, --max-connections=40, --bind-address=0.0.0.0]
+    volumes:
+      - type: bind
+        source: ./data/mariadb
+        target: /var/lib/mysql
+        bind: {create_host_path: false}
+    networks: [backend]
+    mem_limit: 1536m
+    cpus: 1.0
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging: *logging
+
+  app:
+    <<: *app
+    restart: unless-stopped
+    mem_limit: 1024m
+    cpus: 1.0
+    networks:
+      backend: {}
+      application:
+        aliases: [myabi-translate-php]
+    depends_on:
+      db: {condition: service_healthy}
+
+  myabi-web:
+    image: ${MYABI_WEB_IMAGE:-myabi-translate-web}:${RELEASE_TAG}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: web
+      args:
+        APP_REVISION: ${APP_REVISION}
+        APP_VERSION: ${RELEASE_TAG}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-18080}:8080"
+    environment:
+      TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR:-127.0.0.1/32}
+      NGINX_ENVSUBST_FILTER: TRUSTED_PROXY_CIDR
+    networks: [application]
+    mem_limit: 96m
+    cpus: 0.5
+    depends_on: [app]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/up"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging: *logging
+
+  cli:
+    <<: *app
+    profiles: [operations]
+    user: "10002:10001"
+    mem_limit: 512m
+    cpus: 1.0
+    command: [php, artisan, list]
+
+  provision:
+    <<: *app
+    profiles: [operations]
+    user: "0:10001"
+    secrets: [db_root_password, db_migration_password, db_backup_password]
+    mem_limit: 256m
+    command: [php, /opt/myabi/provision.php]
+
+  migrate:
+    <<: *app
+    profiles: [operations]
+    user: "0:10001"
+    secrets: [db_migration_password]
+    mem_limit: 512m
+    command: [php, /opt/myabi/migrate.php]
+
+  backup:
+    <<: *app
+    profiles: [operations]
+    user: "0:10001"
+    secrets: [db_backup_password]
+    mem_limit: 512m
+    command: [bash, /opt/myabi/backup.sh]
+
+networks:
+  backend: {internal: true}
+  application: {}
+
+secrets:
+  db_root_password: {file: ./secrets/db-root-password}
+  db_migration_password: {file: ./secrets/db-migration-password}
+  db_backup_password: {file: ./secrets/db-backup-password}

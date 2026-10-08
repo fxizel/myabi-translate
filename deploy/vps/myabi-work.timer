@@ -1,0 +1,12 @@
+[Unit]
+Description=Run one pending myABI operation each minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Persistent=true
+Unit=myabi-work.service
+# systemd does not start a second instance while the oneshot is still active.
+
+[Install]
+WantedBy=timers.target

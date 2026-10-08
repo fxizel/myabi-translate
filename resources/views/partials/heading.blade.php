@@ -1,0 +1,1 @@
+<div class="page-heading"><div>@isset($headingContext)<p class="eyebrow">{{ $headingContext }}</p>@endisset<h1>{{ $heading }}</h1>@isset($description)<p class="lede">{{ $description }}</p>@endisset</div></div>

@@ -1,0 +1,16 @@
+# Merge with compose.yml. Caddy already exists and is managed in its own project.
+# Requires Docker Compose >= 2.24.4 for explicit port reset semantics.
+services:
+  myabi-web:
+    ports: !reset []
+    environment:
+      TRUSTED_PROXY_CIDR: ${CADDY_TRUSTED_PROXY_CIDR:?Set the actual Caddy proxy IP/CIDR}
+    networks:
+      application: {}
+      caddy:
+        aliases: [myabi-translate-web]
+
+networks:
+  caddy:
+    external: true
+    name: ${CADDY_NETWORK:?Set the existing Caddy Docker network name}
