@@ -1,4 +1,4 @@
 {
     "preset": "laravel",
-    "exclude": [".runtime", "data", "maquette"]
+    "exclude": [".runtime", "data"]
 }

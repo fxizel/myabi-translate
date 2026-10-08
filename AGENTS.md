@@ -1,6 +1,6 @@
 # Référentiel myABI
 
-Laravel 13 / PHP 8.4 / MariaDB 11.4, pages Blade et ressources statiques. Les spécifications à la racine et docs/formats-devconf.md définissent le contrat métier. La maquette myABI du 22.09.2026 est la référence visuelle (maquette/README.md).
+Laravel 13 / PHP 8.4 / MariaDB 11.4, pages Blade et ressources statiques. Les spécifications à la racine et docs/formats-devconf.md définissent le contrat métier. DESIGN.md, issu de la maquette myABI du 22.09.2026, est la référence visuelle.
 
 - Préserver data/imports et ne pas afficher de valeurs métier dans les journaux publics.
 - Secrets, originaux, rapports et publications restent hors de public et des livraisons.

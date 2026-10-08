@@ -47,7 +47,7 @@ Cette liste sert de référence de réalisation et de recette. **D** identifie u
 | T-21 | Préparer les livraisons hors du compte Free et sécuriser leur transfert. | Paquet de production construit dans GitHub Actions, clé dédiée, empreinte SSH vérifiée, données exclues. |
 | T-22 | Éviter les chevauchements de livraison et de traitement ; documenter le retour. | Tests, verrou, contrôle après migration et retour compatible avec le schéma. |
 | T-23 | Tester une restauration cohérente de la base et des fichiers. | Restauration documentée ; copie indépendante avant migration sur stockage existant désigné. |
-| T-24 | Conserver la maquette et les fonctions métier non arbitrées. | Quatre espaces, interface DE/FR/IT, recherche, révisions et notifications conformes au lot prévu. |
+| T-24 | Conserver la présentation décrite dans DESIGN.md et les fonctions métier non arbitrées. | Quatre espaces, interface DE/FR/IT, recherche, révisions et notifications conformes au lot prévu. |
 | T-25 | Garder une exploitation simple et une possibilité de migration. | Responsable et suppléant, procédure courte ; code PHP, sauvegarde MariaDB et fichiers récupérables. |
 
 ## 3. Conditions pour conclure les essais
