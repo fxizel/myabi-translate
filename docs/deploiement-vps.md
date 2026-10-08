@@ -58,7 +58,7 @@ Les commandes suivantes sont destinées à un shell Linux sur le VPS, **après v
 
 ### 1. Code et configuration privée
 
-Placer une copie du code dans `/opt/myabi` avec un checkout parcimonieux excluant `data` et `maquette`, puis sélectionner un commit revu contenant cette préparation. Ne pas transférer `.env`, `.runtime`, la base locale ou les comptes de démonstration. Le contexte de construction Docker est une liste autorisée, qui exclut également les originaux `data/imports` déjà présents dans l'historique Git.
+Placer une copie du code dans `/opt/myabi` avec un checkout parcimonieux excluant `data`, puis sélectionner un commit revu contenant cette préparation. Ne pas transférer `.env`, `.runtime`, la base locale ou les comptes de démonstration. Le contexte de construction Docker est une liste autorisée, qui exclut également les originaux `data/imports` déjà présents dans l'historique Git.
 
 ```sh
 cd /opt/myabi/deploy/docker

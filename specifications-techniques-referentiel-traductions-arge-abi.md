@@ -29,7 +29,7 @@
 
 Le budget nul concerne les services nécessaires à l’hébergement du pilote. Le développement et la maintenance applicative demandent du travail humain. Aucun abonnement payant, domaine payant ou service facturé à l’usage n’est nécessaire à la solution décrite.
 
-La [liste des exigences techniques](docs/exigences-techniques.md) fournit les critères de vérification. Les [spécifications fonctionnelles](specifications-fonctionnelles-referentiel-traductions-arge-abi.md) restent la référence métier. La [maquette Swiss](maquette/README.md) conserve ses quatre espaces : Traductions, Validation, Imports, Publications. La refonte de l’infrastructure ne supprime pas de fonctions métier pour réduire le stockage.
+La [liste des exigences techniques](docs/exigences-techniques.md) fournit les critères de vérification. Les [spécifications fonctionnelles](specifications-fonctionnelles-referentiel-traductions-arge-abi.md) restent la référence métier. La [présentation myABI](DESIGN.md) conserve les quatre espaces : Traductions, Validation, Imports, Publications. La refonte de l’infrastructure ne supprime pas de fonctions métier pour réduire le stockage.
 
 ## 2. Fichiers et volume à prendre en charge
 
@@ -58,7 +58,7 @@ flowchart LR
 | Composant | Choix de réalisation |
 | --- | --- |
 | Application | Laravel 13 et PHP 8.4 ; versions correctives verrouillées et maintenues |
-| Interface | Pages HTML Blade, CSS et JavaScript léger ; reprise de la maquette |
+| Interface | Pages HTML Blade, CSS et JavaScript léger ; présentation décrite dans DESIGN.md |
 | Base | MariaDB gérée par alwaysdata, cible 11.4 ; tables transactionnelles InnoDB, texte en UTF-8 complet |
 | Fichiers | Dossier privé pour originaux, rapports, temporaires et publications |
 | Sessions et cache | Composants Laravel utilisant MariaDB ou les fichiers locaux |
@@ -200,7 +200,7 @@ Un responsable et un suppléant suivent erreurs, stockage, sauvegardes et mises 
 | Étape | Résultat attendu |
 | --- | --- |
 | 1. Faisabilité | Modèle représentatif, sept fichiers complets, import/réimport, historique, export et ressources mesurés sur Free |
-| 2. Application | Cycle métier complet sur les sept types, comptes et droits, maquette intégrée, révisions et publications |
+| 2. Application | Cycle métier complet sur les sept types, comptes et droits, présentation myABI intégrée, révisions et publications |
 | 3. Mise à disposition | Déploiement GitHub, restauration testée, documentation courte et essais avec les collègues |
 
 Le code peut être développé progressivement ; le pilote utilisable reste conditionné aux sept formats. Les lots 2 et 3 fonctionnels sont conservés. Les reports supplémentaires suggérés en technique v2.0 ne sont pas des décisions acceptées : comparaison des révisions, recherche, interface DE/FR/IT et notifications gardent leurs exigences fonctionnelles.
