@@ -126,7 +126,7 @@ Le bouton porte `aria-pressed`. Le changement se fait sans rechargement et sans 
 
 - **Bandeau** (`.masthead`) : logo clair sur marine (168 × 46 px, `public/images/branding/myabi-translate-header-v2.png`), boutons d’icône 30 px, titre de l’application, puis à droite la pastille rouge du profil et l’organisation.
 - **Onglets de travail** (`.app-tab-strip`) : onglet fixe « Gestion des traductions » marqué d’une étoile, puis les fiches ouvertes avec un bouton de fermeture. Un seul onglet porte `aria-current=page`. Les noms trop longs sont tronqués avec points de suspension (largeur maximale 340 px).
-- **Navigation latérale** (`.app-sidebar`) : quatre espaces métier — Traductions, Validation, Imports, Publications — puis, selon les droits, les entrées d’administration. Le compteur de la validation affiche le nombre de propositions en attente. Sous la navigation : le contexte de travail (version myABI, organisation, langue de référence) et un pied discret.
+- **Navigation latérale** (`.app-sidebar`) : Traductions, Validation, Imports, Exports selon les droits, Publications, Groupes de termes et Campagnes de traduction, puis les entrées d’administration autorisées. Le compteur de la validation affiche le nombre de propositions en attente. Sous la navigation : le contexte de travail (version myABI, organisation, langue de référence) et un pied discret.
 - **Barre de contexte** (`.context-bar`) : fil d’Ariane à gauche ; à droite le bouton Compact, la langue d’interface (DE/FR/IT) et la déconnexion.
 - **Pied de page** : portée et langues de référence, 10 px, filet supérieur.
 
@@ -204,6 +204,13 @@ Au-dessus du catalogue et de la validation, `.language-bar` liste les langues de
 - `.history` : liste à filets, valeur en 12 px puis auteur et date en 11 px gris.
 - Comparaisons : `ins` sur `--tint` souligné, `del` gris barré ; `.compare-grid` sur deux colonnes.
 
+### Groupes de termes et campagnes
+
+- Le groupe utilise un repère coloré accompagné de son titre (`.group-badge`). Palette : bleu `#2266a4` par défaut, vert `#32634d`, ambre `#825f20`, gris `#53677b`, bleu nuit `#102348` et rouge `#a12f2f`. Le repère ne porte jamais seul l’information.
+- Le Kanban (`.campaign-kanban`) présente trois colonnes : À faire, En cours, Terminé. Les cartes restent blanches, sans ombre, avec les mêmes filets et espacements que les panneaux. Sur mobile, les colonnes s’empilent.
+- Chaque carte indique les personnes assignées, la langue cible, l’objectif, l’échéance, le nombre de termes et deux indicateurs distincts : avancement du travail et traductions confirmées. Une campagne vide affiche Aucun terme. Le bouton Démarrer constitue la commande accessible ; aucune interaction ne force la terminaison.
+- Les fiches distinguent le statut du référentiel du traitement en campagne. Les consignes et motifs conservent leurs retours à la ligne ; l’historique indique les termes, les personnes, les dates, les révisions examinées et les propositions dont le suivi a cessé.
+
 ### Icônes
 
 Jeu interne dans [resources/views/partials/icon.blade.php](resources/views/partials/icon.blade.php) : `viewBox` 24, trait 1.7, extrémités arrondies, `currentColor`, `aria-hidden`. Taille 16 px, 20 px dans le bandeau. Noms disponibles : search, home, user, help, grid, languages, check-list, upload, download, settings, history, rows, close, entre autres. Toute nouvelle icône y est ajoutée dans le même style ; pas de police d’icônes ni de bibliothèque externe.
@@ -221,6 +228,8 @@ Le logo retenu le 23.09.2026 associe deux tuiles « A » (marine) et « 文 » (
 | **Validation** | File des propositions par langue : en-tête du terme, colonnes source / valeur en vigueur / proposition avec différences mises en évidence, auteur, validation ou rejet motivé, actions groupées. |
 | **Imports** | Parcours en trois étapes : dépôt du fichier, analyse et rapport, application en propositions. |
 | **Publications** | Catalogues publiés par organisation et version, figés, téléchargeables ; création d’une nouvelle publication. |
+| **Groupes de termes** | Classement thématique, palette de repères, termes du groupe, édition et archivage selon les droits. Le catalogue propose les filtres par groupe et Sans groupe. |
+| **Campagnes de traduction** | Kanban filtrable, composition par groupes synchronisés et sélection directe, assignation, démarrage, travail individuel, arbitrage, historique et archives. |
 | Profil, administration, audit, aide | Même cadre, mêmes panneaux et tableaux. |
 
 L’interface rappelle visuellement qu’une proposition reste distincte de la valeur en vigueur jusqu’à sa validation, que la validation crée une révision commune aux langues du terme et que les catalogues publiés ne changent plus.

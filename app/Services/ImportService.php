@@ -289,6 +289,7 @@ class ImportService
         $presences = [];
         $newSnap = [];
         $proposalAnomalies = [];
+        $campaignTerms = [];
         $searchUpdates = [];
         $searchAttributes = [];
         foreach ($prepared as [$presence,$row,$owner,$attrs]) {
@@ -327,19 +328,22 @@ class ImportService
                 $term->fill(['source_import_id' => $import->id, 'source_offset' => $presence->offset, 'source_length' => $presence->length, 'source_text' => $reference, 'search_text' => $search,
                     'semantic_hash' => $format->semanticHash($row), 'source_hash' => $format->sourceHash($row), 'review_needed' => $review, 'revision_no' => $term->revision_no + 1, 'lock_version' => $term->lock_version + 1,
                     'updated_by' => $technical->id, 'obsolete' => false]);
+                $term->campaignSyncDeferred = true;
                 $term->save();
                 $term->unsetRelation('sourceImport');
             } elseif ($isLatest && $term->obsolete) {
+                $term->campaignSyncDeferred = true;
                 $term->update(['obsolete' => false, 'revision_no' => $term->revision_no + 1, 'lock_version' => $term->lock_version + 1, 'updated_by' => $technical->id]);
                 $changed = true;
             }
             if ($created || $changed) {
                 if ($changed) {
+                    $campaignTerms[$term->id] = $term;
                     $searchUpdates[$term->id] = $term;
                     $searchAttributes[$term->id] = $attrs;
                 }
                 $revisions[] = ['term_id' => $term->id, 'number' => $term->revision_no, 'version_id' => $import->version_id, 'source_import_id' => $term->source_import_id, 'source_offset' => $term->source_offset, 'source_length' => $term->source_length,
-                    'validated' => $this->json($term->validated), 'metadata' => $this->json(['organization_id' => $term->organization_id, 'key' => $term->key, 'obsolete' => false, 'review_needed' => $term->review_needed]),
+                    'validated' => $this->json($term->validated), 'metadata' => $this->json(['organization_id' => $term->organization_id, 'key' => $term->key, 'context' => $term->context, 'obsolete' => false, 'review_needed' => $term->review_needed]),
                     'origin' => 'import', 'origin_id' => $import->id, 'created_by' => $technical->id, 'created_at' => $now];
                 $report['revisions_created']++;
                 $newSnap[$term->id] = true;
@@ -368,6 +372,7 @@ class ImportService
                         $searchAttributes[$term->id] = $attrs;
                     }
                     $proposals[] = ['term_id' => $term->id, 'attribute' => $attribute, 'language' => $language, 'value' => $value, 'value_hash' => $valueHash, 'status' => 'pending', 'lock_version' => 1,
+                        'context_fingerprint' => app(CampaignService::class)->contextFingerprint($term, $attribute, $language, $attrs, $row),
                         'author_id' => $technical->id, 'import_id' => $import->id, 'organization_id' => $import->organization_id, 'claimed' => false, 'divergence' => data_get($term->validated, "$attribute.$language") !== null,
                         'anomalies' => $this->json($check['error_codes']), 'edit_history' => '[]', 'created_at' => $now, 'updated_at' => $now];
                     $proposalKeys[$pkey] = ['id' => null, 'value' => $value];
@@ -387,6 +392,10 @@ class ImportService
         }
         app(SearchText::class)->syncMany(collect(array_values($searchUpdates)), $searchAttributes);
         DB::table('import_rows')->upsert($presences, ['id'], ['term_id']);
+        $campaigns = app(CampaignService::class);
+        foreach ($campaignTerms as $term) {
+            $campaigns->synchronizeForTerm($term->fresh(), $technical);
+        }
     }
 
     private function owner(FormatDefinition $format, array $row, ImportBatch $import): array

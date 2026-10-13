@@ -69,6 +69,7 @@ class WorkflowService
             $history = $p->edit_history;
             $history[] = ['value' => $before, 'author_id' => $p->author_id, 'at' => now()->toIso8601String()];
             $p->update(['value' => $value, 'value_hash' => hash('sha256', $value), 'author_id' => $user->id, 'claimed' => true, 'lock_version' => $p->lock_version + 1, 'anomalies' => $warnings, 'edit_history' => $history]);
+            $p->update(['context_fingerprint' => app(CampaignService::class)->contextFingerprint($term, $p->attribute, $p->language)]);
             app(SearchText::class)->sync($term);
             $this->audit->record('proposal.edited', $p, ['value' => $before], ['value' => $value], $user);
             $this->generation();
@@ -111,13 +112,22 @@ class WorkflowService
             $values[$p->attribute][$p->language] = $p->value;
             $review = $term->review_needed;
             unset($review[$p->attribute][$p->language]);
+            $term->campaignSyncDeferred = true;
             $term->update(['validated' => $values, 'review_needed' => $review, 'revision_no' => $term->revision_no + 1, 'lock_version' => $term->lock_version + 1, 'updated_by' => $user->id,
                 'search_text' => $term->label.' '.$term->source_text.' '.implode(' ', array_merge(...array_values($values)))]);
             $p->update(['status' => 'validated', 'decided_by' => $user->id, 'decided_at' => now(), 'lock_version' => $p->lock_version + 1]);
             $superseded = Proposal::where('term_id', $term->id)->where('attribute', $p->attribute)->where('language', $p->language)->where('status', 'pending');
+            $supersededIds = (clone $superseded)->pluck('id');
             $superseded->update(['status' => 'rejected', 'rejection_reason' => 'superseded', 'decided_by' => $user->id, 'decided_at' => now(), 'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now()]);
+            foreach (Proposal::whereIn('id', $supersededIds)->get() as $other) {
+                app(CampaignService::class)->proposalDecided($other, $user);
+            }
             app(SearchText::class)->sync($term);
             $this->source->snapshot($term, 'proposal', $p->id, $user->id);
+        }
+        app(CampaignService::class)->proposalDecided($p->fresh(), $user);
+        if ($decision === 'validate') {
+            app(CampaignService::class)->synchronizeForTerm($term->fresh(), $user);
         }
         $this->audit->record('proposal.'.$decision, $p, [], ['value' => $p->value, 'reason' => $reason, 'manager' => $user->canManage()], $user);
         $this->generation();

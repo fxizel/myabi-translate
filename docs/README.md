@@ -10,12 +10,14 @@ docs/
 │   ├── personas.md
 │   ├── cas-utilisation.md
 │   ├── exigences-fonctionnelles.md
-│   └── parcours-ui-ux.md
+│   ├── parcours-ui-ux.md
+│   └── groupes-et-campagnes-traduction.md
 ├── technique/
 │   ├── formats-devconf.md
 │   ├── exigences-techniques.md
 │   ├── recette.md
-│   └── recette-design-myabi.md
+│   ├── recette-design-myabi.md
+│   └── groupes-campagnes-implementation.md
 ├── deploiement/
 │   ├── deploiement-vps.md
 │   ├── operations.md
@@ -30,6 +32,8 @@ docs/
 
 Le [PRD fonctionnel](fonctionnel/PRD.md) présente le produit existant et donne accès aux personas, cas d’utilisation, exigences et parcours. Le [guide de branding](branding/README.md) regroupe les sources du logo et les variantes visuelles.
 
+La [spécification des groupes de termes et campagnes de traduction](fonctionnel/groupes-et-campagnes-traduction.md) définit le contrat de cette fonctionnalité. Son découpage, les choix retenus et les vérifications sont décrits dans la [mise en œuvre technique](technique/groupes-campagnes-implementation.md).
+
 ## Technique
 
 | Document | Contenu |
@@ -38,6 +42,7 @@ Le [PRD fonctionnel](fonctionnel/PRD.md) présente le produit existant et donne 
 | [Exigences techniques](technique/exigences-techniques.md) | Décisions de réalisation et critères de qualité du pilote. |
 | [Recette du lot 1](technique/recette.md) | Preuves métier, performances, capacité et contrôles restant à effectuer. |
 | [Recette visuelle myABI](technique/recette-design-myabi.md) | Vérifications de l’habillage de l’interface. |
+| [Groupes et campagnes](technique/groupes-campagnes-implementation.md) | Découpage réalisé, transitions, droits, choix de conception et contrôles. |
 
 ## Déploiement et exploitation
 

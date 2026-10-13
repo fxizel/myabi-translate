@@ -2,13 +2,41 @@
 
 namespace App\Models;
 
+use App\Services\CampaignService;
 use App\Services\CommonScope;
 use App\Services\SourceRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Term extends Model
 {
     protected $guarded = [];
+
+    /** Source/decision workers synchronize after their proposals have been persisted. */
+    public bool $campaignSyncDeferred = false;
+
+    protected static function booted(): void
+    {
+        static::updated(function (Term $term) {
+            if ($term->wasChanged(['validated', 'source_import_id', 'source_offset', 'source_length', 'context', 'key', 'organization_id', 'source_hash', 'obsolete', 'scope_unconfirmed'])
+                && Schema::hasTable('campaign_participations')) {
+                app(CampaignService::class)->referenceChanged($term);
+                if (! $term->campaignSyncDeferred) {
+                    app(CampaignService::class)->synchronizeForTerm($term->fresh(), User::find($term->updated_by));
+                }
+            }
+        });
+    }
+
+    public function group()
+    {
+        return $this->belongsTo(TermGroup::class, 'term_group_id');
+    }
+
+    public function campaignParticipations()
+    {
+        return $this->hasMany(CampaignParticipation::class);
+    }
 
     protected function casts(): array
     {

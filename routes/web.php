@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\GroupController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\PublicationController;
@@ -13,6 +15,19 @@ require __DIR__.'/auth.php';
 Route::middleware(['auth', 'session.secure', '2fa.required'])->group(function () {
     Route::get('/', [TermController::class, 'dashboard'])->name('dashboard');
     Route::get('/terms', [TermController::class, 'index'])->name('terms.index');
+    Route::post('/groups/assign', [GroupController::class, 'assign'])->name('groups.assign');
+    Route::resource('groups', GroupController::class);
+    Route::post('/groups/{group}/archive', [GroupController::class, 'archive'])->name('groups.archive');
+    Route::post('/groups/{group}/unarchive', [GroupController::class, 'unarchive'])->name('groups.unarchive');
+    Route::post('/campaigns/prepare', [CampaignController::class, 'prepare'])->name('campaigns.prepare');
+    Route::post('/campaigns/compose', [CampaignController::class, 'compose'])->name('campaigns.compose');
+    Route::resource('campaigns', CampaignController::class);
+    foreach (['groups', 'terms', 'start', 'archive', 'unarchive'] as $action) {
+        Route::post('/campaigns/{campaign}/'.$action, [CampaignController::class, $action])->name('campaigns.'.$action);
+    }
+    foreach (['remove', 'confirm', 'arbitration', 'resolve', 'attach', 'propose', 'reexamine'] as $action) {
+        Route::post('/campaigns/{campaign}/terms/{term}/'.$action, [CampaignController::class, $action])->name('campaigns.'.$action);
+    }
     Route::get('/terms/{term}', [TermController::class, 'show'])->name('terms.show');
     Route::post('/terms/{term}/scope', [TermController::class, 'scope'])->name('terms.scope');
     Route::post('/terms/{term}/proposals', [ProposalController::class, 'store'])->name('proposals.store');

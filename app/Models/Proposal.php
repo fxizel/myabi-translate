@@ -2,11 +2,29 @@
 
 namespace App\Models;
 
+use App\Services\CampaignService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Proposal extends Model
 {
     protected $guarded = [];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Proposal $proposal) {
+            if ($proposal->context_fingerprint === null && Schema::hasColumn('proposals', 'context_fingerprint')) {
+                try {
+                    $term = $proposal->term;
+                    if ($term !== null) {
+                        $proposal->context_fingerprint = app(CampaignService::class)->contextFingerprint($term, $proposal->attribute, $proposal->language);
+                    }
+                } catch (\Throwable) {
+                    // Legacy/test records without accessible source stay conservatively unattached.
+                }
+            }
+        });
+    }
 
     protected function casts(): array
     {

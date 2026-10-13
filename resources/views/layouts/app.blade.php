@@ -17,6 +17,8 @@
         request()->routeIs('terms.show') => url('terms').'?'.http_build_query(['language' => $language ?? request('language', 'fr')]),
         request()->routeIs('imports.show', 'imports.validation-preview') => url('imports'),
         request()->routeIs('publications.show') => url('publications'),
+        request()->routeIs('groups.show', 'groups.edit') => url('groups'),
+        request()->routeIs('campaigns.show', 'campaigns.edit') => url('campaigns'),
         default => null,
     };
 @endphp
@@ -62,6 +64,11 @@
                             @if((!in_array($path, ['imports', 'exports'], true) || ($canManage ?? false)) && ($path !== 'validation' || ($canValidate ?? false)))
                                 <a href="{{ url($path) }}" @if(request()->is($path, $path.'/*')) aria-current="page" @endif>@include('partials.icon', ['name' => $icon])<span class="nav-label">{{ __('ui.'.$label) }} @if($path === 'validation' && ($pendingCount ?? 0) > 0)<span class="count">{{ number_format($pendingCount, 0, '.', '’') }}</span>@endif</span></a>
                             @endif
+                        @endforeach
+                    </div>
+                    <div class="nav-group">
+                        @foreach([['groups', 'grid', 'groups'], ['campaigns', 'check-list', 'campaigns']] as [$path, $icon, $label])
+                            <a href="{{ url($path) }}" @if(request()->is($path, $path.'/*')) aria-current="page" @endif>@include('partials.icon', ['name' => $icon])<span class="nav-label">{{ __('campaigns.'.$label) }}</span></a>
                         @endforeach
                     </div>
                     @if(($canManage ?? false) || ($canAdmin ?? false))
