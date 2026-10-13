@@ -1,6 +1,6 @@
 # Exigences techniques du pilote ARGE-ABI
 
-Version 1.0 du 21.09.2026, associée aux [spécifications techniques v3.0](../specifications-techniques-referentiel-traductions-arge-abi.md).
+Version 1.0 du 21.09.2026, associée aux [spécifications techniques v3.0](../../specifications-techniques-referentiel-traductions-arge-abi.md).
 
 Cette liste sert de référence de réalisation et de recette. **D** identifie une décision issue des échanges ; **T** identifie sa traduction technique ou une contrainte métier conservée. Les choix sont documentés, mais aucun critère d’exécution n’est déclaré vérifié : l’application reste à réaliser.
 

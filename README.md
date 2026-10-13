@@ -5,10 +5,14 @@ Application web commune aux polices membres de l’ARGE-ABI pour gérer les trad
 - **Pile** : Laravel 13, PHP 8.4, MariaDB 11.4, pages Blade. Ni Node ni Redis en production : CSS et JavaScript sont livrés directement dans `public/`.
 - **Interface** : allemand, français et italien, selon la [présentation myABI](DESIGN.md) (bandeau bleu nuit, onglets, navigation latérale, tableaux compacts). Toutes les ressources sont locales ; le bouton Compact mémorise la densité d’affichage dans le navigateur.
 - **Confidentialité** : originaux, rapports et publications restent dans le stockage privé.
-- **Périmètre** : les [spécifications fonctionnelles](specifications-fonctionnelles-referentiel-traductions-arge-abi.md), les [spécifications techniques](specifications-techniques-referentiel-traductions-arge-abi.md) et l’[annexe DEVCONF](docs/formats-devconf.md) font foi. Les points soumis à confirmation de LogObject sont signalés dans l’application ; ils ne sont pas résolus par des transformations silencieuses.
+- **Périmètre** : les [spécifications fonctionnelles](specifications-fonctionnelles-referentiel-traductions-arge-abi.md), les [spécifications techniques](specifications-techniques-referentiel-traductions-arge-abi.md) et l’[annexe DEVCONF](docs/technique/formats-devconf.md) font foi. Les points soumis à confirmation de LogObject sont signalés dans l’application ; ils ne sont pas résolus par des transformations silencieuses.
+
+L’[index de la documentation](docs/README.md) présente l’arborescence des dossiers fonctionnel, technique, déploiement et branding.
 
 ## Sommaire
 
+- [Documentation fonctionnelle de l’existant](#documentation-fonctionnelle-de-lexistant)
+- [Documentation technique](#documentation-technique)
 - [Cycle d’une traduction](#cycle-dune-traduction)
 - [Installation locale](#installation-locale)
 - [Configuration](#configuration)
@@ -17,6 +21,29 @@ Application web commune aux polices membres de l’ARGE-ABI pour gérer les trad
 - [Extension navigateur MyAB Translation Inspector](#extension-navigateur-myab-translation-inspector)
 - [Livraison et exploitation](#livraison-et-exploitation)
 - [Données, licence et contribution](#données-licence-et-contribution)
+
+## Documentation fonctionnelle de l’existant
+
+Le dossier [`docs/fonctionnel/`](docs/fonctionnel/PRD.md) décrit les comportements implémentés au 13 octobre 2026, à partir du code, des écrans et des contrôles existants. Il complète les spécifications historiques sans ajouter de fonctionnalités prévues.
+
+| Document | Contenu |
+| --- | --- |
+| [PRD](docs/fonctionnel/PRD.md) | Finalité, périmètre, capacités et règles du produit actuel. |
+| [Personas](docs/fonctionnel/personas.md) | Profils fondés sur les rôles réels et matrice des droits. |
+| [Cas d’utilisation](docs/fonctionnel/cas-utilisation.md) | Scénarios, préconditions, résultats et exceptions. |
+| [Exigences fonctionnelles](docs/fonctionnel/exigences-fonctionnelles.md) | Règles identifiées et contrôles observables, avec références au code. |
+| [Parcours UI et UX](docs/fonctionnel/parcours-ui-ux.md) | Navigation, écrans, interactions et limites de l’interface existante. |
+
+## Documentation technique
+
+Le dossier `docs/technique/` rassemble les contrats de fichiers, les exigences de réalisation et les preuves de recette applicative.
+
+| Document | Contenu |
+| --- | --- |
+| [Formats DEVCONF](docs/technique/formats-devconf.md) | Formats des sept fichiers, règles de compatibilité et ambiguïtés à arbitrer. |
+| [Exigences techniques](docs/technique/exigences-techniques.md) | Décisions et critères de vérification du pilote. |
+| [Procès-verbal de recette](docs/technique/recette.md) | Preuves métier, performances, capacité et matrice des exigences. |
+| [Recette visuelle myABI](docs/technique/recette-design-myabi.md) | Vérifications de l’habillage et de la navigation. |
 
 ## Cycle d’une traduction
 
@@ -104,7 +131,7 @@ Réglages de `.env` utiles en développement :
 | `AUTH_PASSWORD_MIN_LENGTH` | `8` (défaut) | Longueur minimale des mots de passe pour l’installation, les invitations, la récupération, le profil et l’administration. |
 | `MFA_ENABLED` | `false` (défaut) | Active le second facteur TOTP pour tout le serveur. |
 
-Après une modification de `.env`, exécuter `php artisan config:clear` en développement. En déploiement, reconstruire la configuration avec `php artisan config:cache` et recharger PHP-FPM ; le [guide VPS](docs/deploiement-vps.md) donne les commandes Docker, le fichier concerné et le réglage de la [longueur minimale des mots de passe](docs/deploiement-vps.md#longueur-minimale-des-mots-de-passe).
+Après une modification de `.env`, exécuter `php artisan config:clear` en développement. En déploiement, reconstruire la configuration avec `php artisan config:cache` et recharger PHP-FPM ; le [guide VPS](docs/deploiement/deploiement-vps.md) donne les commandes Docker, le fichier concerné et le réglage de la [longueur minimale des mots de passe](docs/deploiement/deploiement-vps.md#longueur-minimale-des-mots-de-passe).
 
 **Second facteur (MFA).** Désactivé par défaut : aucun compte n’a de code TOTP à saisir ni de second facteur à configurer. Avec `MFA_ENABLED=true` :
 
@@ -123,7 +150,7 @@ Les imports, publications et validations en masse s’exécutent hors requête w
 | `php artisan referentiel:work` | Ponctuelle : enchaîne les lots jusqu’à épuisement des opérations en attente, puis s’arrête. |
 | `php artisan referentiel:work --once` | Traite une seule opération ou un seul lot de validation de 300 propositions au plus ; ne suffit pas pour une validation de plusieurs milliers de propositions. |
 | `php artisan schedule:work` | Développement : planificateur à laisser ouvert dans un terminal ; lance `referentiel:work` chaque minute et les notifications quotidiennes à 07:00 (Europe/Zurich). |
-| `schedule:run` | Production uniquement, en tâche planifiée décrite dans la [procédure d’exploitation](docs/operations.md). |
+| `schedule:run` | Production uniquement, en tâche planifiée décrite dans la [procédure d’exploitation](docs/deploiement/operations.md). |
 
 Sur ce poste, un runtime PHP de vérification est disponible dans `.runtime/php/php.exe`. Ce répertoire est ignoré par Git et ne fait pas partie d’une livraison.
 
@@ -147,7 +174,7 @@ Le contrôle des originaux est une étape locale distincte, dans un environnemen
 php scripts/test_devconf_roundtrip.php --validate-semantics
 ```
 
-Les mesures sur les fichiers complets, l’espace réellement consommé chez l’hébergeur et la réimportation dans une instance myABI figurent dans le [procès-verbal de recette](docs/recette.md). Un test local ne certifie ni le quota ni les performances du pilote.
+Les mesures sur les fichiers complets, l’espace réellement consommé chez l’hébergeur et la réimportation dans une instance myABI figurent dans le [procès-verbal de recette](docs/technique/recette.md). Un test local ne certifie ni le quota ni les performances du pilote.
 
 ## Extension navigateur MyAB Translation Inspector
 
@@ -163,11 +190,10 @@ Caddy est le frontal HTTPS unique, en conteneur Docker : le profil `compose.cadd
 
 | Document | Contenu |
 |---|---|
-| [Guide VPS](docs/deploiement-vps.md) | Comparaison des modes de livraison, stack Docker Compose, configurations, sauvegardes et retour arrière. |
-| [Opérations](docs/operations.md) | Hébergement, paquet de livraison, sauvegardes, restauration et retour au code précédent. |
-| [Sécurité du déploiement](docs/security-deployment.md) | Comptes SQL distincts, contrôle du journal en ajout seul et sessions. |
-| [Procès-verbal de recette](docs/recette.md) | Preuves locales et essais encore nécessaires sur l’hébergement cible et dans myABI. |
-| [Exigences techniques](docs/exigences-techniques.md) | Décisions et exigences de réalisation du pilote. |
+| [Guide VPS](docs/deploiement/deploiement-vps.md) | Comparaison des modes de livraison, stack Docker Compose, configurations, sauvegardes et retour arrière. |
+| [Opérations](docs/deploiement/operations.md) | Hébergement, paquet de livraison, sauvegardes, restauration et retour au code précédent. |
+| [Sécurité du déploiement](docs/deploiement/security-deployment.md) | Comptes SQL distincts, contrôle du journal en ajout seul et sessions. |
+| [Recette des opérations](docs/deploiement/recette-operations.md) | Preuves locales de sécurité et d’exploitation, conditions avant activation du pilote. |
 
 Le dépôt ne contient pas de workflow d’intégration ou de livraison automatique. Le paquet de production se construit depuis `composer.lock` avec `scripts/package-release.sh` ; `scripts/deploy.sh` le livre sur une installation native. La livraison Docker suit le guide VPS et ne doit pas utiliser ce script natif.
 

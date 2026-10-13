@@ -117,7 +117,7 @@ La base principale occupe maintenant 720 912 384 octets selon les statistiques S
 | T-24 | Vérifiée pour le lot 1 | Quatre espaces avec [habillage myABI](recette-design-myabi.md), DE/FR/IT, recherche, révisions et résumés quotidiens ; SMTP réel à vérifier. |
 | T-25 | À vérifier | Procédures livrées ; responsable, suppléant et destination durable des sauvegardes à désigner. |
 
-Les détails de sécurité et d'exploitation se trouvent dans [recette-operations.md](recette-operations.md). Les scripts et commandes d'exploitation sont documentés dans [operations.md](operations.md).
+Les détails de sécurité et d'exploitation se trouvent dans [recette-operations.md](../deploiement/recette-operations.md). Les scripts et commandes d'exploitation sont documentés dans [operations.md](../deploiement/operations.md).
 
 ## Conditions de validation finale du pilote
 

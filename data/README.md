@@ -10,6 +10,6 @@ data/
 
 `exports/` est réservé aux fichiers produits par la solution. Son contenu généré est ignoré par Git.
 
-Les formats attendus (encodage Windows-1252, séparateur point-virgule, séparateurs d’enregistrements CRLF et colonnes propres à chaque type) sont décrits dans l’[annexe des formats DEVCONF](../docs/formats-devconf.md). L’architecture du pilote Laravel/Blade/MariaDB sur alwaysdata gratuit figure dans les [spécifications techniques](../specifications-techniques-referentiel-traductions-arge-abi.md), avec une [liste d’exigences](../docs/exigences-techniques.md). La faisabilité doit être vérifiée sur les sept fichiers complets.
+Les formats attendus (encodage Windows-1252, séparateur point-virgule, séparateurs d’enregistrements CRLF et colonnes propres à chaque type) sont décrits dans l’[annexe des formats DEVCONF](../docs/technique/formats-devconf.md). L’architecture du pilote Laravel/Blade/MariaDB sur alwaysdata gratuit figure dans les [spécifications techniques](../specifications-techniques-referentiel-traductions-arge-abi.md), avec une [liste d’exigences](../docs/technique/exigences-techniques.md). La faisabilité doit être vérifiée sur les sept fichiers complets.
 
 Un audit en lecture seule est disponible avec `python scripts/audit_devconf.py`, depuis la racine du dépôt (Python 3.11 ou supérieur, sans dépendance externe). Il vérifie les volumes, les doublons selon la casse et la fidélité d’une réécriture CSV standard, sans modifier les originaux ni créer d’exports.

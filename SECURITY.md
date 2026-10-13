@@ -12,4 +12,4 @@ Merci de joindre les étapes de reproduction, la version ou le commit concerné 
 - Scripts et configurations de déploiement (`deploy/`, `scripts/`).
 - Extension navigateur (`extension/`).
 
-N'envoyez jamais de données métier réelles, de secrets ou de fichiers `.env` dans un signalement public. Voir aussi [docs/security-deployment.md](docs/security-deployment.md).
+N'envoyez jamais de données métier réelles, de secrets ou de fichiers `.env` dans un signalement public. Voir aussi [docs/deploiement/security-deployment.md](docs/deploiement/security-deployment.md).

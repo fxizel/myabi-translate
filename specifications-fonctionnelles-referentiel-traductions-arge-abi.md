@@ -8,7 +8,7 @@
 | Objet | Besoins, règles de gestion et périmètre de l'application web de gestion du référentiel des traductions de myABI/icm (LogObject) |
 | Document associé | [Spécifications techniques](specifications-techniques-referentiel-traductions-arge-abi.md) : formats de fichier prédéfinis, modèle de données, sécurité, exigences non fonctionnelles, architecture et hébergement |
 
-**Cadrage technique du 21.09.2026** : les [spécifications techniques v3.0](specifications-techniques-referentiel-traductions-arge-abi.md) retiennent Laravel, Blade et MariaDB sur alwaysdata gratuit, pour un pilote d’organisation sans but lucratif, accessible sur Internet. Les sept fichiers restent dans le périmètre ; l’objectif de traitement devient 30 minutes. La [liste des exigences techniques](docs/exigences-techniques.md) reprend les décisions des échanges. Le §9 technique recense les contradictions métier restant à résoudre, notamment collisions, portées, anciennes versions et encodage. Les reports de fonctions proposés en technique v2.0 ne sont pas considérés comme acceptés.
+**Cadrage technique du 21.09.2026** : les [spécifications techniques v3.0](specifications-techniques-referentiel-traductions-arge-abi.md) retiennent Laravel, Blade et MariaDB sur alwaysdata gratuit, pour un pilote d’organisation sans but lucratif, accessible sur Internet. Les sept fichiers restent dans le périmètre ; l’objectif de traitement devient 30 minutes. La [liste des exigences techniques](docs/technique/exigences-techniques.md) reprend les décisions des échanges. Le §9 technique recense les contradictions métier restant à résoudre, notamment collisions, portées, anciennes versions et encodage. Les reports de fonctions proposés en technique v2.0 ne sont pas considérés comme acceptés.
 
 ## Sommaire
 
@@ -93,7 +93,7 @@ flowchart LR
 
 ### Hypothèses
 
-- Le format des fichiers d'export DEVCONF est stable pour une version majeure de myABI. Les sept formats connus sont livrés avec l'application ; un changement de format fait l'objet d'une adaptation et de tests par les développeurs avant livraison (section 5 et [annexe des formats](docs/formats-devconf.md)).
+- Le format des fichiers d'export DEVCONF est stable pour une version majeure de myABI. Les sept formats connus sont livrés avec l'application ; un changement de format fait l'objet d'une adaptation et de tests par les développeurs avant livraison (section 5 et [annexe des formats](docs/technique/formats-devconf.md)).
 - L'allemand est la langue source des libellés métier. La valeur « Default » livrée par l'éditeur est en anglais ou en allemand selon le type.
 - Chaque police reste responsable de l'import des fichiers dans sa propre instance myABI.
 - Les identifiants techniques des libellés (Name, Cause Id, GROUPTYPE + CODEVALUE, etc.) sont stables entre deux versions de myABI ; un identifiant renommé est traité comme un terme supprimé puis créé.
@@ -163,7 +163,7 @@ Le Gestionnaire peut aussi agir comme Validateur pour débloquer une situation ;
 
 ## 5. Types de traduction et attributs
 
-myABI gère ses libellés en 7 types de traduction, chacun exporté et importé dans son propre fichier DEVCONF. Le Référentiel prend en charge ces sept formats prédéfinis, maintenus et testés avec l'application ; leur détail figure dans l’[annexe des formats](docs/formats-devconf.md).
+myABI gère ses libellés en 7 types de traduction, chacun exporté et importé dans son propre fichier DEVCONF. Le Référentiel prend en charge ces sept formats prédéfinis, maintenus et testés avec l'application ; leur détail figure dans l’[annexe des formats](docs/technique/formats-devconf.md).
 
 ### Structure de chaque type
 
@@ -195,7 +195,7 @@ Mêmes fichiers.
 | Law Catalog | 147 | 97 (66 %) | 90 (61 %) | 0 | 50 |
 | Incident code | 415 821 | 54 654 (13 %) | 51 195 (12 %) | 15 | 2 075 |
 
-**Précision de l’audit du 21.09.2026** : les nombres de doublons ci-dessus comptent les occurrences après la première lorsque les clés sont comparées sans casse (`casefold`). En comparaison exacte, les six premiers fichiers n’ont aucun doublon et Incident code en a un, avec des valeurs divergentes. La règle d’identité myABI reste à confirmer par LogObject ; ces statistiques ne justifient aucune suppression automatique. Voir l’[audit reproductible](docs/formats-devconf.md#audit-reproductible-du-21092026).
+**Précision de l’audit du 21.09.2026** : les nombres de doublons ci-dessus comptent les occurrences après la première lorsque les clés sont comparées sans casse (`casefold`). En comparaison exacte, les six premiers fichiers n’ont aucun doublon et Incident code en a un, avec des valeurs divergentes. La règle d’identité myABI reste à confirmer par LogObject ; ces statistiques ne justifient aucune suppression automatique. Voir l’[audit reproductible](docs/technique/formats-devconf.md#audit-reproductible-du-21092026).
 
 ### Constats qui motivent le projet
 
@@ -208,7 +208,7 @@ Mêmes fichiers.
 
 ### Prise en charge des formats
 
-Chaque format définit les colonnes et leur ordre, la clé d'identité, les attributs traduisibles et leurs langues, la valeur de référence, les attributs techniques à préserver, les règles de portée et de doublons, ainsi que les contrôles de saisie. Les définitions sont versionnées, maintenues par les développeurs et testées sur les fichiers d'exemple. Un nouveau type ou une évolution du format passe par une livraison applicative. L'administration ne comporte pas d'éditeur de formats. Détail : [annexe des formats](docs/formats-devconf.md).
+Chaque format définit les colonnes et leur ordre, la clé d'identité, les attributs traduisibles et leurs langues, la valeur de référence, les attributs techniques à préserver, les règles de portée et de doublons, ainsi que les contrôles de saisie. Les définitions sont versionnées, maintenues par les développeurs et testées sur les fichiers d'exemple. Un nouveau type ou une évolution du format passe par une livraison applicative. L'administration ne comporte pas d'éditeur de formats. Détail : [annexe des formats](docs/technique/formats-devconf.md).
 
 ## 6. Workflow de validation
 

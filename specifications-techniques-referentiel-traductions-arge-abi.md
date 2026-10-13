@@ -1,6 +1,6 @@
 # Spécifications techniques – Référentiel des traductions ARGE-ABI
 
-> **Évolution du 22.09.2026 :** à la demande du propriétaire, la préparation du déploiement cible désormais un VPS existant (exemple : `myabi.example.org`). Le [guide VPS](docs/deploiement-vps.md) précise la proposition Docker Compose, l'alternative native, les ressources et les vérifications restantes. Les contraintes propres à alwaysdata Free décrites ci-dessous constituent la référence historique du pilote ; elles sont remplacées pour cette nouvelle cible. Les règles métier, de sécurité, de traçabilité et de recette restent applicables.
+> **Évolution du 22.09.2026 :** à la demande du propriétaire, la préparation du déploiement cible désormais un VPS existant (exemple : `myabi.example.org`). Le [guide VPS](docs/deploiement/deploiement-vps.md) précise la proposition Docker Compose, l'alternative native, les ressources et les vérifications restantes. Les contraintes propres à alwaysdata Free décrites ci-dessous constituent la référence historique du pilote ; elles sont remplacées pour cette nouvelle cible. Les règles métier, de sécurité, de traçabilité et de recette restent applicables.
 
 | Élément | Valeur |
 | --- | --- |
@@ -29,11 +29,11 @@
 
 Le budget nul concerne les services nécessaires à l’hébergement du pilote. Le développement et la maintenance applicative demandent du travail humain. Aucun abonnement payant, domaine payant ou service facturé à l’usage n’est nécessaire à la solution décrite.
 
-La [liste des exigences techniques](docs/exigences-techniques.md) fournit les critères de vérification. Les [spécifications fonctionnelles](specifications-fonctionnelles-referentiel-traductions-arge-abi.md) restent la référence métier. La [présentation myABI](DESIGN.md) conserve les quatre espaces : Traductions, Validation, Imports, Publications. La refonte de l’infrastructure ne supprime pas de fonctions métier pour réduire le stockage.
+La [liste des exigences techniques](docs/technique/exigences-techniques.md) fournit les critères de vérification. Les [spécifications fonctionnelles](specifications-fonctionnelles-referentiel-traductions-arge-abi.md) restent la référence métier. La [présentation myABI](DESIGN.md) conserve les quatre espaces : Traductions, Validation, Imports, Publications. La refonte de l’infrastructure ne supprime pas de fonctions métier pour réduire le stockage.
 
 ## 2. Fichiers et volume à prendre en charge
 
-L’[annexe DEVCONF](docs/formats-devconf.md) décrit les sept formats, leurs colonnes et les ambiguïtés observées. Ces formats sont livrés et versionnés avec le code, sans éditeur de correspondance de colonnes dans l’application.
+L’[annexe DEVCONF](docs/technique/formats-devconf.md) décrit les sept formats, leurs colonnes et les ambiguïtés observées. Ces formats sont livrés et versionnés avec le code, sans éditeur de correspondance de colonnes dans l’application.
 
 Les originaux comptent **581 142 enregistrements pour 108 297 018 octets**, soit environ 108 Mo. Incident code représente **415 821 enregistrements et 71 838 828 octets**, soit environ 72 Mo. Ces volumes constituent la base du test ; la taille finale de MariaDB reste inconnue.
 

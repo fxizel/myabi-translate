@@ -1,8 +1,8 @@
 # Contrats des fichiers DEVCONF
 
-Annexe aux [spécifications techniques simplifiées](../specifications-techniques-referentiel-traductions-arge-abi.md), version du 21.09.2026. Les formats observés restent des contraintes de compatibilité avec myABI, indépendantes de la technologie retenue.
+Annexe aux [spécifications techniques simplifiées](../../specifications-techniques-referentiel-traductions-arge-abi.md), version du 21.09.2026. Les formats observés restent des contraintes de compatibilité avec myABI, indépendantes de la technologie retenue.
 
-Les fichiers originaux sont conservés localement dans `data/imports/` (hors du dépôt public, voir [data/README.md](../data/README.md)) et ne doivent pas être modifiés. Les clés ci-dessous sont candidates tant que LogObject n’a pas confirmé leur sémantique. Les décisions provisoires de traitement des ambiguïtés figurent à la fin de cette annexe.
+Les fichiers originaux sont conservés localement dans `data/imports/` (hors du dépôt public, voir [data/README.md](../../data/README.md)) et ne doivent pas être modifiés. Les clés ci-dessous sont candidates tant que LogObject n’a pas confirmé leur sémantique. Les décisions provisoires de traitement des ambiguïtés figurent à la fin de cette annexe.
 
 ## Formats de fichier DEVCONF
 
@@ -50,7 +50,7 @@ Chaque lot conserve la version du format utilisée. Une publication conserve ses
 
 ## Audit reproductible du 21.09.2026
 
-Exécuter `python scripts/audit_devconf.py` depuis la racine du dépôt, avec Python 3.11 ou supérieur et sa bibliothèque standard. Le [script d’audit](../scripts/audit_devconf.py) lit uniquement les sept originaux, produit des statistiques JSON sans afficher de valeurs métier et ne génère aucun fichier d’export. Il ne constitue pas l’importeur de la future application.
+Exécuter `python scripts/audit_devconf.py` depuis la racine du dépôt, avec Python 3.11 ou supérieur et sa bibliothèque standard. Le [script d’audit](../../scripts/audit_devconf.py) lit uniquement les sept originaux, produit des statistiques JSON sans afficher de valeurs métier et ne génère aucun fichier d’export. Il ne constitue pas l’importeur de la future application.
 
 | Fichier | Octets | Enregistrements hors en-tête | Colonnes | Doublons exacts | Doublons sans casse |
 | --- | ---: | ---: | ---: | ---: | ---: |

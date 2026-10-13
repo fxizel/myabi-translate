@@ -252,7 +252,7 @@ Un retour au tag précédent n'est sûr que si le schéma reste compatible. Si l
 
 ## Livraison native alternative
 
-Les modèles `deploy/vps/` servent à une installation native volontaire : pool FPM isolé, ACL permettant à Nginx de lire uniquement `public`, secrets SQL de migration inaccessibles au compte web, timers et contrôle HTTPS préalable. Voir [leur guide](../deploy/vps/README.md) et la procédure générique de [livraison/reprise](operations.md).
+Les modèles `deploy/vps/` servent à une installation native volontaire : pool FPM isolé, ACL permettant à Nginx de lire uniquement `public`, secrets SQL de migration inaccessibles au compte web, timers et contrôle HTTPS préalable. Voir [leur guide](../../deploy/vps/README.md) et la procédure générique de [livraison/reprise](operations.md).
 
 Le paquet natif se construit avec `scripts/package-release.sh` et se livre avec `scripts/deploy.sh` (voir [operations.md](operations.md)). Les variables optionnelles sont `PHP_BIN`, `DEPLOY_GROUP` et `DEPLOY_PUBLIC_GROUP`. Ne pas utiliser cette voie pour Docker. Le hook privé `post-migrate-hook.sh` peut appliquer les droits des nouvelles tables avant les contrôles de santé.
 
@@ -266,4 +266,4 @@ Pour automatiser Compose, l'étape suivante sera de construire/publier les deux 
 - Réimport des 100 traductions dans myABI, arbitrages métier restants et performances de cinq utilisateurs.
 - Capacité mesurée avec historique, réimport, publication, sauvegarde et images conservées ; restauration complète éprouvée.
 
-Le [PV local](recette.md) reste la preuve des essais déjà effectués. Le changement d'hébergement lève la contrainte de l'offre Free mais ne transforme pas ces résultats en recette distante.
+Le [PV local](../technique/recette.md) reste la preuve des essais déjà effectués. Le changement d'hébergement lève la contrainte de l'offre Free mais ne transforme pas ces résultats en recette distante.
