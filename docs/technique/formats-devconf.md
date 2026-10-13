@@ -8,6 +8,8 @@ Les fichiers originaux sont conservés localement dans `data/imports/` (hors du 
 
 Les 7 fichiers fournis révèlent 5 mises en page de colonnes différentes (les trois types NLS partagent la même), qui se ramènent à trois schémas de langues, de 1 à 12 attributs traduisibles par terme et des clés d'identité de 1 à 4 colonnes. L'application prend en charge ces 7 types au moyen de formats prédéfinis, maintenus et testés avec son code.
 
+Ces fichiers ne constituent pas un inventaire exhaustif des traductions de myABI. Les traductions des masques d’écran sont stockées dans la base de données de myABI et ne figurent pas dans les fichiers NLS (CSV). Elles concernent d’autres termes que ceux du type `Form` : ce sont des termes distincts, hors du périmètre des fichiers pris en charge. L’application ne dispose pas d’un accès direct à ces traductions en base et ne permet pas de les gérer. Le type `Form` reste pris en charge pour les termes du fichier DEVCONF correspondant.
+
 ### Structure de chaque type
 
 Analyse des fichiers DEVCONF du 17.09.2026.

@@ -6,6 +6,8 @@
 
 myABI Translate est le référentiel partagé des traductions myABI pour les organisations membres de l’ARGE-ABI. Il permet de recevoir des fichiers DEVCONF, de retrouver leurs termes, de proposer et faire examiner des traductions, puis de produire des fichiers destinés aux organisations.
 
+La couverture se limite aux traductions présentes dans les fichiers DEVCONF pris en charge. Les fichiers NLS (CSV) ne regroupent pas toutes les traductions de myABI : les traductions des masques d’écran sont stockées dans la base de données de myABI et concernent des termes distincts de ceux du type `Form` déjà pris en charge. Ces termes de masques d’écran et les autres traductions absentes des fichiers ne peuvent pas être gérés par myABI Translate ; l’outil ne les lit ni ne les modifie directement dans cette base.
+
 Le travail s’organise autour de trois valeurs distinctes : la valeur du fichier importé, la proposition en attente et la valeur validée. Une importation ou une saisie ne remplace pas directement une traduction validée. Les décisions, révisions et publications permettent de retracer les changements.
 
 ### Vocabulaire métier

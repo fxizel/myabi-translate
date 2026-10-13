@@ -2,6 +2,8 @@
 
 Application web commune aux polices membres de l’ARGE-ABI pour gérer les traductions de myABI : import des sept formats DEVCONF de LogObject, recherche des termes, propositions et validation à quatre yeux, révisions, puis publication de catalogues figés par organisation.
 
+**Limite de couverture** : les fichiers NLS (CSV) ne contiennent pas toutes les traductions de myABI. Les traductions des masques d’écran sont stockées dans la base de données de myABI et portent sur d’autres termes que ceux du type `Form` déjà pris en charge. L’outil gère uniquement les traductions présentes dans les fichiers DEVCONF pris en charge ; il ne permet pas de gérer ces termes de masques d’écran ni les autres traductions stockées en base et absentes de ces fichiers.
+
 - **Pile** : Laravel 13, PHP 8.4, MariaDB 11.4, pages Blade. Ni Node ni Redis en production : CSS et JavaScript sont livrés directement dans `public/`.
 - **Interface** : allemand, français et italien, selon la [présentation myABI](DESIGN.md) (bandeau bleu nuit, onglets, navigation latérale, tableaux compacts). Toutes les ressources sont locales ; le bouton Compact mémorise la densité d’affichage dans le navigateur.
 - **Confidentialité** : originaux, rapports et publications restent dans le stockage privé.

@@ -53,6 +53,8 @@ Le Référentiel des traductions ARGE-ABI (ci-après « le Référentiel ») est
 
 Le Référentiel gère les libellés des 7 types de traduction myABI, dans les langues de_CH, fr_CH, it_CH et en_US, par échange de fichiers avec myABI.
 
+**Limite de couverture (précision du 13.10.2026)** : toutes les traductions de myABI ne se trouvent pas dans les fichiers NLS (CSV). Les traductions des masques d’écran sont stockées dans la base de données de myABI et portent sur des termes distincts de ceux du type `Form` déjà pris en charge. Le Référentiel ne gère que les traductions présentes dans les fichiers DEVCONF pris en charge ; ces termes de masques d’écran et les autres traductions stockées en base et absentes des fichiers restent hors de son périmètre. Il ne permet pas de les consulter, de les modifier ou de les publier. Le type `Form` reste pris en charge pour les termes du fichier correspondant.
+
 Le schéma ci-dessous situe le Référentiel entre l'éditeur, les instances myABI des polices et les personnes qui traduisent et valident. Tous les échanges avec myABI passent par des fichiers.
 
 ```mermaid
