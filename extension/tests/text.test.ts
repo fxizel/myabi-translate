@@ -54,7 +54,7 @@ describe('truncate', () => {
     });
 
     it('coupe brutalement un texte sans espace', () => {
-        expect(truncate('abcdefghijkl', 5)).toBe('abcde…');
+        expect(truncate('abcdefghijkl', 5)).toBe('abcd…');
     });
 });
 
@@ -63,7 +63,7 @@ describe('excerptAround', () => {
         const full = `${'x'.repeat(100)} Commande ${'y'.repeat(100)}`;
         const excerpt = excerptAround(full, 'Commande', 60);
         expect(excerpt).toContain('Commande');
-        expect(excerpt.length).toBeLessThanOrEqual(62);
+        expect(excerpt.length).toBeLessThanOrEqual(60);
         expect(excerpt.startsWith('…')).toBe(true);
         expect(excerpt.endsWith('…')).toBe(true);
     });

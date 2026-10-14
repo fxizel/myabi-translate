@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Term;
+use App\Services\BrowserExtension\SearchProjection;
 use Illuminate\Support\Facades\DB;
 
 /** Transactional search projection; never changes a term's business revision. */
@@ -35,7 +36,7 @@ class SearchText
     }
 
     /** Caller supplies at most one bounded import chunk of terms. */
-    public function syncMany($terms, array $attributes = []): void
+    public function syncMany($terms, array $attributes = [], ?array $projectionAttributes = null): void
     {
         if ($terms->isEmpty()) {
             return;
@@ -49,5 +50,6 @@ class SearchText
             DB::table('terms')->where('id', $term->id)->update(['search_text' => $text]);
             $term->search_text = $text;
         }
+        app(SearchProjection::class)->syncMany($terms, $projectionAttributes ?? $attributes);
     }
 }

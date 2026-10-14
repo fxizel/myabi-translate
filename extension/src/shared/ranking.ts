@@ -1,5 +1,5 @@
 import type { MatchState, PanelResult, SearchResult } from '../types';
-import { searchKey } from './text';
+import { normalizeText } from './text';
 
 /** Score à partir duquel une correspondance exacte est présentée comme « forte ». */
 export const STRONG_SCORE = 0.9;
@@ -7,18 +7,16 @@ export const STRONG_SCORE = 0.9;
 export const AMBIGUITY_GAP = 0.15;
 
 /**
- * Exacte = l'API le dit (`exact`) ou le texte cherché est identique (sans casse ni accents)
- * à la traduction courante ou au texte source.
+ * Exacte = verdict explicite de l'API, sinon comparaison littérale normalisée
+ * à la traduction courante ou au texte source, uniquement pour le mock legacy.
  */
 export function isExactMatch(result: SearchResult, query: string): boolean {
-    if (result.exact === true) {
-        return true;
-    }
-    const wanted = searchKey(query);
+    if (typeof result.exact === 'boolean') return result.exact;
+    const wanted = normalizeText(query);
     if (!wanted) {
         return false;
     }
-    return [result.currentTranslation, result.sourceText].some((value) => value !== '' && searchKey(value) === wanted);
+    return [result.currentTranslation, result.sourceText].some((value) => value !== '' && normalizeText(value) === wanted);
 }
 
 /** Score décroissant ; à score égal : exactes d'abord, puis ordre alphabétique des clés. */
@@ -43,9 +41,10 @@ export function classifyResults(ranked: readonly SearchResult[], query: string):
     if (!ranked.some((result) => isExactMatch(result, query))) {
         return 'noExact';
     }
+    if (ranked.filter((result) => isExactMatch(result, query)).length > 1) return 'multiple';
     const second = ranked[1];
     const clearWinner = !second || top.score - second.score >= AMBIGUITY_GAP;
-    if (isExactMatch(top, query) && clearWinner && (top.score >= STRONG_SCORE || ranked.length === 1)) {
+    if (isExactMatch(top, query) && clearWinner && top.score >= STRONG_SCORE) {
         return 'strong';
     }
     return 'multiple';

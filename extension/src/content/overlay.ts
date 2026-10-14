@@ -17,7 +17,7 @@ export interface OverlayOptions {
 }
 
 const RETRYABLE = new Set(['network', 'timeout', 'rateLimited', 'server', 'http', 'invalidResponse']);
-const SETTINGS_ERRORS = new Set(['notConfigured', 'unauthorized', 'forbidden', 'notFound', 'permission', 'domainNotAllowed']);
+const SETTINGS_ERRORS = new Set(['notConfigured', 'unauthorized', 'forbidden', 'notFound', 'permission', 'domainNotAllowed', 'languageRequired', 'invalidRequest', 'payloadTooLarge', 'upgradeRequired']);
 /** Les clics dans l'overlay ne doivent pas atteindre les écouteurs de MyAB (par exemple « clic extérieur ferme la modale »). */
 const ISOLATED_EVENTS = ['mousedown', 'mouseup', 'click', 'dblclick', 'pointerdown', 'pointerup', 'touchstart', 'touchend'];
 
@@ -173,6 +173,10 @@ export class Overlay {
         banner.setAttribute('role', 'status');
         banner.textContent = t(lang, bannerKey[message.state] ?? 'stateNone');
         content.append(banner);
+        if (message.mock) content.append(create(this.doc, 'div', 'banner', t(lang, 'mockWarning')));
+        if (message.request.textTruncated) content.append(create(this.doc, 'div', 'hint', t(lang, 'textTruncated')));
+        if (message.candidateSetComplete === false) content.append(create(this.doc, 'div', 'hint', t(lang, 'incompleteSearch')));
+        if (message.hasMore) content.append(create(this.doc, 'div', 'hint', t(lang, 'moreResults')));
 
         if (message.state === 'noExact' && message.results.length > 0) {
             content.append(create(this.doc, 'div', 'hint', t(lang, 'approximateResults')));
@@ -344,18 +348,30 @@ export class Overlay {
             }
         };
         const targetLanguage = (result.targetLanguage || message.request.lang || 'fr').toUpperCase();
-        row((result.sourceLanguage || '??').toUpperCase(), result.sourceText);
-        row(targetLanguage, result.currentTranslation);
+        if (result.type) row(t(lang, 'typeLabel'), result.type);
+        if (result.attribute) row(t(lang, 'attributeLabel'), result.attribute);
+        if (result.valueOrigin) {
+            const originKey: Record<string, MessageKey> = { validated: 'originValidated', imported: 'originImported', reference: 'originReference' };
+            row(t(lang, 'matchedLabel', { origin: t(lang, originKey[result.valueOrigin]!) }), result.matchedText ?? '');
+            row(t(lang, 'sourceLabel', { language: result.sourceLanguage ? languageName(lang, result.sourceLanguage) : t(lang, 'unknownLanguage') }), result.sourceText);
+            row(t(lang, 'validatedLabel', { language: targetLanguage }), result.currentTranslation || '—');
+            row(t(lang, 'importedLabel', { language: targetLanguage }), result.importedTranslation || '—');
+            row(t(lang, 'pendingCount'), String(result.pendingCount ?? 0));
+        } else {
+            row((result.sourceLanguage || '??').toUpperCase(), result.sourceText);
+            row(targetLanguage, result.currentTranslation);
+        }
         if (result.proposedTranslation && result.proposedTranslation !== result.currentTranslation) {
             row(t(lang, 'proposal'), result.proposedTranslation);
         }
         row(t(lang, 'module'), result.module);
         card.append(details);
+        if (result.previewTruncated) card.append(create(this.doc, 'div', 'hint', t(lang, 'previewTruncated')));
 
         const actions = create(this.doc, 'div', 'actions');
         actions.append(this.copyButton(t(lang, 'copyKey'), result.key));
         if (result.sourceText) {
-            actions.append(this.copyButton(t(lang, 'copySource', { language: languageName(lang, result.sourceLanguage) }), result.sourceText));
+            actions.append(this.copyButton(t(lang, result.previewTruncated ? 'copyPreview' : 'copySource'), result.sourceText, result.previewTruncated === true));
         }
         if (result.openUrl) {
             const open = create(this.doc, 'a', 'button primary');
@@ -372,13 +388,13 @@ export class Overlay {
         return card;
     }
 
-    private copyButton(label: string, value: string): HTMLButtonElement {
+    private copyButton(label: string, value: string, preview = false): HTMLButtonElement {
         const button = create(this.doc, 'button', '');
         button.type = 'button';
         button.textContent = label;
         button.addEventListener('click', () => {
             void this.copy(value).then((copied) => {
-                button.textContent = t(this.lang, copied ? 'copied' : 'copyFailed');
+                button.textContent = t(this.lang, copied ? preview ? 'copiedPreview' : 'copied' : 'copyFailed');
                 this.doc.defaultView?.setTimeout(() => {
                     button.textContent = label;
                 }, 1500);

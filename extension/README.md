@@ -4,14 +4,14 @@ Extension navigateur (Chrome et Firefox, **un seul code source**) qui retrouve l
 
 **Elle ne modifie jamais MyAB.** Elle identifie un texte, collecte son contexte, interroge l'API de l'application de gestion et affiche les correspondances avec un lien vers la traduction.
 
-> **Première vérification.** Ce code a été écrit sans pouvoir être compilé ni exécuté (Node n'était pas installé sur la machine de développement). Avant tout usage : `npm install && npm run check` (typage, tests, build). Voir [Limites et points à vérifier](#limites-et-points-à-vérifier).
+> **Vérification.** `npm install && npm run check` contrôle le typage, les tests et les builds des deux navigateurs. La [recette du backend réel](../docs/technique/api-extension-implementation.md) décrit les vérifications intégrées et les conditions de mise en service.
 
 ## Utilisation
 
 1. Ouvrez la page **Paramètres** (ouverte automatiquement après l'installation) : URL de l'API, token, domaines MyAB. Le navigateur demande l'autorisation d'accéder à ces domaines.
 2. Dans MyAB, activez le **mode inspecteur** depuis l'icône de l'extension (ou `Alt+Maj+M`, modifiable). Le badge **ON** s'affiche. Rechargez les onglets MyAB déjà ouverts.
 3. **Alt + clic** sur un texte : l'élément est surligné, le panneau s'ouvre en haut à droite avec les clés trouvées, triées par score.
-4. Actions : *Copier la clé*, *Copier le texte allemand*, *Ouvrir la traduction*, *Rechercher manuellement dans l'application*, et (si activé) *Signaler cette correspondance comme correcte*.
+4. Actions : *Copier la clé*, *Copier le texte source*, *Ouvrir la traduction*, *Rechercher manuellement dans l'application*, et (si activé et autorisé) *Signaler cette correspondance comme correcte*. Un aperçu tronqué est annoncé comme tel.
 5. **Échap** ferme le panneau et le surlignage ; MyAB n'est plus du tout influencé tant qu'il n'y a pas d'Alt+clic.
 
 Pendant un Alt+clic, MyAB ne reçoit ni `pointerdown`, `mousedown`, `mouseup`, `click` ni `dblclick` : un lien ne navigue pas, un bouton ne se déclenche pas. Sans Alt, ou mode désactivé, rien n'est intercepté.
@@ -107,13 +107,15 @@ Les iframes sont gérées : chaque frame détecte son clic et surligne son élé
 | URL de l'API | `https://translations.example.test/api/browser-extension`. **HTTPS obligatoire** (HTTP toléré pour `localhost` / `127.0.0.1` seulement) |
 | Token / clé API | Envoyé en `Authorization: Bearer`. Jamais affiché, jamais journalisé, jamais exporté. Conservation : sur l'appareil (`storage.local`) ou session du navigateur seulement (`storage.session`, à ressaisir) |
 | URL de l'application | Facultatif ; base des liens et de la recherche manuelle. Vide = origine de l'API |
+| Mode API | Réelle (défaut) ou test explicite ; aucun repli automatique vers le mock |
+| Langue du texte recherché | Automatique depuis la page, ou allemand, français, italien, anglais ; indépendante de la langue de l’interface |
 | Domaines MyAB autorisés | Un par ligne : `myab.example.test` ou `*.example.test`. Seuls ces domaines reçoivent le content script |
 | Langue de l'interface | Automatique, français, allemand, anglais |
 | Touche du clic | Alt (défaut), Alt+Maj ou Alt+Ctrl |
 | Raccourci d'activation | Affiché ; se modifie dans le navigateur (`chrome://extensions/shortcuts`, ou Firefox : Gérer les raccourcis) |
 | Nombre maximum de résultats | 1 à 20 |
-| Collecter le contexte | Désactivé : seuls texte, URL, titre et langue de la page partent |
-| URL de page transmise | Sans paramètres (défaut), complète, ou domaine seulement |
+| Collecter le contexte | Désactivé par défaut : seuls texte, URL, titre et langue de la page partent |
+| URL de page transmise | Domaine seulement (défaut), sans paramètres, ou complète |
 | Délai d'attente | 1 à 30 s |
 | Avancé | Sélecteurs CSS facultatifs (fil d'Ariane, modale, titre de section, éléments à ignorer) et gabarit de recherche manuelle (`{appUrl}/terms?q={query}`) |
 
@@ -121,90 +123,28 @@ Rien n'est codé en dur sur MyAB : domaines, structure du DOM et URL sont des r�
 
 ## Contrat de l'API
 
-L'application de gestion doit exposer (voir *Limites* : ces routes n'existent pas encore dans ce dépôt Laravel).
+Le backend Laravel expose `POST /api/browser-extension/search` et `POST /api/browser-extension/feedback`, avec un jeton personnel Sanctum. Le [contrat version 2](../docs/technique/api-extension-navigateur.md) définit les champs, limites, scores, statuts et erreurs ; la [mise en œuvre](../docs/technique/api-extension-implementation.md) décrit la projection, l’entretien et la recette.
 
-### `POST {apiUrl}/search`
+Les recherches réelles envoient `contractVersion: 2` et `textTruncated`, avec la langue du texte inspecté, distincte de celle du panneau. Chaque résultat identifie une cellule par terme, type DEVCONF, tuple exact, attribut et langue. La valeur importée, la référence et la traduction validée sont affichées séparément. Les propositions pending sont comptées, sans sélection arbitraire d’une traduction en vigueur.
 
-En-têtes : `Authorization: Bearer <token>`, `Content-Type: application/json`, `Accept: application/json`. Les cookies ne sont pas envoyés.
+La version reconstruite pour cette API est **0.2.0**. Vérifier cette version dans la fiche de l’extension après chargement. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation et faire autoriser son origine côté API si nécessaire.
 
-```json
-{
-  "text": "Commande",
-  "pageUrl": "https://myab.example.test/orders#/detail",
-  "pageTitle": "Détail de la commande",
-  "surroundingText": "Informations générales Fournisseur Commande Statut",
-  "elementTag": "span",
-  "elementId": "",
-  "elementClasses": ["lbl"],
-  "ariaLabel": "",
-  "title": "",
-  "dataAttributes": { "data-i18n-key": "PURCHASE_ORDER" },
-  "lang": "fr",
-  "maxResults": 5,
-  "uiLanguage": "fr",
+Le serveur calcule `matchState`, `exactCandidateCount`, `hasMore` et `candidateSetComplete` avant la limite d’affichage. Plusieurs exacts restent ambigus avec `maxResults: 1`. Le client respecte `exact: false` et annonce les aperçus tronqués. Le feedback est facultatif, signé et sans effet sur la validation ou les campagnes.
 
-  "alternativeTexts": ["mot en gras"],
-  "role": "button",
-  "elementName": "supplier",
-  "inputType": "text",
-  "ariaAttributes": { "aria-describedby": "tip" },
-  "parentText": "Commande Statut",
-  "siblingTexts": ["Statut"],
-  "formLabel": "Fournisseur",
-  "sectionTitle": "Informations générales",
-  "inDialog": true,
-  "dialogTitle": "Confirmer la commande",
-  "breadcrumbs": ["Accueil", "Achats", "Commandes"],
-  "tableColumn": "Fournisseur",
-  "frameUrl": "https://myab.example.test/frame"
-}
-```
+Le mode **API de test** accepte encore les réponses du mock ; il est choisi explicitement dans les paramètres. Aucun échec réseau ne change de backend automatiquement. Un client ancien reçoit 426 sur l’API réelle.
 
-Les champs jusqu'à `uiLanguage` sont toujours présents (vides si le contexte est désactivé). Ceux qui suivent sont **facultatifs** et omis quand ils n'ont pas de valeur. `alternativeTexts` : autres lectures du texte cliqué (élément le plus profond, texte direct).
+## Connexion au backend réel
 
-Réponse attendue (format de la spécification) :
+1. Dans le référentiel, ouvrir **Profil → Extension navigateur**, confirmer le mot de passe et créer un jeton. Copier le secret immédiatement ; la MFA applicable doit avoir été satisfaite à la connexion.
+2. Dans les paramètres de l’extension, choisir **API réelle**, l’URL `https://translations.example.org/api/browser-extension` et ce jeton. Pour la recette locale, utiliser le port du serveur Laravel, par exemple `http://127.0.0.1:8000/api/browser-extension`.
+3. Ajouter le domaine MyAB, accepter les permissions et tester la connexion. Si la langue de la page est absente ou inconnue, choisir celle du texte dans le réglage dédié.
+4. Activer l’inspecteur et recharger l’onglet MyAB. Alt+clic ouvre les correspondances ; leur lien vers la fiche exige la connexion web habituelle.
 
-```json
-{
-  "query": "Commande",
-  "results": [
-    {
-      "id": 1245, "key": "PURCHASE_ORDER",
-      "sourceLanguage": "de", "sourceText": "Bestellung",
-      "currentTranslation": "Commande", "proposedTranslation": "Commande fournisseur",
-      "module": "Purchasing", "status": "approved", "score": 0.96,
-      "translationUrl": "https://translations.example.test/translations/1245"
-    }
-  ]
-}
-```
-
-Champs facultatifs : `targetLanguage` (défaut : langue de la page), `exact` (booléen : l'API certifie une correspondance exacte). Le score est un ratio 0–1 (un pourcentage 0–100 est toléré). Les entrées sans `key` sont ignorées. Statuts reconnus : `approved`, `review`, `pending`, `proposed`, `rejected`, `draft`, `obsolete` (autres : affichés tels quels).
-
-### `POST {apiUrl}/feedback` (facultatif, si activé)
-
-`{ "text", "resultId", "key", "pageUrl", "verdict": "correct" }` — réponse JSON quelconque en 2xx.
-
-### Affichage des résultats
-
-Tri par score décroissant (à score égal : exactes d'abord, puis clé). « Exacte » : `exact: true` ou texte identique (sans casse ni accents) à la traduction courante ou au texte source.
-
-| État | Condition | Message |
-| --- | --- | --- |
-| Correspondance forte | première exacte, score ≥ 0,90 (ou seule) et écart ≥ 0,15 avec la suivante | *Correspondance forte* |
-| Plusieurs possibles | au moins une exacte, mais ambiguïté | *Plusieurs correspondances possibles* |
-| Aucune exacte | résultats, mais aucun exact | *Aucune traduction exacte trouvée.* puis les résultats approximatifs |
-| Aucun résultat | liste vide | *Aucune traduction trouvée.* |
-
-Seuils : `STRONG_SCORE` et `AMBIGUITY_GAP` dans `src/shared/ranking.ts`. Le lien « Ouvrir la traduction » n'est affiché que si `translationUrl` est en HTTPS **sur l'origine de l'API ou de l'URL de l'application** (une API compromise ne peut pas rediriger ailleurs).
-
-### Erreurs
-
-Messages en clair pour : API inaccessible, délai dépassé, 401 (token absent / invalide / expiré), 403, 404 (URL erronée), 429 (avec délai `Retry-After`), 5xx, réponse invalide, redirection HTTP non sécurisée, extension non configurée, domaine non autorisé, permission manquante, extension rechargée. « Réessayer » est proposé pour les erreurs transitoires, « Ouvrir les paramètres » pour celles de configuration.
+Après installation des dépendances PHP et migrations, construire la projection avec `php artisan referentiel:extension-search-rebuild`. Une projection manquante ou périmée produit 503. Le serveur factice du port 8787 reste un outil de test et ne consulte pas le référentiel.
 
 ## Données collectées et sécurité
 
-**Jamais transmis** : le HTML de la page, les valeurs des champs de saisie (`value`, `textarea`, options de `select` ne sont jamais lus ; seul le libellé d'un champ l'est), les identifiants dans l'URL, la query-string (par défaut).
+**Jamais transmis** : le HTML de la page et les valeurs des champs de saisie (`value`, `textarea`, options de `select` ne sont jamais lus ; seul le libellé d'un champ l'est). Le mode d’URL par défaut transmet seulement l’origine ; les modes plus détaillés peuvent contenir des identifiants métier dans le chemin, fragment ou paramètres. Un texte visible peut lui-même être une donnée métier. Le serveur réel ne conserve aucun texte ni contexte de recherche.
 
 **Contexte limité** : tailles bornées partout (texte 500 caractères, 20 attributs `data-*` de 100 caractères…). Pour une **cellule de tableau**, on n'envoie jamais le texte de la ligne (données métier), seulement l'en-tête de colonne. Le background reconstruit la requête champ par champ avant l'envoi (`sanitizeSearchRequest`).
 
@@ -233,6 +173,7 @@ npm run test:manual     # idem + page de test locale (5173)
 
 1. Chargez l'extension (`dist/chrome` ou `dist/firefox`) et ouvrez ses **Paramètres** :
    - **URL de l'API** : `http://localhost:8787/api/browser-extension` (HTTP accepté pour localhost uniquement) ;
+   - **Mode API** : API de test ;
    - **Token** : `ok` ;
    - **Domaines MyAB** : le domaine réel de MyAB (par exemple `myab.example.test`) ;
    - (ou **Importer** `config.mock.json`, puis remplacer le domaine `localhost` par celui de MyAB.)
@@ -255,7 +196,7 @@ Pour un texte quelconque de MyAB, le faux serveur **génère** une réponse : un
 |  |  | `badjson` | 200 mais page HTML |
 |  |  | `down` | connexion coupée (réseau) |
 
-Le bouton **Tester la connexion** des Paramètres fonctionne aussi. « Ouvrir la traduction » et « Rechercher manuellement » ouvrent de fausses pages servies par le même serveur. `http://localhost:8787/__requests` liste les 50 dernières requêtes reçues (le token n'y figure jamais) : pratique pour contrôler exactement ce que l'extension envoie.
+Le bouton **Tester la connexion** des Paramètres fonctionne aussi. « Ouvrir la traduction » et « Rechercher manuellement » ouvrent de fausses pages servies par le même serveur. `http://localhost:8787/__requests` liste les métadonnées des 50 dernières requêtes (champs et mode de scénario, sans texte inspecté ni token). Cet endpoint de test n’existe pas dans l’API réelle.
 
 Le même faux serveur est testé automatiquement (`tests/mockApi.test.ts`) avec le vrai client de l'extension.
 
@@ -265,9 +206,9 @@ Le même faux serveur est testé automatiquement (`tests/mockApi.test.ts`) avec 
 
 ## Limites et points à vérifier
 
-- **Vérifié par les tests automatiques uniquement** (`npm run check` : typage, tests Vitest, build des deux navigateurs). L'Alt+clic réel, le panneau et les permissions optionnelles restent à essayer dans Chrome et Firefox, avec la page de test puis le vrai MyAB. Les `.zip` ne sont pas versionnés : `npm run package` les génère dans `dist/packages/`.
+- **Recette réelle sur API synthétique** : Chromium 151 et Firefox 153 ont vérifié les permissions locales, Alt+clic, les quatre scénarios, les ambiguïtés avec limite 1 et la révocation. Le passage sur une instance MyAB conserve les réglages de domaine et de DOM à vérifier. Les `.zip` ne sont pas versionnés : `npm run package` les génère dans `dist/packages/`.
 - **Firefox non signé** : une extension non signée ne se charge que temporairement (`about:debugging`, `web-ext run`) ; l'installation durable demande une signature AMO (« non listé »).
-- **Backend absent.** Les routes `POST /api/browser-extension/search` (et `/feedback`) n'existent pas encore dans l'application Laravel de ce dépôt. Authentification attendue : jeton porteur propre à l'utilisateur, avec les droits de visibilité de l'utilisateur sur les termes.
+- **Backend réel.** Les routes `/api/browser-extension/search` et `/feedback` nécessitent les migrations, une projection disponible et un jeton personnel. Le catalogue couvre les sept formats DEVCONF ; les textes MyAB absents de ces fichiers ne sont pas inventés comme correspondances.
 - **Firefox** : `optional_host_permissions` en MV3 et `data_collection_permissions` (catégorie `websiteContent`, à ajuster) sont déclarés pour Firefox 128+ ; à confirmer au chargement (avertissements dans `about:debugging`). Le Shadow DOM de l'overlay utilise `adoptedStyleSheets` avec repli sur `<style>`.
 - **Shadow DOM fermé** de MyAB : non inspectable (l'hôte est identifié).
 - **Onglets déjà ouverts** : à recharger après modification des domaines.

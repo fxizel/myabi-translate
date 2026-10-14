@@ -20,45 +20,33 @@ export function hasMeaningfulText(text: string): boolean {
     return MEANINGFUL.test(text);
 }
 
-/** Coupe à `max` caractères (de préférence à une limite de mot) et ajoute « … ». */
-export function truncate(text: string, max: number): string {
-    if (text.length <= max) {
-        return text;
-    }
-    let cut = max;
-    const code = text.charCodeAt(cut - 1);
-    if (code >= 0xd800 && code <= 0xdbff) {
-        cut -= 1;
-    }
-    let slice = text.slice(0, cut);
-    const lastSpace = slice.lastIndexOf(' ');
-    if (lastSpace > max * 0.6) {
-        slice = slice.slice(0, lastSpace);
-    }
-    return `${slice.trimEnd()}…`;
+/** Nombre de caractères Unicode (les paires UTF-16 comptent pour un). */
+export function characterLength(text: string): number {
+    return Array.from(text).length;
 }
 
-/** Extrait d'au plus `max` caractères centré sur `needle` dans `full`. */
+/** Borne le résultat final, ellipse comprise, sans couper une paire UTF-16. */
+export function truncate(text: string, max: number): string {
+    const characters = Array.from(text);
+    if (characters.length <= max) return text;
+    if (max <= 0) return '';
+    let slice = characters.slice(0, max - 1).join('');
+    const lastSpace = slice.lastIndexOf(' ');
+    if (lastSpace > slice.length * 0.6) slice = slice.slice(0, lastSpace);
+    return slice.trimEnd() + '…';
+}
+
+/** Extrait Unicode borné, ellipses comprises. */
 export function excerptAround(full: string, needle: string, max: number): string {
-    if (full.length <= max) {
-        return full;
-    }
+    const characters = Array.from(full);
+    if (characters.length <= max) return full;
     const index = needle ? full.indexOf(needle) : -1;
-    if (index < 0) {
-        return truncate(full, max);
-    }
-    const room = Math.max(0, max - needle.length);
-    let start = Math.max(0, index - Math.floor(room / 2));
-    const end = Math.min(full.length, start + max);
-    start = Math.max(0, end - max);
-    let slice = full.slice(start, end).trim();
-    if (start > 0) {
-        slice = `…${slice}`;
-    }
-    if (end < full.length) {
-        slice = `${slice}…`;
-    }
-    return slice;
+    if (index < 0 || characterLength(needle) >= max - 2) return truncate(full, max);
+    const needleIndex = characterLength(full.slice(0, index));
+    const room = Math.max(0, max - 2 - characterLength(needle));
+    const start = Math.max(0, needleIndex - Math.floor(room / 2));
+    const end = Math.min(characters.length, start + max - 2);
+    return (start > 0 ? '…' : '') + characters.slice(start, end).join('').trim() + (end < characters.length ? '…' : '');
 }
 
 /** Clé de comparaison : minuscules, sans accents, apostrophes typographiques unifiées. */

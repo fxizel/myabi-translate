@@ -285,12 +285,17 @@ class ImportService
         $campaignTerms = [];
         $searchUpdates = [];
         $searchAttributes = [];
+        $projectionAttributes = [];
         foreach ($prepared as [$presence,$row,$exactKey,$attrs]) {
             $term = $this->findExact($known->get($presence->raw_identity_hash, collect()), $format->code, $format->identity($row));
             if (! $term) {
                 throw new \RuntimeException('Exact identity mismatch');
             }
             $created = isset($new[$exactKey]) && ! isset($newSnap[$term->id]);
+            if ($created) {
+                $searchUpdates[$term->id] = $term;
+                $searchAttributes[$term->id] = $attrs;
+            }
             $changed = ! $created && $isLatest && ! $presence->collision && ($term->semantic_hash !== $format->semanticHash($row) || $term->source_hash !== $format->sourceHash($row));
             if ($changed) {
                 $review = $term->review_needed;
@@ -342,6 +347,9 @@ class ImportService
                 $newSnap[$term->id] = true;
             }
             $presences[] = ['id' => $presence->id, 'import_id' => $import->id, 'record_number' => $presence->record_number, 'offset' => $presence->offset, 'length' => $presence->length, 'identity_hash' => $presence->identity_hash, 'raw_identity_hash' => $presence->raw_identity_hash, 'term_id' => $term->id, 'collision' => $presence->collision, 'category' => $presence->category];
+            if ((int) $term->source_import_id === (int) $import->id && (int) $term->source_offset === (int) $presence->offset && (int) $term->source_length === (int) $presence->length) {
+                $projectionAttributes[$term->id] = $attrs;
+            }
             if (! $isLatest || $presence->collision) {
                 continue;
             }
@@ -383,7 +391,7 @@ class ImportService
         if ($links) {
             DB::table('proposal_imports')->insertOrIgnore($links);
         }
-        app(SearchText::class)->syncMany(collect(array_values($searchUpdates)), $searchAttributes);
+        app(SearchText::class)->syncMany(collect(array_values($searchUpdates)), $searchAttributes, $projectionAttributes);
         DB::table('import_rows')->upsert($presences, ['id'], ['term_id']);
         $campaigns = app(CampaignService::class);
         foreach ($campaignTerms as $term) {

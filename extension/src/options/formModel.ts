@@ -12,6 +12,8 @@ export interface FormInput {
     token: string;
     tokenPersistence: string;
     uiLanguage: string;
+    searchLanguage?: string;
+    backendMode?: string;
     activationModifier: string;
     maxResults: string;
     collectContext: boolean;
@@ -80,6 +82,8 @@ export function buildSettingsFromForm(input: FormInput, lang: Lang, isValidSelec
         appUrl: input.appUrl,
         allowedDomains: domains.domains,
         uiLanguage: input.uiLanguage,
+        searchLanguage: input.searchLanguage,
+        backendMode: input.backendMode,
         activationModifier: input.activationModifier,
         maxResults: input.maxResults,
         collectContext: input.collectContext,

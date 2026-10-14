@@ -73,7 +73,7 @@ describe('Alt+clic en mode inspecteur', () => {
         expect(sent).toHaveLength(1);
         expect(sent[0]).toMatchObject({
             type: 'search',
-            request: { text: 'Enregistrer', elementTag: 'button', uiLanguage: 'fr', maxResults: 5 },
+            request: { text: 'Enregistrer', elementTag: '', uiLanguage: 'fr', maxResults: 5 },
         });
         expect(document.querySelector('myab-translation-inspector')).not.toBeNull();
     });
@@ -162,7 +162,7 @@ describe('Alt+clic en mode inspecteur', () => {
         const { sent } = await start();
 
         shadow.getElementById('sb')!.dispatchEvent(mouse('click', { altKey: true }));
-        expect(sent[0]).toMatchObject({ type: 'search', request: { text: 'Bouton shadow', elementTag: 'button' } });
+        expect(sent[0]).toMatchObject({ type: 'search', request: { text: 'Bouton shadow', elementTag: '' } });
     });
 });
 

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, parseSearchResponse, searchTranslations, sendFeedback } from '../src/api/translationApi';
+import { ApiError, parseSearchResponse as parseRealSearchResponse, searchTranslations, sendFeedback } from '../src/api/translationApi';
 import { sampleRequest, specResponse } from './helpers';
+
+const parseSearchResponse = (data: unknown) => parseRealSearchResponse(data, 'mock');
 
 const TOKEN = 'secret-token-1234';
 const API = 'https://translations.example.test/api/browser-extension';
@@ -14,7 +16,7 @@ function json(body: unknown, init: ResponseInit = {}): Response {
 }
 
 function options(fetchImpl: (input: string, init: RequestInit) => Promise<Response>, extra = {}) {
-    return { apiUrl: API, token: TOKEN, timeoutMs: 1000, fetchImpl, ...extra };
+    return { backendMode: 'mock' as const, apiUrl: API, token: TOKEN, timeoutMs: 1000, fetchImpl, ...extra };
 }
 
 async function failure(promise: Promise<unknown>): Promise<ApiError> {
@@ -113,7 +115,7 @@ describe('searchTranslations — erreurs', () => {
         [429, 'rateLimited'],
         [500, 'server'],
         [503, 'server'],
-        [422, 'http'],
+        [422, 'invalidRequest'],
     ];
 
     it.each(cases)('HTTP %i → %s', async (status, kind) => {

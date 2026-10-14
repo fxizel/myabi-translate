@@ -1,4 +1,4 @@
-import { hasMeaningfulText, normalizeText, truncate, uniqueStrings } from '../shared/text';
+import { characterLength, hasMeaningfulText, normalizeText, truncate, uniqueStrings } from '../shared/text';
 import {
     OVERLAY_ATTRIBUTE,
     closestComposed,
@@ -46,6 +46,7 @@ export type TextSource = 'content' | 'value' | 'label' | 'attribute';
 
 export interface ResolvedText {
     text: string;
+    textTruncated?: boolean;
     /** Autres lectures plausibles : texte de l'élément le plus profond, texte direct de l'élément. */
     alternatives: string[];
     source: TextSource;
@@ -316,7 +317,7 @@ function resolveControl(control: Element, maxLength: number, target: Element): R
     if (!hasMeaningfulText(text)) {
         return { ok: false, reason: 'empty' };
     }
-    const value: ResolvedText = { text: truncate(text, maxLength), alternatives: [], source, container: control, target };
+    const value: ResolvedText = { text: truncate(text, maxLength), textTruncated: characterLength(text) > maxLength, alternatives: [], source, container: control, target };
     if (attribute) {
         value.attribute = attribute;
     }
@@ -336,20 +337,22 @@ export function resolveText(target: Element, options: ExtractOptions = {}): Reso
         return resolveControl(target, maxLength, target);
     }
 
-    const own = getVisibleText(target, options);
+    const own = getVisibleText(target, options, Number.POSITIVE_INFINITY);
     let container: Element = target;
     if (hasMeaningfulText(own)) {
         container = climbInline(target, options);
     } else {
         container = findTextBearingAncestor(target, options) ?? target;
     }
-    let text = container === target ? own : getVisibleText(container, options);
-    if (text.length > maxLength) {
-        if (hasMeaningfulText(own) && own.length <= maxLength) {
+    let text = container === target ? own : getVisibleText(container, options, Number.POSITIVE_INFINITY);
+    let textTruncated = false;
+    if (characterLength(text) > maxLength) {
+        if (hasMeaningfulText(own) && characterLength(own) <= maxLength) {
             text = own;
             container = target;
         } else if (countTextBearingChildren(container, options) <= 1) {
             // Un seul long paragraphe : on le tronque. Un bloc structurel (page, section…) est refusé.
+            textTruncated = true;
             text = truncate(text, maxLength);
         } else {
             return { ok: false, reason: 'tooLong' };
@@ -364,6 +367,7 @@ export function resolveText(target: Element, options: ExtractOptions = {}): Reso
             ok: true,
             value: {
                 text,
+                textTruncated,
                 alternatives: uniqueStrings(candidates, 3, [text]),
                 source: 'content',
                 container,
@@ -378,6 +382,7 @@ export function resolveText(target: Element, options: ExtractOptions = {}): Reso
             ok: true,
             value: {
                 text: truncate(fallback.text, maxLength),
+                textTruncated: characterLength(fallback.text) > maxLength,
                 alternatives: [],
                 source: 'attribute',
                 attribute: fallback.attribute,

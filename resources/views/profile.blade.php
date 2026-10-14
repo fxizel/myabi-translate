@@ -2,7 +2,15 @@
 @section('title', __('ui.profile'))
 @section('content')
 @include('partials.heading', ['heading'=>__('ui.profile'), 'description'=>$user->name.' · '.$user->organization?->name])
-<div class="detail-grid"><section class="surface block"><h2>{{ __('ui.preferences') }}</h2><dl class="meta"><dt>{{ __('ui.email') }}</dt><dd>{{ $user->email }}</dd><dt>{{ __('ui.organization') }}</dt><dd>{{ $user->organization?->name }}</dd><dt>{{ __('ui.roles') }}</dt><dd>@foreach($user->roles as $role=>$languages)<span class="badge">{{ __('ui.'.$role) }} · {{ implode(', ',array_map('strtoupper',$languages)) }}</span> @endforeach</dd><dt>{{ __('ui.created_at') }}</dt><dd>{{ $user->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</dd><dt>{{ __('ui.updated_at') }}</dt><dd>{{ $user->updated_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</dd></dl>@include('partials.trace',['entity'=>$user])<hr class="divider"><form method="post" action="{{ route('profile.update') }}">@csrf @method('PATCH')<label class="field"><span>{{ __('ui.interface_language') }}</span><select class="input" name="locale">@foreach(['de','fr','it'] as $locale)<option value="{{ $locale }}" @selected($user->locale===$locale)>{{ __('ui.'.$locale) }}</option>@endforeach</select></label><input type="hidden" name="notifications_enabled" value="0"><label class="check-label section"><input type="checkbox" name="notifications_enabled" value="1" @checked($user->notifications_enabled)>{{ __('ui.daily_notifications') }}</label><div class="form-actions"><button class="button primary">{{ __('ui.save') }}</button></div></form></section>
+<div class="detail-grid"><section class="surface block"><h2>{{ __('ui.preferences') }}</h2><dl class="meta"><dt>{{ __('ui.email') }}</dt><dd>{{ $user->email }}</dd><dt>{{ __('ui.organization') }}</dt><dd>{{ $user->organization?->name }}</dd><dt>{{ __('ui.roles') }}</dt><dd>
+@foreach($user->roles ?? [] as $role => $languages)
+    @php($roleName = is_int($role) ? $languages : $role)
+    @if(is_string($roleName))
+        @php($roleLanguages = $user->roleLanguages($roleName))
+        <span class="badge">{{ __('ui.'.$roleName) }}@if($roleLanguages) · {{ implode(', ', array_map('strtoupper', $roleLanguages)) }}@endif</span>
+    @endif
+@endforeach
+</dd><dt>{{ __('ui.created_at') }}</dt><dd>{{ $user->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</dd><dt>{{ __('ui.updated_at') }}</dt><dd>{{ $user->updated_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</dd></dl>@include('partials.trace',['entity'=>$user])<hr class="divider"><form method="post" action="{{ route('profile.update') }}">@csrf @method('PATCH')<label class="field"><span>{{ __('ui.interface_language') }}</span><select class="input" name="locale">@foreach(['de','fr','it'] as $locale)<option value="{{ $locale }}" @selected($user->locale===$locale)>{{ __('ui.'.$locale) }}</option>@endforeach</select></label><input type="hidden" name="notifications_enabled" value="0"><label class="check-label section"><input type="checkbox" name="notifications_enabled" value="1" @checked($user->notifications_enabled)>{{ __('ui.daily_notifications') }}</label><div class="form-actions"><button class="button primary">{{ __('ui.save') }}</button></div></form></section>
 <div class="form-stack">
     <section class="surface block" aria-labelledby="password-heading">
         <h2 id="password-heading">{{ __('ui.change_password') }}</h2>
@@ -37,4 +45,5 @@
 @endif
 </section></div></div>
 <section class="surface block section"><h2>{{ __('ui.my_actions') }}</h2><div class="table-wrap"><table><thead><tr><th>{{ __('ui.date') }}</th><th>{{ __('ui.event') }}</th><th>{{ __('ui.entity') }}</th></tr></thead><tbody>@forelse($actions as $event)<tr><td>{{ $event->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i:s') }}</td><td>@include('partials.event-label', ['value'=>$event->action])</td><td>@include('partials.event-label', ['value'=>$event->entity_type, 'group'=>'entities']) #{{ $event->entity_id }}</td></tr>@empty<tr><td colspan="3">{{ __('ui.no_history') }}</td></tr>@endforelse</tbody></table></div>@include('partials.pagination',['items'=>$actions])</section>
+@include('partials.extension-tokens')
 @endsection

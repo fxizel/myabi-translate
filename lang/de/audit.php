@@ -2,6 +2,10 @@
 
 return [
     'events' => [
+        'extension' => [
+            'token_created' => 'Erweiterungstoken erstellt',
+            'token_revoked' => 'Erweiterungstoken widerrufen',
+        ],
         'account' => [
             'invited' => 'Einladung gesendet',
             'created' => 'Konto erstellt',
@@ -80,6 +84,7 @@ return [
     ],
     'origins' => ['import' => 'Import', 'proposal' => 'Vorschlag', 'scope' => 'Änderung des Geltungsbereichs'],
     'entities' => [
+        'App\\Models\\PersonalAccessToken' => 'Erweiterungstoken',
         'App\\Models\\User' => 'Konto',
         'App\\Models\\Organisation' => 'Organisation',
         'App\\Models\\ImportBatch' => 'Import',

@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 
 export function createMockServer(options?: {
-    slowMs?: number;
+    slowMs?: number; captureRequests?: boolean;
     log?: (line: string) => void;
 }): Server & { requests: Array<Record<string, unknown>> };

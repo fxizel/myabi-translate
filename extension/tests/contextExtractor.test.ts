@@ -50,7 +50,7 @@ describe('buildContext — champs de base', () => {
             elementClasses: ['lbl', 'strong'],
             ariaLabel: '',
             title: 'Info',
-            dataAttributes: { 'data-i18n-key': 'PURCHASE_ORDER', 'data-extra': 'x' },
+            dataAttributes: { 'data-i18n-key': 'PURCHASE_ORDER' },
             ariaAttributes: { 'aria-describedby': 'tip' },
             lang: 'fr',
         });
@@ -175,8 +175,9 @@ describe('buildContext — collecte désactivée et limites', () => {
         const payload = context('p', { collectContext: false });
         expect(payload).toEqual({
             text: 'Commande',
+            textTruncated: false,
             pageUrl: 'http://localhost:3000/orders/12#/detail',
-            pageTitle: 'Détail de la commande',
+            pageTitle: '',
             surroundingText: '',
             elementTag: '',
             elementId: '',
@@ -196,7 +197,7 @@ describe('buildContext — collecte désactivée et limites', () => {
         const attributes = Array.from({ length: 30 }, (_, index) => `data-a${index}="${'v'.repeat(300)}"`).join(' ');
         document.body.innerHTML = `<p id="p" ${attributes}>Commande</p>`;
         const { dataAttributes } = context('p');
-        expect(Object.keys(dataAttributes)).toHaveLength(20);
+        expect(Object.keys(dataAttributes)).toHaveLength(0);
         expect(Object.values(dataAttributes).every((value) => value.length <= 101)).toBe(true);
     });
 

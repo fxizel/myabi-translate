@@ -1,12 +1,15 @@
 {
     "apiUrl": "https://translations.example.test/api/browser-extension",
     "appUrl": "https://translations.example.test",
-    "allowedDomains": ["myab.example.test", "*.myab-test.example.test"],
+    "allowedDomains": [
+        "myab.example.test",
+        "*.myab-test.example.test"
+    ],
     "uiLanguage": "auto",
     "activationModifier": "alt",
     "maxResults": 5,
-    "collectContext": true,
-    "urlMode": "noQuery",
+    "collectContext": false,
+    "urlMode": "origin",
     "timeoutMs": 10000,
     "feedbackEnabled": false,
     "tokenPersistence": "local",
@@ -16,5 +19,7 @@
         "dialog": "",
         "sectionTitle": "",
         "ignore": ""
-    }
+    },
+    "backendMode": "real",
+    "searchLanguage": "auto"
 }

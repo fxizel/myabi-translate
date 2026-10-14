@@ -15,6 +15,9 @@ use App\Models\Revision;
 use App\Models\Term;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\BrowserExtension\ApiProblem;
+use App\Services\BrowserExtension\SearchProjection;
+use App\Services\BrowserExtension\SearchService;
 use App\Services\DevconfExportService;
 use App\Services\ImportService;
 use App\Services\LocalizedMessage;
@@ -119,6 +122,43 @@ class WorkflowImportTest extends TestCase
         $this->assertSame(1, $term->revision_no);
         $this->assertDatabaseHas('proposals', ['value' => 'Bonjour {name}', 'status' => 'pending']);
         $this->assertSame('#12345', app(SourceRecord::class)->row($term)['sa_IN']);
+    }
+
+    public function test_extension_projection_tracks_new_imports_but_keeps_canonical_imported_values_separate(): void
+    {
+        app(SearchProjection::class)->rebuild();
+        $original = $this->import([['Name' => 'ExtensionKey', 'de_CH' => 'Referenz', 'fr_CH' => 'ValeurInitiale']]);
+        $search = fn ($text) => app(SearchService::class)->search($this->manager, ['text' => $text, 'lang' => 'fr', 'textTruncated' => false, 'maxResults' => 5]);
+        $result = $search('ValeurInitiale')['results'][0];
+        $this->assertSame('imported', $result['valueOrigin']);
+        $this->assertSame('missing', $result['status']);
+        $this->assertSame(1, $result['pendingCount']);
+        $this->import([['Name' => 'ExtensionKey', 'de_CH' => 'Referenz', 'fr_CH' => 'NouvelleProposition']]);
+        $this->assertSame($original->id, Term::first()->source_import_id);
+        $this->assertSame('ValeurInitiale', $search('ValeurInitiale')['results'][0]['importedTranslation']);
+        $this->assertSame('none', $search('NouvelleProposition')['matchState']);
+        app(WorkflowService::class)->decide($this->validator, Proposal::where('value', 'NouvelleProposition')->firstOrFail(), 'validate', 1);
+        $result = $search('NouvelleProposition')['results'][0];
+        $this->assertSame('validated', $result['valueOrigin']);
+        $this->assertSame('NouvelleProposition', $result['currentTranslation']);
+        $this->assertSame('ValeurInitiale', $result['importedTranslation']);
+        $this->assertSame(0, $result['pendingCount']);
+    }
+
+    public function test_extension_rebuild_rejects_a_corrupted_private_original_without_reactivating_index(): void
+    {
+        $import = $this->import([['Name' => 'ExtensionKey', 'de_CH' => 'Referenz', 'fr_CH' => 'ValeurInitiale']]);
+        $projection = app(SearchProjection::class);
+        $projection->rebuild();
+        file_put_contents($import->originalPath(), "\r\n", FILE_APPEND);
+        try {
+            $projection->rebuild();
+            $this->fail('The changed private original cannot certify a new search generation.');
+        } catch (ApiProblem $error) {
+            $this->assertSame(503, $error->status);
+            $this->assertSame('search_index_unavailable', $error->getMessage());
+        }
+        $this->assertFalse((bool) DB::table(SearchProjection::STATE)->value('ready'));
     }
 
     public function test_import_form_and_upload_use_one_mode_without_a_completeness_parameter(): void

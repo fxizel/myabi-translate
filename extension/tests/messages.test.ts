@@ -4,12 +4,12 @@ import { sampleRequest } from './helpers';
 
 describe('sanitizeSearchRequest', () => {
     it('conserve une requête valide', () => {
-        const request = sampleRequest({ elementClasses: ['a', 'b'], dataAttributes: { 'data-key': 'X' } });
+        const request = sampleRequest({ elementClasses: ['a', 'b'], dataAttributes: { 'data-i18n-key': 'X' } });
         expect(sanitizeSearchRequest(request)).toMatchObject({
             text: 'Commande',
             elementTag: 'span',
             elementClasses: ['a', 'b'],
-            dataAttributes: { 'data-key': 'X' },
+            dataAttributes: { 'data-i18n-key': 'X' },
             maxResults: 5,
             uiLanguage: 'fr',
         });
@@ -34,8 +34,8 @@ describe('sanitizeSearchRequest', () => {
             ariaLabel: { evil: true },
         });
         expect(request).not.toBeNull();
-        expect(request!.text.length).toBeLessThanOrEqual(501);
-        expect(request!.pageTitle.length).toBeLessThanOrEqual(201);
+        expect(request!.text.length).toBeLessThanOrEqual(500);
+        expect(request!.pageTitle.length).toBeLessThanOrEqual(200);
         expect(request!.elementClasses).toHaveLength(20);
         expect(request!.siblingTexts).toHaveLength(6);
         expect(request!.maxResults).toBe(20);
@@ -49,7 +49,7 @@ describe('sanitizeSearchRequest', () => {
             dataAttributes: { 'data-id': '1', onclick: 'alert(1)', 'data-a b': 'x', style: 'color:red' },
             ariaAttributes: { 'aria-describedby': 'tip', class: 'x' },
         });
-        expect(request?.dataAttributes).toEqual({ 'data-id': '1' });
+        expect(request?.dataAttributes).toEqual({});
         expect(request?.ariaAttributes).toEqual({ 'aria-describedby': 'tip' });
     });
 

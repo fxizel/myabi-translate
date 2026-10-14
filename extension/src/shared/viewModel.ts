@@ -5,6 +5,10 @@ import { buildManualSearchUrl, safeLinkUrl, validateHttpUrl } from './url';
 export interface ResultsView {
     state: MatchState;
     results: PanelResult[];
+    hasMore: boolean;
+    candidateSetComplete: boolean;
+    mock: boolean;
+    feedbackAllowed: boolean;
 }
 
 /** Base de l'application de gestion : « URL de l'application » ou, à défaut, l'origine de l'API. */
@@ -40,10 +44,16 @@ export function manualSearchLink(settings: Settings, query: string): string | nu
 
 /** Classe (score décroissant), borne à « nombre maximum de résultats » et qualifie la réponse de l'API. */
 export function buildResultsView(response: SearchResponse, request: SearchRequest, settings: Settings): ResultsView {
-    const ranked = rankResults(response.results, request.text, settings.maxResults);
+    const ranked = response.contractVersion === 2 ? response.results : rankResults(response.results, request.text);
+    let state = response.contractVersion === 2 || response.mock && response.matchState ? response.matchState! : classifyResults(ranked, request.text);
+    if (request.textTruncated && state === 'strong') state = 'noExact';
     const origins = allowedLinkOrigins(settings);
     return {
-        state: classifyResults(ranked, request.text),
-        results: toPanelResults(ranked, request.text, (url) => safeLinkUrl(url, origins)),
+        state,
+        hasMore: response.hasMore ?? ranked.length > settings.maxResults,
+        candidateSetComplete: response.candidateSetComplete ?? !request.textTruncated,
+        mock: response.mock === true,
+        feedbackAllowed: response.feedbackAllowed ?? settings.backendMode === 'mock',
+        results: toPanelResults(ranked.slice(0, settings.maxResults), request.text, (url) => safeLinkUrl(url, origins)),
     };
 }

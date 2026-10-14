@@ -2,7 +2,7 @@
 
 État au 13 octobre 2026, référentiel commun après la transition du 13.10.2026. Ces cas décrivent les fonctions implémentées dans l’application Laravel. Les acteurs correspondent aux [personas](personas.md) ; les chemins d’écran sont détaillés dans les [parcours UI et UX](parcours-ui-ux.md). Les résultats supposent que les droits et les conditions indiqués sont satisfaits.
 
-L’extension navigateur [MyAB Translation Inspector](../../extension/README.md) dispose de son propre code et de tests avec une API factice. Les routes de recherche et de retour de correspondance qu’elle attend ne sont pas implémentées dans cette application Laravel ; elle ne constitue donc pas un parcours intégré au référentiel actuel.
+L’extension navigateur [MyAB Translation Inspector](../../extension/README.md) retrouve les cellules du catalogue commun via l’API Laravel version 2 et un jeton créé dans le profil. Elle distingue les valeurs importées et validées et ouvre la fiche pour correction, sans modifier MyAB. Le [contrat et la recette](../technique/api-extension-implementation.md) décrivent ce parcours complémentaire ; son feedback facultatif n’est pas une validation de traduction.
 
 ## Accès au référentiel
 

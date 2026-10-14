@@ -182,10 +182,11 @@ Les mesures sur les fichiers complets, l’espace réellement consommé chez l�
 
 ## Extension navigateur MyAB Translation Inspector
 
-Le dossier [`extension/`](extension/README.md) contient une extension Chrome et Firefox (WebExtensions MV3, TypeScript). Un Alt+clic sur un texte de l’ERP MyAB interroge `POST {apiUrl}/search` et affiche dans un panneau flottant la clé, le texte allemand, la traduction, le module et le statut des correspondances, avec les actions Copier la clé, Copier le texte allemand, Ouvrir la traduction et Signaler correcte. Seuls le texte cliqué et son contexte (jamais de HTML) sont transmis, uniquement sur les domaines MyAB configurés.
+Le dossier [`extension/`](extension/README.md) contient une extension Chrome et Firefox (WebExtensions MV3, TypeScript). Alt+clic sur un texte de MyAB interroge la recherche réelle Laravel et affiche les cellules correspondantes : type, clé, attribut, langue, référence, valeur importée et traduction validée. Le verdict conserve les ambiguïtés même si un seul résultat est affiché. Les corrections passent par la fiche web ; un retour de correspondance ne valide aucune traduction.
 
 - L’extension est indépendante de l’application Laravel et hors des livraisons Laravel et Docker. Node 20.19+ n’est requis que pour la développer : `cd extension && npm install && npm run check`.
-- Les routes `POST /api/browser-extension/search` et `/feedback` n’existent pas encore dans cette application. En attendant, `npm run serve:mock` lance une API factice qui permet d’essayer l’extension sur le vrai MyAB.
+- Les routes `POST /api/browser-extension/search` et `/feedback` utilisent le [contrat v2](docs/technique/api-extension-navigateur.md), un jeton personnel créé dans le profil et une projection construite par `php artisan referentiel:extension-search-rebuild`. Voir la [mise en service et la recette](docs/technique/api-extension-implementation.md).
+- `npm run serve:mock` reste disponible dans le mode de test explicite ; aucune erreur de l’API réelle ne provoque de bascule vers lui.
 - Le [README de l’extension](extension/README.md) décrit le build, le chargement dans Chrome et Firefox, la configuration, le contrat de l’API, la sécurité et la page de test.
 
 ## Livraison et exploitation
