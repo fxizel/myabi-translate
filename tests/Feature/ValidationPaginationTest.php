@@ -6,6 +6,8 @@ use App\Http\Middleware\RequireTwoFactor;
 use App\Models\Organisation;
 use App\Models\Proposal;
 use App\Models\Term;
+use App\Models\TermGroup;
+use App\Models\TranslationCampaign;
 use App\Models\User;
 use App\Services\SourceRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -144,6 +146,86 @@ class ValidationPaginationTest extends TestCase
 
         auth()->logout();
         $this->getJson('/validation?per_page=all&language=fr')->assertUnauthorized();
+    }
+
+    public function test_group_and_campaign_filters_intersect_active_terms_and_preserve_language_rights(): void
+    {
+        $group = $this->group();
+        $campaign = $this->campaign();
+        $matching = $this->proposal('matching', term: ['term_group_id' => $group->id]);
+        $inactive = $this->proposal('inactive', term: ['term_group_id' => $group->id]);
+        $outside = $this->proposal('outside', term: ['term_group_id' => $group->id]);
+        $ungrouped = $this->proposal('ungrouped');
+        $italian = $this->proposal('italian', proposal: ['language' => 'it'], term: ['term_group_id' => $group->id]);
+        foreach ([$matching, $inactive, $ungrouped, $italian] as $proposal) {
+            $campaign->participations()->create(['term_id' => $proposal->term_id, 'attribute' => 'label', 'active' => $proposal->id !== $inactive->id]);
+        }
+
+        $url = '/validation?language=fr&campaign_id='.$campaign->id;
+        $campaignOnly = $this->get($url)->assertOk();
+        self::assertSame([$matching->id, $ungrouped->id], $campaignOnly->viewData('proposals')->pluck('id')->all());
+        $combined = $this->get($url.'&group_id='.$group->id.'&type=server&context=test')->assertOk();
+        self::assertSame(1, $combined->viewData('proposalTotal'));
+        self::assertSame([$matching->id], $combined->viewData('proposals')->pluck('id')->all());
+        $combined->assertSee('name="group_id"', false)->assertSee('name="campaign_id"', false);
+        self::assertTrue($combined->viewData('groups')->contains('id', $group->id));
+        self::assertTrue($combined->viewData('filterCampaigns')->contains('id', $campaign->id));
+        $without = $this->get($url.'&group_id=none')->assertOk();
+        self::assertSame([$ungrouped->id], $without->viewData('proposals')->pluck('id')->all());
+        $groupOnly = $this->get('/validation?group_id='.$group->id)->assertOk();
+        self::assertSame([$matching->id, $inactive->id, $outside->id], $groupOnly->viewData('proposals')->pluck('id')->all());
+        $forbiddenLanguage = $this->getJson('/validation?per_page=all&language=it&campaign_id='.$campaign->id.'&group_id='.$group->id)
+            ->assertOk()->assertJsonPath('next_url', null);
+        self::assertSame([], $this->selectionIds($forbiddenLanguage->json('html')));
+    }
+
+    public function test_scope_filters_survive_numbered_and_cursor_pagination(): void
+    {
+        $group = $this->group();
+        $campaign = $this->campaign();
+        $expected = [];
+        for ($index = 0; $index < 105; $index++) {
+            $proposal = $this->proposal('scope-'.$index, term: ['term_group_id' => $group->id]);
+            $expected[] = $proposal->id;
+            $campaign->participations()->create(['term_id' => $proposal->term_id, 'attribute' => 'label']);
+        }
+        $this->proposal('outside-campaign', term: ['term_group_id' => $group->id]);
+        $query = ['language' => 'fr', 'group_id' => $group->id, 'campaign_id' => $campaign->id];
+        $numbered = $this->get('/validation?'.http_build_query($query + ['per_page' => 25, 'page' => 2]))->assertOk();
+        self::assertSame(105, $numbered->viewData('proposalTotal'));
+        self::assertSame(array_slice($expected, 25, 25), $this->selectionIds($numbered->getContent()));
+        parse_str(parse_url($numbered->viewData('proposals')->previousPageUrl(), PHP_URL_QUERY), $previous);
+        self::assertSame((string) $group->id, $previous['group_id']);
+        self::assertSame((string) $campaign->id, $previous['campaign_id']);
+
+        $all = $this->get('/validation?'.http_build_query($query + ['per_page' => 'all']))->assertOk();
+        self::assertSame(105, $all->viewData('proposalTotal'));
+        self::assertSame(array_slice($expected, 0, 100), $this->selectionIds($all->getContent()));
+        $next = $all->viewData('proposals')->nextPageUrl();
+        self::assertNotNull($next);
+        $remaining = $this->getJson($next)->assertOk()->assertJsonPath('next_url', null);
+        self::assertSame(array_slice($expected, 100), $this->selectionIds($remaining->json('html')));
+    }
+
+    public function test_scope_filters_reject_invalid_parameters(): void
+    {
+        foreach (['invalid', '0', '-1'] as $group) {
+            $this->getJson('/validation?group_id='.$group)->assertUnprocessable()->assertJsonValidationErrors('group_id');
+        }
+        foreach (['invalid', '999999'] as $campaign) {
+            $this->getJson('/validation?campaign_id='.$campaign)->assertUnprocessable()->assertJsonValidationErrors('campaign_id');
+        }
+    }
+
+    private function group(): TermGroup
+    {
+        return TermGroup::create(['title' => 'Synthetic group', 'created_by' => $this->validator->id, 'updated_by' => $this->validator->id]);
+    }
+
+    private function campaign(): TranslationCampaign
+    {
+        return TranslationCampaign::create(['title' => 'Synthetic campaign', 'objective' => 'translation', 'language' => 'fr',
+            'created_by' => $this->validator->id, 'updated_by' => $this->validator->id]);
     }
 
     private function selectionIds(string $html): array

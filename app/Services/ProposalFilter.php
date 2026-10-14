@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Domain\Devconf\FormatRegistry;
 use App\Models\Proposal;
+use App\Models\TranslationCampaign;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,8 @@ class ProposalFilter
             'organization_id' => 'nullable|integer',
             'import_id' => 'nullable|integer',
             'overdue' => 'nullable|boolean',
+            'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
+            'campaign_id' => 'nullable|integer|exists:translation_campaigns,id',
         ])->validate();
         $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
         $filters['language'] ??= $user->canManage() ? 'fr' : ($user->roleLanguages('validator')[0] ?? 'fr');
@@ -39,6 +42,15 @@ class ProposalFilter
         $query = Proposal::where('status', 'pending')->where('language', $filters['language']);
         if (! $user->canManage()) {
             $query->whereIn('language', $user->roleLanguages('validator'));
+        }
+        if (isset($filters['group_id'])) {
+            $query->whereHas('term', fn ($term) => $filters['group_id'] === 'none'
+                ? $term->whereNull('term_group_id')
+                : $term->where('term_group_id', (int) $filters['group_id']));
+        }
+        if (isset($filters['campaign_id'])) {
+            $campaign = TranslationCampaign::visibleTo($user)->findOrFail($filters['campaign_id']);
+            $query->whereIn('term_id', $campaign->participations()->where('active', true)->select('term_id'));
         }
         if (isset($filters['import_id'])) {
             $query->where(fn ($origin) => $origin->where('import_id', $filters['import_id'])

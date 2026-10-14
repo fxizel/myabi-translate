@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\BulkOperation;
 use App\Models\Proposal;
 use App\Models\Term;
+use App\Models\TermGroup;
+use App\Models\TranslationCampaign;
 use App\Services\FilteredValidationService;
 use App\Services\OperationLock;
 use App\Services\ProposalFilter;
@@ -44,7 +46,10 @@ class ProposalController extends Controller
         $filteredOperations = BulkOperation::where('type', 'filtered_validation')->where('user_id', $request->user()->id)
             ->latest('id')->limit(5)->get();
 
-        return view('validation.index', [...$viewData, ...compact('filteredSnapshot', 'filteredOperations')]);
+        $groups = TermGroup::visibleTo($request->user())->orderBy('title')->get();
+        $filterCampaigns = TranslationCampaign::visibleTo($request->user())->orderBy('title')->get();
+
+        return view('validation.index', [...$viewData, ...compact('filteredSnapshot', 'filteredOperations', 'groups', 'filterCampaigns')]);
     }
 
     public function validateFiltered(Request $request, FilteredValidationService $validation)

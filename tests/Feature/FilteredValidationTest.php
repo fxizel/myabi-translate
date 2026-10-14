@@ -12,6 +12,8 @@ use App\Models\Organisation;
 use App\Models\Proposal;
 use App\Models\Revision;
 use App\Models\Term;
+use App\Models\TermGroup;
+use App\Models\TranslationCampaign;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\FilteredValidationService;
@@ -163,6 +165,36 @@ class FilteredValidationTest extends TestCase
         }
         $this->assertSame('rejected', $proposals[4]->fresh()->status);
         $this->assertSame(1, $operation->fresh()->counts['validated']);
+    }
+
+    public function test_filtered_validation_keeps_the_group_and_campaign_scope_from_the_snapshot(): void
+    {
+        $this->import(4);
+        $proposals = Proposal::orderBy('id')->get();
+        $group = TermGroup::create(['title' => 'Synthetic group', 'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
+        $campaign = TranslationCampaign::create(['title' => 'Synthetic campaign', 'objective' => 'translation', 'language' => 'fr',
+            'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
+        foreach ([0, 1, 2] as $index) {
+            $proposals[$index]->term->update(['term_group_id' => $group->id]);
+        }
+        foreach ([0, 1, 3] as $index) {
+            $campaign->participations()->create(['term_id' => $proposals[$index]->term_id, 'attribute' => 'label', 'active' => $index !== 1]);
+        }
+        $filters = ['group_id' => $group->id, 'campaign_id' => $campaign->id];
+        $response = $this->listing($filters);
+        $this->assertSame(1, $response->viewData('proposalTotal'));
+        $this->post('/proposals/validate-filtered', ['snapshot_token' => $response->viewData('filteredSnapshot'), 'confirmed' => 1,
+            'group_id' => 'none', 'campaign_id' => null])
+            ->assertRedirect(route('validation.index', ['language' => 'fr', ...$filters]))->assertSessionHasNoErrors();
+        $operation = BulkOperation::where('type', 'filtered_validation')->latest('id')->firstOrFail();
+        $this->assertSame((string) $group->id, $operation->preview['filters']['group_id']);
+        $this->assertSame((string) $campaign->id, $operation->preview['filters']['campaign_id']);
+        $this->assertTrue($this->step($operation));
+        $this->assertSame(1, $operation->fresh()->counts['validated']);
+        $this->assertSame('validated', $proposals[0]->fresh()->status);
+        foreach ([1, 2, 3] as $index) {
+            $this->assertSame('pending', $proposals[$index]->fresh()->status);
+        }
     }
 
     public function test_excluded_proposals_are_counted_without_preventing_other_matching_decisions(): void
