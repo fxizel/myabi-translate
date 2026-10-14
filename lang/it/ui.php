@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'upload_too_large_title' => 'File troppo grande',
+    'upload_too_large_help' => 'L’invio supera il limite del server e non è stata creata alcuna importazione. Le importazioni accettano file fino a 100 MiB quando il server è configurato per questa dimensione. Se il file è più piccolo, segnali questo errore all’amministratore per verificare la configurazione del server. Dovrà selezionare nuovamente il file.',
+    'upload_return' => 'Torna alle importazioni',
     'preserved_source_cells' => 'Celle di riferimento conservate',
     'empty_targets' => 'Celle di destinazione non convalidate vuote',
     'historical_lineages' => 'Cronologie storiche',

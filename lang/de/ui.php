@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'upload_too_large_title' => 'Datei zu gross',
+    'upload_too_large_help' => 'Die Übertragung überschreitet das Serverlimit. Es wurde kein Import erstellt. Importe unterstützen Dateien bis 100 MiB, wenn der Server dafür konfiguriert ist. Ist Ihre Datei kleiner, melden Sie diesen Fehler der Administration, damit die Serverkonfiguration geprüft wird. Wählen Sie die Datei danach erneut aus.',
+    'upload_return' => 'Zurück zu den Importen',
     'preserved_source_cells' => 'Erhaltene Referenzzellen',
     'empty_targets' => 'Leere nicht validierte Zielzellen',
     'historical_lineages' => 'Historische Verläufe',

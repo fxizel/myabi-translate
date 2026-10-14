@@ -111,6 +111,6 @@ La disponibilité et la capacité du compte alwaysdata, le hook vers le stockage
 
 ## Limites de transfert PHP
 
-Le dossier `public` contient un `.user.ini` pour PHP-FPM : mémoire 256 Mio, fichier 100 Mio, requête 110 Mio, lecture de la requête jusqu'à 1 800 secondes. Les traitements métier restent confiés au planificateur ; la requête web normale est limitée à 120 secondes. Vérifier dans le panneau alwaysdata que ces valeurs sont appliquées et que le frontal HTTP accepte aussi le DEVCONF Incident code complet. PHP CLI doit utiliser PHP 8.4 et une limite mémoire de 256 Mio. Le serveur intégré local peut ignorer `.user.ini` : utiliser alors les mêmes réglages dans son `php.ini`.
+Le dossier `public` contient un `.user.ini` pour PHP-FPM : mémoire 256 Mio, fichier 100 Mio, requête 110 Mio, lecture de la requête jusqu'à 1 800 secondes. Les traitements métier restent confiés au planificateur ; la requête web normale est limitée à 120 secondes. Vérifier dans le panneau alwaysdata que ces valeurs sont appliquées et que le frontal HTTP accepte aussi le DEVCONF Incident code complet. PHP CLI doit utiliser PHP 8.4 et une limite mémoire de 256 Mio. Le serveur intégré local ignore `.user.ini` : repérer son `php.ini` avec `php --ini`, y appliquer les mêmes limites, puis redémarrer le serveur. Voir le [diagnostic des imports locaux](../../README.md#installation-locale).
 
 Le test du téléversement se fait avec le fichier réel depuis un navigateur, séparément de la durée d'analyse et d'application. Ne pas considérer un import CLI comme preuve du transfert HTTP.

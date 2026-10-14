@@ -117,6 +117,8 @@ php artisan serve --host=127.0.0.1
 
 La commande d’installation demande le mot de passe de l’administrateur sans l’afficher. L’administrateur crée ensuite les organisations et invite les utilisateurs depuis l’administration. Le compte technique d’import est créé automatiquement et ne peut pas se connecter.
 
+**Taille des imports locaux.** Le serveur intégré ignore `public/.user.ini`. Avant de le lancer, repérer son fichier de configuration avec `php --ini` (ou `.\.runtime\php\php.exe --ini` sur ce poste), puis régler `upload_max_filesize = 100M`, `post_max_size = 110M`, `max_input_time = 1800` et `max_execution_time = 120` dans le `php.ini` indiqué. Conserver une mémoire d’au moins 256 Mio et désactiver `display_errors` ainsi que `display_startup_errors`. Redémarrer ensuite le serveur local. Une erreur 413 avec « POST Content-Length exceeds the limit of 8388608 bytes » signifie que PHP utilise encore la limite de requête par défaut de 8 Mio, avant même la lecture du CSV par l’application. Les options `php -d ... artisan serve` ne suffisent pas : Artisan lance un processus PHP distinct sans ces options.
+
 > [!CAUTION]
 > Ne jamais committer `.env` ni les fichiers privés. Ne pas utiliser les identifiants du pilote ni des données opérationnelles dans les tests.
 
