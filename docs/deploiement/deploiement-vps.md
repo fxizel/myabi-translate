@@ -240,6 +240,59 @@ L'upstream livré utilise une zone partagée et `resolve` avec le DNS Docker `12
 
 Pour la variante native, modifier `/srv/myabi/shared/.env`, reconstruire la configuration avec `php artisan config:cache` depuis la version active et recharger son service PHP-FPM. En développement local, modifier `.env` puis exécuter `php artisan config:clear`. Conserver le cache applicatif des limites de tentatives et de protection anti-rejeu TOTP. Aucun changement de configuration ni déploiement distant n'est effectué par l'ajout de cette option au code.
 
+## Commande de mise à jour rapide Docker
+
+Une installation Docker déjà configurée se met à jour depuis un **checkout propre et committé** avec `scripts/deploy-vps.ps1` (Windows) ou `scripts/deploy-vps.py` (Windows/Linux). La commande livre le commit courant ; elle n’installe pas le VPS. Une version déjà active ne provoque aucune bascule.
+
+Prérequis sur le poste : Python 3.12+, Git, OpenSSH avec clé d’hôte déjà vérifiée, Docker en mode Linux amd64, PHP 8.4 avec les dépendances de développement installées et Node 24 pour les tests locaux. Le VPS doit disposer de Python 3.10+, Docker Compose et d’un accès `sudo -n` permettant les opérations ciblées. Aucun Node supplémentaire n’est installé en production.
+
+Créer une fois la configuration privée :
+
+```powershell
+New-Item -ItemType Directory -Force .runtime | Out-Null
+Copy-Item deploy/docker/deploy-client.example.json .runtime/vps-deploy.json
+```
+
+Renseigner l’hôte, le compte et la clé SSH, la racine distante existante, l’URL HTTPS et les chemins des outils locaux dans ce JSON. Les chemins relatifs de clé SSH sont résolus depuis le dossier de configuration. **Ne jamais committer la configuration réelle** : `.runtime/` est ignoré par Git. L’exemple ne contient que des valeurs fictives. Les commandes de test sont des tableaux d’arguments, sans shell ; les jokers des fichiers de test sont développés par le client. Le contrôle des sept originaux nécessite leur présence locale dans `data/imports/` ; ils ne sont pas livrés. S’ils sont conservés ailleurs, renseigner `originals_dir` (relatif au dossier de configuration ou absolu) et passer ce même dossier comme argument à `scripts/test_devconf_roundtrip.php` dans `test_commands`.
+
+Depuis la racine du dépôt :
+
+```powershell
+# Inventaire et compatibilité en lecture seule, même avec des modifications locales.
+.\scripts\deploy-vps.ps1 -Plan
+
+# Livrer le commit courant après validation.
+.\scripts\deploy-vps.ps1
+
+# Variantes : interpréteur local ou commit attendu du checkout courant.
+.\scripts\deploy-vps.ps1 -Python 'C:\outils\python\python.exe' -Ref HEAD
+```
+
+Le client Python peut aussi être appelé directement :
+
+```sh
+python scripts/deploy-vps.py --plan
+python scripts/deploy-vps.py
+```
+
+La préparation se déroule avant maintenance : inventaire des services, comparaison des fichiers critiques, tests locaux, construction des deux images avec cache Docker et transfert compressé des seules images absentes. Les résultats de tests sont réutilisés uniquement si les fichiers testés, les commandes, les exécutables, les métadonnées des dépendances locales, la configuration locale et les originaux ont la même empreinte. Les images sont contrôlées par leur identifiant et par leur manifeste de release ; aucune image n’est construite sur le VPS.
+
+Ensuite, le client acquiert un bail de déploiement persistant, arrête uniquement les timers myABI initialement actifs et attend les traitements admis. Il ferme l’application, transfère la sauvegarde vers le poste et vérifie tous les membres du ZIP avant de basculer. Seuls `app` et `myabi-web` sont recréés. Le conteneur SQL, les autres projets, les fichiers privés, le verrou des opérations, les compteurs du catalogue et la projection de recherche de l’extension sont contrôlés. La santé CLI, les droits d’audit, PHP-FPM, Nginx et les routes HTTPS `/up` et `/login` sont vérifiés avant le succès final. Les timers retrouvent leur état initial.
+
+Cette voie rapide exige un schéma et une infrastructure inchangés. Une modification des migrations, de la projection/normalisation de recherche ou des fichiers Docker critiques arrête la commande **avant maintenance** ; suivre alors la procédure complète ci-dessous, avec examen des migrations et des droits SQL. Le client ne lance ni migration, ni reconstruction de projection, ni nettoyage global Docker. L’extension navigateur reste hors des livraisons Laravel ; son API côté Laravel est incluse.
+
+Les sauvegardes, journaux et reçus restent sous `.runtime/vps-deploy/` sur le poste et sous `operations/deploy-<identifiant>/` dans la racine privée distante. Prévoir leur capacité et une rétention adaptée. Une erreur tente automatiquement de rétablir la version précédente et les timers de ce déploiement. Si la connexion est perdue ou si la récupération échoue, conserver les reçus et reprendre le bail appartenant à ce poste avec l’identifiant affiché :
+
+```powershell
+.\scripts\deploy-vps.ps1 -Recover IDENTIFIANT
+```
+
+```sh
+python scripts/deploy-vps.py --recover IDENTIFIANT
+```
+
+Un bail appartenant à un autre déploiement, une maintenance préexistante ou une configuration privée modifiée entre-temps ne sont pas écrasés. Ne pas effacer un bail à la main pour contourner ce contrôle.
+
 ## Mises à jour et retour arrière Docker
 
 1. Préparer les nouvelles images et garder les tags/digests de la version précédente. Mesurer la marge disque ; aucun nettoyage global Docker.
@@ -256,7 +309,7 @@ Les modèles `deploy/vps/` servent à une installation native volontaire : pool 
 
 Le paquet natif se construit avec `scripts/package-release.sh` et se livre avec `scripts/deploy.sh` (voir [operations.md](operations.md)). Les variables optionnelles sont `PHP_BIN`, `DEPLOY_GROUP` et `DEPLOY_PUBLIC_GROUP`. Ne pas utiliser cette voie pour Docker. Le hook privé `post-migrate-hook.sh` peut appliquer les droits des nouvelles tables avant les contrôles de santé.
 
-Pour automatiser Compose, l'étape suivante sera de construire/publier les deux images depuis un commit testé, puis de faire exécuter la procédure ci-dessus avec une identité dédiée et une clé d'hôte vérifiée. On décidera du registre et du mécanisme d'exécution après le premier déploiement manuel. Ne pas installer de runner d'intégration permanent sur le VPS.
+La commande de mise à jour rapide ci-dessus automatise les livraisons sans changement de schéma. Les évolutions du schéma ou de l’infrastructure conservent cette procédure complète. Aucun runner d’intégration permanent n’est installé sur le VPS.
 
 ## Critères avant ouverture aux utilisateurs
 

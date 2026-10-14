@@ -200,7 +200,7 @@ Caddy est le frontal HTTPS unique, en conteneur Docker : le profil `compose.cadd
 | [Sécurité du déploiement](docs/deploiement/security-deployment.md) | Comptes SQL distincts, contrôle du journal en ajout seul et sessions. |
 | [Recette des opérations](docs/deploiement/recette-operations.md) | Preuves locales de sécurité et d’exploitation, conditions avant activation du pilote. |
 
-Le dépôt ne contient pas de workflow d’intégration ou de livraison automatique. Le paquet de production se construit depuis `composer.lock` avec `scripts/package-release.sh` ; `scripts/deploy.sh` le livre sur une installation native. La livraison Docker suit le guide VPS et ne doit pas utiliser ce script natif.
+Pour une installation Docker existante, `.\scripts\deploy-vps.ps1` livre rapidement le commit courant avec tests, cache d’images, sauvegarde vérifiée et récupération ; `-Plan` effectue les vérifications en lecture seule. La [configuration privée et les limites de cette commande](docs/deploiement/deploiement-vps.md#commande-de-mise-à-jour-rapide-docker) sont décrites dans le guide VPS. Le paquet de production se construit depuis `composer.lock` avec `scripts/package-release.sh` ; `scripts/deploy.sh` le livre sur une installation native. Le dépôt ne contient pas de pipeline CI/CD hébergé.
 
 Les mesures historiques alwaysdata Free restent documentées ; le VPS reçoit sa propre enveloppe de stockage mesurée. Le profil utilise la compression InnoDB et les migrations vérifient qu’elle est effectivement activée. Ne pas relever un quota pour contourner un refus sans capacité réellement disponible.
 

@@ -1,0 +1,17 @@
+{
+  "ssh_host": "vps.example.org",
+  "ssh_user": "deploy",
+  "ssh_key": "~/.ssh/myabi_deploy",
+  "remote_root": "/opt/myabi",
+  "site_url": "https://myabi.example.org",
+  "ssh_port": 22,
+  "project": "myabi-translate",
+  "min_free_bytes": 3221225472,
+  "operations_timeout_seconds": 2100,
+  "test_commands": [
+    ["php", "artisan", "test"],
+    ["node", "--test", "tests/JavaScript/*.test.cjs"],
+    ["python", "-m", "unittest", "discover", "-s", "tests/Operations", "-p", "test_*.py"],
+    ["php", "scripts/test_devconf_roundtrip.php", "--validate-semantics"]
+  ]
+}
