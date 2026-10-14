@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Services\CommonScope;
 use Illuminate\Database\Eloquent\Model;
 
 class TranslationCampaign extends Model
@@ -36,17 +35,7 @@ class TranslationCampaign extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if (! $user->active || $user->is_technical) {
-            return $query->whereRaw('1 = 0');
-        }
-        if ($user->canManage() || $user->canValidateAny()) {
-            return $query;
-        }
-
-        return CommonScope::forOrganization($query, $user->organization_id, 'translation_campaigns.organization_id')
-            ->whereDoesntHave('participations', fn ($q) => $q->whereNotIn('term_id', Term::visibleTo($user)->select('terms.id')))
-            ->whereDoesntHave('groups', fn ($q) => $q->whereNotIn('term_groups.id', TermGroup::visibleTo($user)->select('term_groups.id')))
-            ->whereDoesntHave('assignees', fn ($q) => CommonScope::outsideOrganization($q, (int) $user->organization_id, 'users.organization_id'));
+        return $user->canSeeCatalogue() ? $query : $query->whereRaw('1 = 0');
     }
 
     public function isOverdue(): bool

@@ -20,7 +20,7 @@ class CampaignParticipation extends Model
 
     public function term()
     {
-        return $this->belongsTo(Term::class);
+        return $this->belongsTo(Term::class)->withoutGlobalScope('current');
     }
 
     public function trackedProposal()

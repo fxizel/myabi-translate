@@ -122,24 +122,23 @@ class CampaignAccessTest extends TestCase
         self::assertSame(['label' => ['fr' => 'Current value']], $term->fresh()->validated);
     }
 
-    public function test_assignment_does_not_grant_access_when_the_term_moves_to_a_private_scope(): void
+    public function test_assigned_participants_from_another_organization_work_on_the_same_term(): void
     {
-        $participant = $this->user(['translator' => ['fr']]);
-        $term = $this->term('Scope restriction', ['fr' => 'Current value'], $this->organization->id);
-        $campaign = $this->campaign('Scope campaign', ['objective' => 'revision', 'term_ids' => [$term->id], 'assignee_ids' => [$participant->id]]);
-        $this->post('/campaigns/'.$campaign->id.'/start')->assertRedirect()->assertSessionHasNoErrors();
-        $before = $campaign->participations()->firstOrFail()->getAttributes();
         $foreign = Organisation::create(['code' => 'QB', 'name' => 'Synthetic foreign organization', 'active' => true]);
-        $term->update(['organization_id' => $foreign->id, 'lock_version' => $term->lock_version + 1]);
+        $participant = $this->user(['translator' => ['fr']], $foreign->id);
+        $term = $this->term('Shared revision', ['fr' => 'Current value']);
+        $campaign = $this->campaign('Shared campaign', ['objective' => 'revision', 'term_ids' => [$term->id], 'assignee_ids' => [$participant->id]]);
+        $this->post('/campaigns/'.$campaign->id.'/start')->assertRedirect()->assertSessionHasNoErrors();
+        $before = $term->fresh()->validated;
         $this->actingAs($participant);
 
-        $base = '/campaigns/'.$campaign->id.'/terms/'.$term->id;
-        $this->get('/campaigns/'.$campaign->id)->assertNotFound();
-        $this->postJson($base.'/propose', ['value' => 'Foreign correction', 'lock_version' => $term->lock_version])->assertForbidden();
-        $this->postJson($base.'/confirm', ['lock_version' => $term->lock_version])->assertForbidden();
+        $this->get('/campaigns/'.$campaign->id)->assertOk()->assertSee($term->label);
+        $this->post('/campaigns/'.$campaign->id.'/terms/'.$term->id.'/confirm', ['lock_version' => $term->lock_version])
+            ->assertRedirect()->assertSessionHasNoErrors();
 
         self::assertSame(0, Proposal::count());
-        self::assertSame($before, $campaign->participations()->firstOrFail()->getAttributes());
+        self::assertSame($before, $term->fresh()->validated);
+        self::assertSame('completed', $campaign->fresh()->status);
     }
 
     public function test_assigned_participant_can_confirm_without_acquiring_validation_rights(): void
@@ -178,12 +177,12 @@ class CampaignAccessTest extends TestCase
         self::assertSame(1, $filtered->viewData('terms')->total());
         self::assertSame(['server' => 1], $filtered->viewData('typeCounts')->all());
         $without = $this->get('/terms?group_id=none')->assertOk();
-        self::assertSame([$ungrouped->id], $without->viewData('terms')->pluck('id')->all());
-        self::assertSame(1, $without->viewData('terms')->total());
+        self::assertSame([$ungrouped->id, $private->id], $without->viewData('terms')->pluck('id')->all());
+        self::assertSame(2, $without->viewData('terms')->total());
         $filtered->assertDontSee('Grouped private');
     }
 
-    public function test_private_memberships_hide_group_and_campaign_instructions_as_a_whole(): void
+    public function test_shared_memberships_show_groups_campaigns_and_instructions_to_catalogue_readers(): void
     {
         $foreign = Organisation::create(['code' => 'QB', 'name' => 'Synthetic foreign organization', 'active' => true]);
         $private = $this->term('Private campaign term', owner: $foreign->id);
@@ -195,11 +194,11 @@ class CampaignAccessTest extends TestCase
             'group_ids' => [$group->id], 'assignee_ids' => [$this->manager->id]]);
         $this->actingAs($this->user(['reader' => ['fr']]));
 
-        $this->get('/groups')->assertOk()->assertDontSee($group->title);
-        $this->get('/campaigns')->assertOk()->assertDontSee($campaign->title)->assertDontSee('Confidential synthetic instructions');
-        $this->get('/groups/'.$group->id)->assertNotFound();
-        $this->get('/campaigns/'.$campaign->id)->assertNotFound();
-        $this->get('/terms')->assertOk()->assertSee($visible->label)->assertDontSee($private->label);
+        $this->get('/groups')->assertOk()->assertSee($group->title);
+        $this->get('/campaigns')->assertOk()->assertSee($campaign->title);
+        $this->get('/groups/'.$group->id)->assertOk();
+        $this->get('/campaigns/'.$campaign->id)->assertOk()->assertSee('Confidential synthetic instructions');
+        $this->get('/terms')->assertOk()->assertSee($visible->label)->assertSee($private->label);
     }
 
     public function test_translator_cannot_reclassify_a_term(): void
@@ -309,7 +308,7 @@ class CampaignAccessTest extends TestCase
 
     private function term(string $label, array $translations = [], ?int $owner = null): Term
     {
-        return Term::create(['type' => 'server', 'organization_id' => $owner, 'identity_hash' => hash('sha256', $label),
+        return Term::create(['type' => 'server', 'identity_hash' => hash('sha256', $label),
             'key' => [$label], 'label' => $label, 'context' => 'Synthetic context', 'source_text' => 'Synthetic reference',
             'search_text' => $label.' Synthetic reference', 'semantic_hash' => str_repeat('a', 64), 'source_hash' => str_repeat('b', 64),
             'source_import_id' => 1, 'source_offset' => 0, 'source_length' => 1,

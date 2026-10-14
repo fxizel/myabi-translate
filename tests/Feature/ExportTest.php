@@ -76,12 +76,12 @@ class ExportTest extends TestCase
             self::assertSame($before, $term->fresh()->getAttributes());
 
             $audit = AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail();
-            self::assertSame($source->id, $audit->after_values['source_import_id']);
+            self::assertSame($source->id, $audit->after_values['sources'][0]['import_id']);
             self::assertSame($this->organization->id, $audit->after_values['organization_id']);
-            self::assertSame($source->sha256, $audit->after_values['source_sha256']);
+            self::assertSame($source->sha256, $audit->after_values['sources'][0]['sha256']);
             self::assertSame(hash_file('sha256', $path), $audit->after_values['sha256']);
             self::assertSame(1, $audit->after_values['records']);
-            self::assertEqualsCanonicalizing(['version_id', 'type', 'organization_id', 'source_import_id', 'source_sha256', 'sha256', 'records', 'format_version', 'coverage'], array_keys($audit->after_values));
+            self::assertEqualsCanonicalizing(['version_id', 'type', 'organization_id', 'sources', 'sha256', 'records', 'format_version', 'coverage'], array_keys($audit->after_values));
 
             ob_start();
             try {
@@ -125,15 +125,15 @@ class ExportTest extends TestCase
         self::assertDatabaseCount('publications', 0);
     }
 
-    public function test_organization_source_has_priority_and_other_organizations_use_the_publisher(): void
+    public function test_current_term_source_is_independent_of_the_recipient_and_repeated_presences_add_no_row(): void
     {
         [$publisher, $term] = $this->source('mric');
         [$local] = $this->source('mric', $this->organization->id, existing: $term);
         $local->update(['is_complete' => false]);
         $this->download()->assertOk();
-        self::assertSame($local->id, AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail()->after_values['source_import_id']);
+        self::assertSame($publisher->id, AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail()->after_values['sources'][0]['import_id']);
         $this->download(organizationId: $this->other->id)->assertOk();
-        self::assertSame($publisher->id, AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail()->after_values['source_import_id']);
+        self::assertSame($publisher->id, AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail()->after_values['sources'][0]['import_id']);
         self::assertFalse($local->fresh()->is_complete);
         self::assertDatabaseCount('import_batches', 2);
         self::assertDatabaseCount('publications', 0);
@@ -254,13 +254,11 @@ class ExportTest extends TestCase
         $this->assertBlocked('source', 'publication_source_count');
     }
 
-    public function test_foreign_and_unconfirmed_scope_cannot_be_exported(): void
+    public function test_terms_from_another_organization_are_exported(): void
     {
-        [, $term] = $this->source('mric');
-        $term->update(['organization_id' => $this->other->id]);
-        $this->assertBlocked('scope', 'publication_foreign_scope');
-        $term->update(['organization_id' => null, 'scope_unconfirmed' => true]);
-        $this->assertBlocked('scope', 'publication_scope_unconfirmed');
+        [$source] = $this->source('mric', $this->other->id);
+        $response = $this->download()->assertOk();
+        self::assertSame(file_get_contents($source->originalPath()), file_get_contents($response->baseResponse->getFile()->getPathname()));
     }
 
     public function test_original_checksum_and_current_revision_are_required(): void
@@ -276,7 +274,7 @@ class ExportTest extends TestCase
     public function test_invalid_validated_values_fail_privately_and_remove_partial_csv_files(): void
     {
         [, $term] = $this->source('mric');
-        foreach (['Synthetic invalid {other}', 'Synthetic invalid 漢 {}'] as $value) {
+        foreach (['Synthetic invalid {other}', 'Synthetic invalid 漢 {}', 17] as $value) {
             DB::table('revisions')->where('term_id', $term->id)->update(['validated' => json_encode(['label' => ['fr' => $value]])]);
             $response = $this->actingAs($this->manager)->postJson(route('exports.download'), $this->parameters())
                 ->assertUnprocessable()->assertJsonValidationErrors('export')
@@ -290,11 +288,81 @@ class ExportTest extends TestCase
         }
     }
 
-    public function test_missing_rows_from_the_selected_source_are_not_silently_omitted(): void
+    public function test_all_known_terms_are_composed_from_their_own_originals_with_one_header_and_stable_order(): void
+    {
+        [$first] = $this->source('mric');
+        [$second] = $this->source('mric', $this->other->id);
+        $firstRecords = iterator_to_array((new CsvReader)->records($first->originalPath()));
+        $secondRecords = iterator_to_array((new CsvReader)->records($second->originalPath()));
+        $response = $this->download()->assertOk();
+        $expected = $firstRecords[0]->raw().$firstRecords[1]->raw().$secondRecords[1]->raw();
+        self::assertSame($expected, file_get_contents($response->baseResponse->getFile()->getPathname()));
+        $other = $this->download(organizationId: $this->other->id)->assertOk();
+        self::assertSame($expected, file_get_contents($other->baseResponse->getFile()->getPathname()));
+        $audit = AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail();
+        self::assertSame(2, $audit->after_values['records']);
+        self::assertSame([$first->id, $second->id], array_column($audit->after_values['sources'], 'import_id'));
+    }
+
+    public function test_null_historical_validated_cell_uses_the_imported_fallback(): void
+    {
+        [$source] = $this->source('mric', validated: ['label' => ['fr' => null]]);
+        $response = $this->download()->assertOk();
+        self::assertSame(file_get_contents($source->originalPath()), file_get_contents($response->baseResponse->getFile()->getPathname()));
+    }
+
+    public function test_1200_known_terms_are_exported_from_sources_of_1000_and_200_rows_for_every_recipient(): void
+    {
+        [$first, $firstTerm] = $this->source('mric', validated: ['label' => ['fr' => 'Valeur commune {}']]);
+        $firstKeys = $this->appendSyntheticRows($first, $firstTerm, 1000);
+        [$second, $secondTerm] = $this->source('mric', $this->other->id, ['label' => ['fr' => 'Valeur commune {}']]);
+        $secondKeys = $this->appendSyntheticRows($second, $secondTerm, 200);
+        self::assertSame(1000, $first->fresh()->row_count);
+        self::assertSame(200, $second->fresh()->row_count);
+        self::assertDatabaseCount('terms', 1200);
+
+        $response = $this->download()->assertOk();
+        $bytes = file_get_contents($response->baseResponse->getFile()->getPathname());
+        $records = iterator_to_array((new CsvReader)->records($response->baseResponse->getFile()->getPathname()));
+        self::assertCount(1201, $records);
+        self::assertSame(1, substr_count($bytes, $records[0]->raw()));
+        $keys = [];
+        foreach (array_slice($records, 1) as $record) {
+            $row = $record->associative(FormatRegistry::get('mric')->headers);
+            $keys[] = $row['Name'];
+            self::assertSame('Import {}', $row['it_CH']);
+            self::assertSame('Quelle {}', $row['de_CH']);
+        }
+        self::assertSame([...$firstKeys, ...$secondKeys], $keys);
+        self::assertCount(1200, array_unique($keys));
+        self::assertSame('Valeur commune {}', $records[1]->associative(FormatRegistry::get('mric')->headers)['fr_CH']);
+        self::assertSame('Valeur commune {}', $records[1001]->associative(FormatRegistry::get('mric')->headers)['fr_CH']);
+        self::assertSame('Import {}', $records[1200]->associative(FormatRegistry::get('mric')->headers)['fr_CH']);
+
+        $other = $this->download(organizationId: $this->other->id)->assertOk();
+        self::assertSame($bytes, file_get_contents($other->baseResponse->getFile()->getPathname()));
+        $audit = AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail();
+        self::assertSame(1200, $audit->after_values['records']);
+        self::assertSame([$first->id, $second->id], array_column($audit->after_values['sources'], 'import_id'));
+        self::assertSame(2, $audit->after_values['coverage']['fr']['validated']);
+        self::assertSame(1198, $audit->after_values['coverage']['fr']['fallback']);
+    }
+
+    public function test_expected_term_with_missing_provenance_blocks_the_whole_multi_source_export(): void
     {
         $this->source('mric');
-        $this->source('mric');
-        $this->assertBlocked('source', 'publication_source_missing_rows');
+        [, $term] = $this->source('mric');
+        DB::table('revisions')->where('term_id', $term->id)->update(['source_offset' => 0]);
+        $this->assertBlocked('source', 'publication_identity_mismatch');
+    }
+
+    public function test_distinct_exact_keys_with_the_same_stored_fingerprint_are_not_merged(): void
+    {
+        [, $first] = $this->source('mric');
+        [, $second] = $this->source('mric');
+        $second->update(['identity_hash' => $first->identity_hash]);
+        $response = $this->download()->assertOk();
+        self::assertCount(3, iterator_to_array((new CsvReader)->records($response->baseResponse->getFile()->getPathname())));
     }
 
     public function test_archived_versions_cannot_be_exported(): void
@@ -336,6 +404,53 @@ class ExportTest extends TestCase
             'roles' => [$role], 'languages' => ['fr'], 'organization_id' => $this->organization->id, 'active' => true]);
     }
 
+    /** Extend an isolated synthetic original and its provenance with batched inserts. */
+    private function appendSyntheticRows(ImportBatch $source, Term $firstTerm, int $recordCount): array
+    {
+        $format = FormatRegistry::get('mric');
+        $original = iterator_to_array((new CsvReader)->records($source->originalPath()));
+        $row = $original[1]->associative($format->headers);
+        $bytes = file_get_contents($source->originalPath());
+        $keys = [$row['Name']];
+        $termTemplate = $firstTerm->getAttributes();
+        unset($termTemplate['id']);
+        $revisionTemplate = $firstTerm->revisions()->firstOrFail()->getAttributes();
+        unset($revisionTemplate['id']);
+        $termRows = $revisionRows = $presenceRows = [];
+        $nextId = (int) DB::table('terms')->max('id') + 1;
+        for ($number = 2; $number <= $recordCount; $number++) {
+            $row['Name'] = 'synthetic-volume-'.$source->id.'-'.$number;
+            $keys[] = $row['Name'];
+            $raw = implode(';', array_map(fn ($value) => '"'.str_replace('"', '""', Encoding::encode($value)).'"', array_values($row)))."\r\n";
+            $offset = strlen($bytes);
+            $bytes .= $raw;
+            $id = $nextId++;
+            $key = $format->identity($row);
+            $hash = $format->identityHash($row);
+            $termRows[] = [...$termTemplate, 'id' => $id, 'identity_hash' => $hash, 'raw_identity_hash' => $hash,
+                'key' => json_encode($key, JSON_THROW_ON_ERROR), 'label' => $row['Name'], 'semantic_hash' => $format->semanticHash($row),
+                'source_offset' => $offset, 'source_length' => strlen($raw), 'validated' => '[]'];
+            $revisionRows[] = [...$revisionTemplate, 'term_id' => $id, 'source_offset' => $offset,
+                'source_length' => strlen($raw), 'validated' => '[]',
+                'metadata' => json_encode(['key' => $key, 'organization_id' => null], JSON_THROW_ON_ERROR)];
+            $presenceRows[] = ['import_id' => $source->id, 'record_number' => $number, 'offset' => $offset, 'length' => strlen($raw),
+                'identity_hash' => $hash, 'term_id' => $id, 'collision' => false, 'category' => 'new'];
+        }
+        foreach (array_chunk($termRows, 300) as $chunk) {
+            DB::table('terms')->insert($chunk);
+        }
+        foreach (array_chunk($revisionRows, 300) as $chunk) {
+            DB::table('revisions')->insert($chunk);
+        }
+        foreach (array_chunk($presenceRows, 300) as $chunk) {
+            DB::table('import_rows')->insert($chunk);
+        }
+        file_put_contents($source->originalPath(), $bytes);
+        $source->update(['sha256' => hash('sha256', $bytes), 'size' => strlen($bytes), 'row_count' => $recordCount, 'analysis_offset' => strlen($bytes)]);
+
+        return $keys;
+    }
+
     /** Synthetic sources contain no institutional data. */
     private function source(string $type, ?int $organizationId = null, array $validated = [], ?Term $existing = null): array
     {
@@ -370,11 +485,11 @@ class ExportTest extends TestCase
             'organization_id' => $organizationId, 'source_kind' => $organizationId ? 'organization' : 'publisher', 'is_complete' => true,
             'filename' => $format->filename, 'path' => $path, 'sha256' => hash('sha256', $bytes), 'size' => strlen($bytes), 'status' => 'applied',
             'row_count' => 1, 'analysis_offset' => strlen($bytes), 'report' => [], 'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
-        $term = $existing ?? Term::create(['type' => $type, 'organization_id' => null, 'identity_hash' => $format->identityHash($row), 'key' => $key,
+        $term = $existing ?? Term::create(['type' => $type, 'identity_hash' => $format->identityHash($row), 'key' => $key,
             'label' => implode(' / ', $key), 'context' => '', 'source_text' => 'Quelle {}', 'search_text' => 'Quelle {}',
             'semantic_hash' => $format->semanticHash($row), 'source_hash' => $format->sourceHash($row), 'source_import_id' => $source->id,
             'source_offset' => $record->offset, 'source_length' => $record->length, 'validated' => $validated, 'review_needed' => [],
-            'revision_no' => 1, 'lock_version' => 1, 'obsolete' => false, 'scope_unconfirmed' => false, 'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
+            'revision_no' => 1, 'lock_version' => 1, 'obsolete' => false, 'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
         DB::table('import_rows')->insert(['import_id' => $source->id, 'record_number' => 1, 'offset' => $record->offset, 'length' => $record->length,
             'identity_hash' => $format->identityHash($row), 'term_id' => $term->id, 'collision' => false, 'category' => 'new']);
         if (! $existing) {

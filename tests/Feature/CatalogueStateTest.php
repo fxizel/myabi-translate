@@ -13,11 +13,29 @@ use App\Models\User;
 use App\Services\SourceRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\GuardedSchemaReset;
 use Tests\TestCase;
 
 class CatalogueStateTest extends TestCase
 {
-    use RefreshDatabase;
+    use GuardedSchemaReset;
+    use RefreshDatabase {
+        refreshTestDatabase as private refreshUsingTransaction;
+    }
+
+    protected function refreshTestDatabase()
+    {
+        if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            return $this->refreshUsingTransaction();
+        }
+
+        // Projection trigger DDL commits implicitly on MariaDB.
+        $this->resetIsolatedTestSchema();
+        $this->beforeApplicationDestroyed(function () {
+            $this->resetIsolatedTestSchema();
+            DB::disconnect();
+        });
+    }
 
     private User $reader;
 
@@ -105,31 +123,31 @@ class CatalogueStateTest extends TestCase
         self::assertSame(0, TermState::matchingState('published', 'fr')->count());
     }
 
-    public function test_projection_backfill_and_state_routes_preserve_scope_and_language_filters(): void
+    public function test_projection_backfill_and_state_routes_preserve_global_language_filters(): void
     {
         $common = $this->term('server', ['label' => ['fr' => 'FR']], ['label' => ['fr' => true]]);
         $own = $this->term('server', ['label' => ['it' => 'IT']], ['label' => ['it' => true]], $this->reader->organization_id);
         $foreign = Organisation::create(['code' => 'FR', 'name' => 'Fribourg', 'active' => true]);
-        $this->term('server', ['label' => ['fr' => 'Private']], ['label' => ['fr' => true]], $foreign->id);
+        $external = $this->term('server', ['label' => ['fr' => 'External']], ['label' => ['fr' => true]], $foreign->id);
         DB::table('term_states')->delete();
         $migration = require database_path('migrations/2026_09_21_200000_create_compact_term_states.php');
         $migration->up();
         self::assertSame(3, TermState::count());
-        self::assertSame([$common->id], $this->get('/terms?state=review&language=fr')->assertOk()->viewData('terms')->pluck('id')->all());
-        self::assertSame([$own->id], $this->get('/terms?state=validated&language=it&scope=own')->assertOk()->viewData('terms')->pluck('id')->all());
+        self::assertSame([$common->id, $external->id], $this->get('/terms?state=review&language=fr')->assertOk()->viewData('terms')->pluck('id')->all());
+        self::assertSame([$own->id], $this->get('/terms?state=validated&language=it')->assertOk()->viewData('terms')->pluck('id')->all());
         $common->update(['obsolete' => true]);
         self::assertSame([$common->id], $this->get('/terms?state=obsolete')->assertOk()->viewData('terms')->pluck('id')->all());
-        self::assertSame(0, $this->get('/terms?state=review&language=fr')->assertOk()->viewData('terms')->total());
+        self::assertSame(1, $this->get('/terms?state=review&language=fr')->assertOk()->viewData('terms')->total());
     }
 
-    public function test_dashboard_review_count_respects_scope_and_ignores_obsolete_or_false_flags(): void
+    public function test_dashboard_review_count_is_global_and_ignores_obsolete_or_false_flags(): void
     {
         $this->term('server', [], ['label' => ['fr' => true]]);
         $this->term('server', [], ['label' => ['fr' => false]]);
         $this->term('server', [], ['label' => ['fr' => true]])->update(['obsolete' => true]);
         $foreign = Organisation::create(['code' => 'FR', 'name' => 'Fribourg', 'active' => true]);
         $this->term('server', [], ['label' => ['fr' => true]], $foreign->id);
-        self::assertSame(1, $this->get('/')->assertOk()->viewData('stats')['review']);
+        self::assertSame(2, $this->get('/')->assertOk()->viewData('stats')['review']);
         $this->reader->update(['roles' => ['manager' => ['fr']]]);
         self::assertSame(2, $this->get('/')->assertOk()->viewData('stats')['review']);
     }
@@ -143,7 +161,7 @@ class CatalogueStateTest extends TestCase
     {
         $label = 'Synthetic '.bin2hex(random_bytes(5));
 
-        return Term::create(['type' => $type, 'organization_id' => $organizationId, 'identity_hash' => hash('sha256', $type.$label), 'key' => [$label],
+        return Term::create(['type' => $type, 'identity_hash' => hash('sha256', $type.$label), 'key' => [$label],
             'label' => $label, 'context' => '', 'source_text' => 'Reference', 'search_text' => $label.' Reference',
             'semantic_hash' => str_repeat('a', 64), 'source_hash' => str_repeat('b', 64), 'source_import_id' => 1,
             'source_offset' => 0, 'source_length' => 1, 'validated' => $validated, 'review_needed' => $review, 'revision_no' => 1,

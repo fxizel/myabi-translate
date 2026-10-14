@@ -73,6 +73,8 @@ Le calcul applicatif additionne fichiers, code, dépendances, données et index 
 
 ### Réduction des index sans perte de traçabilité — migration 240000
 
+Ces mesures décrivent le schéma historique avant la transition du 13.10.2026. Le changement de propriétaire et sa route ont depuis été retirés ; les index et requêtes courants suivent le [contrat des termes communs](transition-termes-communs.md). Les relevés chronométrés ci-dessous restent des résultats historiques, sans qualification de performance du nouveau schéma.
+
 Le contrôle de conflit de portée utilise désormais l'empreinte brute indexée, le type et l'organisation cible, puis compare strictement les clés. Les éventuelles anciennes lignes sans empreinte brute restent incluses dans un repli traité par lots bornés. Les index séparés de l'empreinte avec portée et du dernier identifiant de publication sont devenus inutiles et ont été retirés ; leurs colonnes restent conservées. L'empreinte historique de chaque présence est également conservée : elle ne peut pas être supprimée sur la seule base de son absence de lecture dans l'interface.
 
 Sur la base du benchmark, la migration prend 0,368 s. Les statistiques SQL passent de **857 604 096 à 819 978 240 octets**, soit **37 625 856 octets de moins** après réestimation InnoDB. Les comptes métier, la génération, les sommes des numéros de révision et des verrous restent identiques. Le contrôle de conflit conserve son index brut, environ deux candidats dans le plan observé et 3,5–7,1 ms de lecture. La même migration a été appliquée à la base principale en 0,264 s, puis le contrôle de santé et le catalogue dans le navigateur ont été vérifiés.

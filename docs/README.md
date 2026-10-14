@@ -43,6 +43,7 @@ La [spécification des groupes de termes et campagnes de traduction](fonctionnel
 | [Recette du lot 1](technique/recette.md) | Preuves métier, performances, capacité et contrôles restant à effectuer. |
 | [Recette visuelle myABI](technique/recette-design-myabi.md) | Vérifications de l’habillage de l’interface. |
 | [Groupes et campagnes](technique/groupes-campagnes-implementation.md) | Découpage réalisé, transitions, droits, choix de conception et contrôles. |
+| [Référentiel commun](technique/transition-termes-communs.md) | Lots réalisés, diagnostic privé, reprise des historiques et procédure de bascule. |
 
 ## Déploiement et exploitation
 

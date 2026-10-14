@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Services\CampaignService;
-use App\Services\CommonScope;
 use App\Services\SourceRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
@@ -17,8 +16,15 @@ class Term extends Model
 
     protected static function booted(): void
     {
+        // Consolidated records retain their historical IDs and revisions, but
+        // only the canonical term participates in the current catalogue.
+        static::addGlobalScope('current', function ($query) {
+            if (Schema::hasColumn('terms', 'consolidated_into_id')) {
+                $query->whereNull($query->getModel()->qualifyColumn('consolidated_into_id'));
+            }
+        });
         static::updated(function (Term $term) {
-            if ($term->wasChanged(['validated', 'source_import_id', 'source_offset', 'source_length', 'context', 'key', 'organization_id', 'source_hash', 'obsolete', 'scope_unconfirmed'])
+            if ($term->wasChanged(['validated', 'source_import_id', 'source_offset', 'source_length', 'context', 'key', 'source_hash', 'obsolete'])
                 && Schema::hasTable('campaign_participations')) {
                 app(CampaignService::class)->referenceChanged($term);
                 if (! $term->campaignSyncDeferred) {
@@ -40,12 +46,7 @@ class Term extends Model
 
     protected function casts(): array
     {
-        return ['key' => 'array', 'validated' => 'array', 'review_needed' => 'array', 'obsolete' => 'boolean', 'scope_unconfirmed' => 'boolean', 'scope_overridden' => 'boolean'];
-    }
-
-    public function organization()
-    {
-        return $this->belongsTo(Organisation::class, 'organization_id');
+        return ['key' => 'array', 'validated' => 'array', 'review_needed' => 'array', 'obsolete' => 'boolean'];
     }
 
     public function creator()
@@ -103,15 +104,11 @@ class Term extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->canManage() || $user->canValidateAny()) {
-            return $query;
-        }
-
-        return CommonScope::forOrganization($query, $user->organization_id);
+        return $user->canSeeCatalogue() ? $query : $query->whereRaw('1 = 0');
     }
 
     public function scopeCommon($query)
     {
-        return CommonScope::query($query);
+        return $query;
     }
 }

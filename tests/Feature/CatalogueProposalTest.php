@@ -148,7 +148,7 @@ class CatalogueProposalTest extends TestCase
 
     private function term(string $type): Term
     {
-        return Term::create(['type' => $type, 'organization_id' => null, 'identity_hash' => hash('sha256', $type),
+        return Term::create(['type' => $type, 'identity_hash' => hash('sha256', $type),
             'key' => [$type], 'label' => 'Synthetic '.$type, 'context' => '', 'source_text' => 'Aggregated references',
             'search_text' => 'Synthetic catalogue', 'semantic_hash' => str_repeat('a', 64), 'source_hash' => str_repeat('b', 64),
             'source_import_id' => 1, 'source_offset' => 0, 'source_length' => 1,

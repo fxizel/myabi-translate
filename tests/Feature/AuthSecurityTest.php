@@ -188,23 +188,24 @@ class AuthSecurityTest extends TestCase
         }
     }
 
-    public function test_role_languages_and_organization_boundaries_are_independent(): void
+    public function test_role_languages_are_independent_from_contribution_organization(): void
     {
         $own = Organisation::create(['name' => 'Own', 'code' => 'OWN']);
-        $other = Organisation::create(['name' => 'Other', 'code' => 'OTHER']);
-        $root = Organisation::create(['name' => 'ARGE-ABI', 'code' => 'ARGE', 'is_root' => true]);
         $user = $this->user(['translator' => ['it'], 'validator' => ['fr']], ['organization_id' => $own->id]);
         $this->assertTrue($user->canValidate('fr'));
         $this->assertFalse($user->canValidate('it'));
-        $this->assertTrue($user->canTranslate('fr', $other->id));
-        $this->assertFalse($user->canTranslate('it', $other->id));
-        $this->assertTrue($user->canTranslate('it', $own->id));
-        $this->assertTrue($user->canTranslate('it', $root->id));
-        $this->assertFalse($user->canTranslate('de', null));
+        $this->assertTrue($user->canTranslate('fr'));
+        $this->assertTrue($user->canTranslate('it'));
+        $this->assertFalse($user->canTranslate('de'));
         $admin = $this->user(['admin' => ['de', 'fr', 'it']]);
         $this->assertFalse($admin->canManage());
         $this->assertFalse($admin->canValidate('fr'));
-        $this->assertFalse($admin->canSeeOrganisation($other->id));
+        $this->assertFalse($admin->canTranslate('fr'));
+        $this->assertTrue($admin->canSeeCatalogue());
+        foreach (['active' => false, 'is_technical' => true] as $attribute => $value) {
+            $admin->fill([$attribute => $value]);
+            $this->assertFalse($admin->canSeeCatalogue());
+        }
     }
 
     public function test_guest_can_choose_locale_but_revoked_session_cannot_mutate_profile(): void

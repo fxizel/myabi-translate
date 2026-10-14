@@ -12,8 +12,6 @@ use App\Models\Term;
 use App\Models\TermGroup;
 use App\Models\TermState;
 use App\Models\TranslationCampaign;
-use App\Services\AuditService;
-use App\Services\OperationLock;
 use App\Services\SourceRecord;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -40,12 +38,7 @@ class TermController extends Controller
     {
         $query = Term::visibleTo($request->user());
         $pending = Proposal::where('status', 'pending');
-        $review = TermState::where('review_languages', '>', 0);
-        if (! ($request->user()->canManage() || $request->user()->canValidateAny())) {
-            $visible = (clone $query)->select('id');
-            $pending->whereIn('term_id', $visible);
-            $review->whereIn('id', $visible);
-        }
+        $review = TermState::where('review_languages', '>', 0)->whereIn('id', Term::select('id'));
         if (! $request->user()->canManage()) {
             $pending->whereIn('language', $request->user()->canValidateAny() ? $request->user()->roleLanguages('validator') : $request->user()->roleLanguages('translator'));
         }
@@ -59,10 +52,10 @@ class TermController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate(['type' => 'nullable|in:'.implode(',', array_keys(FormatRegistry::all())), 'language' => 'nullable|in:de,fr,it,en', 'q' => 'nullable|string|max:250',
-            'version_id' => 'nullable|integer|exists:myabi_versions,id', 'organization_id' => 'nullable|integer', 'context' => 'nullable|string|max:255', 'per_page' => 'nullable|integer|min:10|max:100',
-            'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'scope' => 'nullable|in:common,own', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/']]);
+            'version_id' => 'nullable|integer|exists:myabi_versions,id', 'context' => 'nullable|string|max:255', 'per_page' => 'nullable|integer|min:10|max:100',
+            'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/']]);
         $language = $data['language'] ?? 'fr';
-        $query = Term::visibleTo($request->user())->with('organization', 'sourceImport', 'lastPublication');
+        $query = Term::visibleTo($request->user())->with('sourceImport', 'lastPublication');
         if (($data['group_id'] ?? '') === 'none') {
             $query->whereNull('term_group_id');
         } elseif ($request->filled('group_id')) {
@@ -73,15 +66,6 @@ class TermController extends Controller
         }
         if ($request->filled('version_id')) {
             $query->whereIn('id', DB::table('import_rows')->join('import_batches', 'import_batches.id', '=', 'import_rows.import_id')->where('import_batches.version_id', $data['version_id'])->where('status', 'applied')->select('term_id'));
-        }
-        if ($request->filled('organization_id')) {
-            $query->where('organization_id', $data['organization_id']);
-        }
-        if (($data['scope'] ?? '') === 'common') {
-            $query->common();
-        }
-        if (($data['scope'] ?? '') === 'own') {
-            $query->where('organization_id', $request->user()->organization_id);
         }
         if ($request->filled('context')) {
             $query->where('context', $data['context']);
@@ -130,9 +114,7 @@ class TermController extends Controller
             && ! $request->filled('context') && ! $request->filled('group_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
             // Keep the count on a covering term index. A proposal-first
             // LooseScan otherwise fetches every large matching term by PK.
-            $scoped = ! ($request->user()->canManage() || $request->user()->canValidateAny())
-                || $request->filled('organization_id') || $request->filled('scope');
-            $countQuery->forceIndex($scoped ? 'terms_organization_id_index' : 'terms_type_obsolete_id_index');
+            $countQuery->forceIndex('terms_type_obsolete_id_index');
         }
         foreach (array_keys(FormatRegistry::all()) as $type) {
             $countQuery->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) AS '.$type, [$type]);
@@ -145,14 +127,13 @@ class TermController extends Controller
         // ordered scan; hydrate at most 100 large rows after SQL filtering.
         $pageQuery = (clone $query)->withoutEagerLoads()->select('id');
         if (in_array(DB::getDriverName(), ['mariadb', 'mysql']) && $sort !== 'label' && ! $request->filled('context') && ! $request->filled('group_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
-            // MariaDB may otherwise choose organization_id IS NULL OR ... and
-            // fetch/sort the entire common catalogue despite a tiny LIMIT.
+            // Keep the ordered catalogue page on its covering date/id index.
             $pageQuery->forceIndex($sort === 'created_at' ? 'terms_created_page_index' : 'terms_updated_page_index');
         }
         $ids = $typeCounts->sum() > ($page - 1) * $perPage
             ? $pageQuery->orderBy($sort, $sort === 'label' ? 'asc' : 'desc')->orderBy('id')->forPage($page, $perPage)->pluck('id')
             : collect();
-        $rows = Term::visibleTo($request->user())->with('organization', 'sourceImport', 'lastPublication', 'group')->whereIn('id', $ids)->get()->keyBy('id');
+        $rows = Term::visibleTo($request->user())->with('sourceImport', 'lastPublication', 'group')->whereIn('id', $ids)->get()->keyBy('id');
         $items = $ids->map(fn ($id) => $rows->get($id))->filter()->values();
         $terms = (new LengthAwarePaginator($items, $typeCounts->sum(), $perPage, $page, ['path' => $request->url()]))->withQueryString();
         $proposals = Proposal::whereIn('term_id', $terms->pluck('id'))->where('language', $language)->where('status', 'pending')
@@ -178,66 +159,44 @@ class TermController extends Controller
         return view('terms.index', [...self::filters(), ...compact('terms', 'language', 'typeCounts', 'groups', 'compositionCampaigns')]);
     }
 
-    public function show(Request $request, Term $term, SourceRecord $source)
+    public function show(Request $request, string $term, SourceRecord $source)
     {
-        abort_unless($request->user()->canSeeOrganisation($term->organization_id), 403);
+        abort_unless($request->user()->canSeeCatalogue(), 403);
+        $term = Term::withoutGlobalScope('current')->findOrFail($term);
+        if ($term->consolidated_into_id !== null) {
+            return redirect()->route('terms.show', [...$request->query(), 'term' => $term->consolidated_into_id, 'lineage' => $term->id]);
+        }
+        $lineageIds = DB::table('term_consolidations')->where('common_term_id', $term->id)->pluck('legacy_term_id');
+        $lineages = Term::withoutGlobalScope('current')->whereIn('id', $lineageIds)->orderBy('created_at')->orderBy('id')->get();
+        $lineageId = $request->integer('lineage', $term->id);
+        abort_unless($lineageId === $term->id || $lineageIds->contains($lineageId), 404);
+        $revisionTerm = $lineageId === $term->id ? $term : $lineages->firstWhere('id', $lineageId);
+        $historicalLineage = $lineageId !== $term->id;
         $term->load('group');
         $language = in_array($request->query('language'), ['de', 'fr', 'it', 'en']) ? $request->query('language') : 'fr';
         $attributes = $term->attributesForDisplay();
-        $proposals = $term->proposals()->with('author', 'organization')->latest()->orderByDesc('id')->paginate(50)->withQueryString();
-        $revisions = $term->revisions()->with('author')->orderByDesc('number')->paginate(30, ['*'], 'revisions_page');
+        $proposals = $term->proposals()->with('author', 'organization', 'import.organization', 'imports.organization')->latest()->orderByDesc('id')->paginate(50)->withQueryString();
+        $revisions = $revisionTerm->revisions()->with('author')->orderByDesc('number')->paginate(30, ['*'], 'revisions_page');
         $presences = DB::table('import_rows')->join('import_batches', 'import_batches.id', '=', 'import_rows.import_id')->join('myabi_versions', 'myabi_versions.id', '=', 'import_batches.version_id')
             ->where('term_id', $term->id)->where('import_batches.status', 'applied')->select('import_rows.*', 'myabi_versions.number as version_number', 'import_batches.filename', 'import_batches.created_at')->orderByDesc('import_id')->paginate(25, ['*'], 'presence_page');
         $comparison = null;
         $restoreRevision = null;
         if ($request->filled('restore_revision')) {
-            $restoreRevision = $term->revisions()->where('number', (int) $request->query('restore_revision'))->firstOrFail();
+            $restoreRevision = $revisionTerm->revisions()->where('number', (int) $request->query('restore_revision'))->firstOrFail();
         }
         if ($request->filled('from') && $request->filled('to')) {
             foreach (['from', 'to'] as $side) {
-                $revision = $term->revisions()->where('number', (int) $request->query($side))->firstOrFail();
+                $revision = $revisionTerm->revisions()->where('number', (int) $request->query($side))->firstOrFail();
                 $comparison[$side] = ['revision' => $revision, 'attributes' => $source->attributes($revision), 'validated' => $revision->validated];
             }
         }
-        $events = AuditEvent::with('user')->where(function ($q) use ($term) {
-            $q->where(fn ($q) => $q->where('entity_type', Term::class)->where('entity_id', (string) $term->id))
+        $events = AuditEvent::with('user')->where(function ($q) use ($term, $lineageIds) {
+            $q->where(fn ($q) => $q->where('entity_type', Term::class)->whereIn('entity_id', $lineageIds->prepend($term->id)->map(fn ($id) => (string) $id)))
                 ->orWhere(fn ($q) => $q->where('entity_type', Proposal::class)->whereIn('entity_id', $term->proposals()->select('id')));
         })->orderByDesc('id')->paginate(30, ['*'], 'history_page');
 
         $groups = TermGroup::visibleTo($request->user())->orderBy('title')->get();
 
-        return view('terms.show', [...self::filters(), ...compact('term', 'attributes', 'proposals', 'revisions', 'presences', 'comparison', 'language', 'events', 'restoreRevision', 'groups'), 'sourceMetadata' => $source->row($term)]);
-    }
-
-    public function scope(Request $request, Term $term, OperationLock $lock, AuditService $audit, SourceRecord $source)
-    {
-        abort_unless($request->user()->canManage(), 403);
-        $d = $request->validate(['organization_id' => 'nullable|integer|exists:organizations,id', 'lock_version' => 'required|integer']);
-        $lock->run(fn () => DB::transaction(function () use ($d, $term, $request, $audit, $source) {
-            $t = Term::whereKey($term->id)->lockForUpdate()->firstOrFail();
-            if ($t->lock_version != (int) $d['lock_version']) {
-                throw ValidationException::withMessages(['scope' => __('ui.stale_change')]);
-            }
-            $owner = isset($d['organization_id']) ? (int) $d['organization_id'] : null;
-            $hash = hash('sha256', json_encode([$t->type, $owner, $t->key], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-            $rawHash = hash('sha256', json_encode([$t->type, $t->key], JSON_THROW_ON_ERROR));
-            $candidates = Term::where('type', $t->type)->where('organization_id', $owner)->where('id', '!=', $t->id)
-                ->where(fn ($query) => $query->where('raw_identity_hash', $rawHash)->orWhereNull('raw_identity_hash'))
-                ->select('id', 'key')->lockForUpdate();
-            // Legacy rows without a raw hash remain part of the exact check.
-            // Their slower, bounded fallback must never silently allow a conflict.
-            foreach ($candidates->lazyById(300) as $candidate) {
-                if ($candidate->key === $t->key) {
-                    throw ValidationException::withMessages(['scope' => __('ui.scope_collision')]);
-                }
-            }
-            $before = $t->organization_id;
-            $t->update(['organization_id' => $owner, 'identity_hash' => $hash, 'scope_unconfirmed' => false, 'scope_overridden' => true, 'lock_version' => $t->lock_version + 1, 'revision_no' => $t->revision_no + 1, 'updated_by' => $request->user()->id]);
-            $source->snapshot($t, 'scope', $t->id, $request->user()->id);
-            $audit->record('term.scope', $t, ['organization_id' => $before], ['organization_id' => $owner]);
-            DB::table('catalogue_state')->where('id', 1)->increment('generation');
-        }, 3));
-
-        return back()->with('status', __('ui.saved'));
+        return view('terms.show', [...self::filters(), ...compact('term', 'attributes', 'proposals', 'revisions', 'presences', 'comparison', 'language', 'events', 'restoreRevision', 'groups', 'lineages', 'lineageId', 'historicalLineage'), 'sourceMetadata' => $source->row($term)]);
     }
 }

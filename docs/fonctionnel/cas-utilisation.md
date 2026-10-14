@@ -1,6 +1,6 @@
 # Cas d’utilisation de myABI Translate
 
-État au 13 octobre 2026, code de référence `346df90`. Ces cas décrivent les fonctions implémentées dans l’application Laravel. Les acteurs correspondent aux [personas](personas.md) ; les chemins d’écran sont détaillés dans les [parcours UI et UX](parcours-ui-ux.md). Les résultats supposent que les droits et les conditions indiqués sont satisfaits.
+État au 13 octobre 2026, référentiel commun après la transition du 13.10.2026. Ces cas décrivent les fonctions implémentées dans l’application Laravel. Les acteurs correspondent aux [personas](personas.md) ; les chemins d’écran sont détaillés dans les [parcours UI et UX](parcours-ui-ux.md). Les résultats supposent que les droits et les conditions indiqués sont satisfaits.
 
 L’extension navigateur [MyAB Translation Inspector](../../extension/README.md) dispose de son propre code et de tests avec une API factice. Les routes de recherche et de retour de correspondance qu’elle attend ne sont pas implémentées dans cette application Laravel ; elle ne constitue donc pas un parcours intégré au référentiel actuel.
 
@@ -47,16 +47,16 @@ L’extension navigateur [MyAB Translation Inspector](../../extension/README.md)
 
 ### UC-04 Rechercher un terme et consulter sa fiche
 
-**Acteur :** tout utilisateur connecté. **Précondition :** terme visible dans son périmètre.
+**Acteur :** tout utilisateur connecté. **Précondition :** terme courant du catalogue commun.
 
 1. Ouvrir Traductions et choisir la langue de travail.
-2. Rechercher du texte ou combiner les filtres de type, version, état, périmètre, organisation et contexte.
+2. Rechercher du texte ou combiner les filtres de type, version, langue, état, groupe et contexte.
 3. Parcourir les résultats triés et paginés, puis ouvrir une clé ou sa référence.
 4. Consulter les attributs, valeurs importées et validées, propositions, présences dans les imports, révisions et historique.
 
 **Résultat :** le terme et sa provenance sont identifiés. Les droits du compte déterminent les actions proposées sur la fiche.
 
-**Variantes :** recherche par préfixe de clé ; recherche entre guillemets d’une séquence dans le texte indexé ; expression régulière pour le Gestionnaire sur MariaDB ou MySQL. Un accès direct à un terme hors périmètre est refusé. Le filtre de version sélectionne les termes présents dans des imports appliqués de cette version ; les valeurs affichées restent celles du catalogue courant.
+**Variantes :** recherche par préfixe de clé ; recherche entre guillemets d’une séquence dans le texte indexé ; expression régulière pour le Gestionnaire sur MariaDB ou MySQL. Un ancien identifiant consolidé redirige vers la fiche commune, avec accès à sa lignée historique. Le filtre de version sélectionne les termes présents dans des imports appliqués de cette version ; les valeurs affichées restent celles du catalogue courant.
 
 ### UC-05 Soumettre une ou plusieurs propositions
 
@@ -78,7 +78,7 @@ L’extension navigateur [MyAB Translation Inspector](../../extension/README.md)
 2. Modifier la valeur et envoyer.
 3. Le système contrôle le contenu et la version examinée de la proposition.
 
-**Résultat :** la proposition reste en attente avec la nouvelle valeur ; l’ancienne valeur et son auteur sont conservés dans l’historique interne des modifications. Une proposition importée corrigée devient revendiquée par l’utilisateur qui la corrige.
+**Résultat :** la proposition reste en attente avec la nouvelle valeur ; l’ancienne valeur, son auteur, son organisation et les imports associés sont conservés dans l’historique ; l’origine ne suit pas les changements d’organisation du compte. Une proposition importée corrigée devient revendiquée par l’utilisateur qui la corrige.
 
 **Exceptions :** proposition déjà décidée, modification concurrente ou proposition appartenant à un autre auteur et déjà revendiquée. La vue affiche les propositions et leur traçabilité, sans écran dédié à l’historique interne de chaque correction.
 
@@ -186,16 +186,9 @@ L’extension navigateur [MyAB Translation Inspector](../../extension/README.md)
 
 **Exclusions :** erreur ou avertissement de contenu, divergence avec une valeur validée, terme obsolète, propositions concurrentes, auto-validation sans dérogation. L’aperçu est lié à l’utilisateur et au catalogue examiné ; un aperçu périmé ou âgé de plus de 30 minutes ne permet pas de lancer la validation. Une erreur de lot permet une reprise sous les contrôles de cohérence du service.
 
-### UC-15 Confirmer ou changer le périmètre d’un terme
+### UC-15 Ancien changement de propriétaire retiré
 
-**Acteur :** Gestionnaire.
-
-1. Ouvrir la fiche du terme.
-2. Sélectionner le périmètre commun ou une organisation puis enregistrer.
-
-**Résultat :** le périmètre devient explicite, l’indicateur « non confirmé » est levé et une révision conserve ce changement. Ce choix reste pris en compte lors des réimports correspondants.
-
-**Exceptions :** modification concurrente ou présence d’une même clé exacte, du même type, dans le périmètre cible. Le système refuse la collision ; il ne fusionne pas les deux termes.
+Ce parcours historique est retiré depuis le 13.10.2026 : tous les termes sont communs, sans propriétaire. La fiche et la route de modification de portée ont été supprimées. Les anciennes décisions restent lisibles dans l'historique. Les identifiants UC-15 et EF-42 sont conservés pour tracer cette évolution ; la [transition](../technique/transition-termes-communs.md) ne fusionne jamais les groupes ambigus.
 
 ### UC-16 Télécharger un export CSV courant
 
@@ -203,11 +196,11 @@ L’extension navigateur [MyAB Translation Inspector](../../extension/README.md)
 
 1. Ouvrir Exports, choisir un type, une version proposée et une organisation active.
 2. Demander le téléchargement.
-3. Le système sélectionne la source appliquée la plus récente pour cette organisation, ou celle de l’éditeur à défaut, et construit le CSV.
+3. Le système parcourt tous les termes courants connus du type et vérifie leur source technique respective, indépendamment du destinataire. Plusieurs imports peuvent alimenter le fichier, avec un en-tête unique et une seule ligne par terme.
 
 **Résultat :** un CSV DEVCONF avec les valeurs validées courantes et les valeurs d’origine pour les cellules non validées. Une proposition en attente n’est pas injectée ; aucune publication n’est créée.
 
-**Exceptions :** version archivée ou datée avant la plus récente version ayant un import appliqué ; source absente, altérée ou incomplète ; collision ; périmètre non confirmé ou étranger ; révision indisponible ; traduction validée incompatible avec la référence ; stockage insuffisant ou opération lourde incompatible. Une valeur « à revoir » reste exportable si les contrôles de contenu réussissent.
+**Exceptions :** version archivée ou datée avant la plus récente version ayant un import appliqué ; source absente, altérée ou incomplète ; collision ; révision indisponible ; traduction validée incompatible avec la référence ; stockage insuffisant ou opération lourde incompatible. Une valeur « à revoir » reste exportable si les contrôles de contenu réussissent.
 
 ### UC-17 Consulter et télécharger une publication
 
@@ -229,7 +222,7 @@ L’extension navigateur [MyAB Translation Inspector](../../extension/README.md)
 2. Le formulaire actuel cible toutes les organisations actives ; suivre la construction en arrière-plan sur la fiche créée.
 3. Après publication, retirer éventuellement le catalogue en renseignant un motif et en confirmant.
 
-**Résultat :** une publication numérotée par version, avec un ZIP distinct par destinataire, ou un retrait conservant fichiers et historique.
+**Résultat :** une publication numérotée, avec un ZIP par destinataire et une sélection commune des termes au moins partiellement validés. Les cellules cibles validées sont renseignées, les autres vides ; les références et colonnes techniques sont préservées. Un retrait conserve fichiers et historique.
 
 **Exceptions et variantes :** absence de source détectée dès la demande ; autres contrôles de sortie d’UC-16 revérifiés à la construction ; bouton Réessayer après échec. Les valeurs sont figées lors de la construction, pas au clic initial. Le serveur accepte aussi une liste explicite d’organisations destinataires, sans sélecteur correspondant dans le formulaire.
 
@@ -282,7 +275,7 @@ L’extension navigateur [MyAB Translation Inspector](../../extension/README.md)
 | UC-05 à UC-09 et UC-11 | [Workflow](../../app/Services/WorkflowService.php), [propositions](../../app/Http/Controllers/ProposalController.php) | [CatalogueProposalTest](../../tests/Feature/CatalogueProposalTest.php), [WorkflowImportTest](../../tests/Feature/WorkflowImportTest.php) |
 | UC-10 | [Validation filtrée](../../app/Services/FilteredValidationService.php), [filtres](../../app/Services/ProposalFilter.php) | [FilteredValidationTest](../../tests/Feature/FilteredValidationTest.php), [ValidationPaginationTest](../../tests/Feature/ValidationPaginationTest.php) |
 | UC-12 et UC-18 | [Versions](../../app/Http/Controllers/VersionController.php), [publications](../../app/Services/PublicationService.php) | [PublicationTest](../../tests/Feature/PublicationTest.php) |
-| UC-13 à UC-15 | [Imports](../../app/Services/ImportService.php), [validation initiale](../../app/Services/InitialValidationService.php), [périmètres](../../app/Http/Controllers/TermController.php) | [WorkflowImportTest](../../tests/Feature/WorkflowImportTest.php), [InitialValidationTest](../../tests/Feature/InitialValidationTest.php), [ScopeIdentityTest](../../tests/Feature/ScopeIdentityTest.php) |
+| UC-13 à UC-15 | [Imports](../../app/Services/ImportService.php), [validation initiale](../../app/Services/InitialValidationService.php), [transition commune](../technique/transition-termes-communs.md) | [WorkflowImportTest](../../tests/Feature/WorkflowImportTest.php), [InitialValidationTest](../../tests/Feature/InitialValidationTest.php), [ScopeIdentityTest](../../tests/Feature/ScopeIdentityTest.php) |
 | UC-16 et UC-17 | [Export](../../app/Services/SimpleExportService.php), [contrôles de sortie](../../app/Services/DevconfExportService.php), [téléchargement](../../app/Http/Controllers/PublicationController.php) | [ExportTest](../../tests/Feature/ExportTest.php), [PublicationTest](../../tests/Feature/PublicationTest.php) |
 | UC-19 et UC-20 | [Administration](../../app/Http/Controllers/AdminController.php), [audit](../../app/Http/Controllers/AdminAuditController.php) | [AdminAccountActivationTest](../../tests/Feature/AdminAccountActivationTest.php), [AdminSecurityInvariantTest](../../tests/Feature/AdminSecurityInvariantTest.php), [AuditLocalizationTest](../../tests/Feature/AuditLocalizationTest.php) |
 | UC-21 | [Profil](../../app/Http/Controllers/ProfileController.php), [résumé](../../app/Services/DailyDigestService.php), [envoi](../../app/Console/Commands/SendDailyDigest.php) | [ProfilePasswordTest](../../tests/Feature/ProfilePasswordTest.php), [SecurityDailyDigestTest](../../tests/Feature/SecurityDailyDigestTest.php) |

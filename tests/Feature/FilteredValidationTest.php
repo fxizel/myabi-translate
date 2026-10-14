@@ -143,18 +143,19 @@ class FilteredValidationTest extends TestCase
         $import = $this->import(5);
         $proposals = Proposal::orderBy('id')->get();
         foreach ($proposals as $proposal) {
-            $proposal->term->update(['context' => 'target', 'organization_id' => $this->manager->organization_id]);
+            $proposal->term->update(['context' => 'target']);
+            $proposal->update(['organization_id' => $this->manager->organization_id]);
             $proposal->update(['created_at' => now()->subDays(31)]);
         }
         $proposals[1]->term->update(['context' => 'other']);
-        $proposals[2]->term->update(['organization_id' => null]);
+        $proposals[2]->update(['organization_id' => null]);
         $proposals[3]->update(['created_at' => now()->subDays(5)]);
         $proposals[4]->update(['status' => 'rejected']);
-        $filters = ['type' => 'server', 'import_id' => $import->id, 'version_id' => $this->version->id, 'context' => 'target', 'scope' => 'own', 'organization_id' => $this->manager->organization_id, 'q' => 'Key.', 'overdue' => 1];
+        $filters = ['type' => 'server', 'import_id' => $import->id, 'version_id' => $this->version->id, 'context' => 'target', 'organization_id' => $this->manager->organization_id, 'q' => 'Key.', 'overdue' => 1];
         $response = $this->listing($filters);
         $this->assertSame(1, $response->viewData('proposalTotal'));
         $this->assertSame([$proposals[0]->id], $response->viewData('proposals')->pluck('id')->all());
-        $operation = $this->enqueue($response->viewData('filteredSnapshot'), ['language' => 'it', 'context' => 'other', 'scope' => 'common']);
+        $operation = $this->enqueue($response->viewData('filteredSnapshot'), ['language' => 'it', 'context' => 'other', 'organization_id' => 999]);
         $this->assertTrue($this->step($operation));
         $this->assertSame('validated', $proposals[0]->fresh()->status);
         foreach ([1, 2, 3] as $index) {

@@ -249,7 +249,7 @@ Un groupe ne peut être supprimé que s’il ne contient plus de termes et n’e
 | Participant assigné | Proposer une traduction, confirmer sans changement et demander un arbitrage, dans ses langues autorisées. |
 | Validateur de la langue ou Gestionnaire | Résoudre les arbitrages et demander un réexamen. |
 
-Les droits actuels de validation restent inchangés. Cette répartition ne permet pas de contourner les restrictions de langue, de périmètre ou de validation du référentiel.
+Les droits actuels de validation restent inchangés. Cette répartition ne permet pas de contourner les restrictions de langue, d’assignation ou de validation du référentiel.
 
 ### 8.2. Règles préservées
 
@@ -262,17 +262,17 @@ Les droits actuels de validation restent inchangés. Cette répartition ne perme
 
 Cette spécification complète les [exigences fonctionnelles](exigences-fonctionnelles.md) et les [spécifications fonctionnelles de référence](../../specifications-fonctionnelles-referentiel-traductions-arge-abi.md), sans modifier les règles existantes d’import, de validation et de publication.
 
-### 8.3. Évolution prévue des organisations
+### 8.3. Référentiel commun du 13.10.2026
 
-La gestion des organisations doit évoluer : la traduction d’un même terme, pour un attribut et une langue donnés, sera commune à toutes les organisations. Les campagnes s’appuieront sur cette traduction partagée ; elles ne définiront pas de variante de traduction par organisation pour ce même terme.
+Un terme est identifié par son type et sa clé exacte, sans organisation propriétaire. Une traduction validée par attribut et langue est commune à toutes les organisations ; les groupes et campagnes s’appuient sur cette valeur et ne créent aucune variante.
 
-Les conséquences de cette évolution sur la visibilité des groupes, des campagnes, de leurs consignes, de leurs historiques et de leurs compteurs seront précisées dans le cadre de la refonte des organisations. Les règles de langue, de validation et de préservation des identités restent applicables.
+Les utilisateurs autorisés consultent les groupes, campagnes, consignes, historiques et compteurs du catalogue partagé. La contribution en campagne exige toujours l’assignation, la langue et un compte actif ; l’assignation ne confère aucun droit de validation. L’organisation documente la création et les contributions. Ce chantier adapte l’existant au modèle commun sans ajouter de fonctionnalité de groupes ou de campagnes.
 
 ## 9. Décisions restantes et détails de conception
 
 ### 9.1. Décisions métier restant à préciser
 
-- Règles de consultation des groupes et campagnes dans le futur modèle des organisations, fondé sur une traduction commune selon la section 8.3.
+La consultation commune est actée dans la section 8.3 ; aucune variante organisationnelle n’est à définir.
 
 ### 9.2. Détails de conception à préciser
 
@@ -285,7 +285,7 @@ Les autres décisions métier précédentes sont adoptées. Les détails suivant
 - Traitement d’une modification de référence pendant qu’une proposition est suivie, et consultation des participations retirées dont une proposition a été décidée depuis le retrait.
 - Modalités de retrait manuel ou d’exclusion individuelle d’un terme provenant d’un groupe synchronisé, si cette commande est proposée.
 
-La demande de développement du 13 octobre 2026 autorise la mise en œuvre de ce contrat. Les choix de conception retenus, sans refonte du modèle des organisations, sont décrits dans la [mise en œuvre technique](../technique/groupes-campagnes-implementation.md).
+La demande de développement du 13 octobre 2026 autorise la mise en œuvre de ce contrat. Les choix de conception retenus, avec alignement sur le référentiel commun, sont décrits dans la [mise en œuvre technique](../technique/groupes-campagnes-implementation.md).
 
 ## 10. Scénarios d’acceptation fonctionnelle
 

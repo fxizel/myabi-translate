@@ -44,7 +44,7 @@ Pour chaque type, la définition du format précise :
 4. Les attributs traduisibles et leurs colonnes par langue. Les trois dispositions existantes sont prises en charge : colonnes fixes (mRic-js), paires « colonne langue / colonne valeur » (Form), colonne par attribut et par langue (Law Catalog, Incident code).
 5. La valeur de référence et ses replis : de_CH sinon Default, puis Caption (mRic-js, MonoMOT, Server) ; Default Label, dont la langue est donnée par Default Language (Form, Incident Workflow) ; « attribut de_CH » sinon « attribut Default » (Law Catalog) ; « attribut_DE » (Incident code).
 6. Les colonnes techniques à conserver et à réexporter telles qu'importées, y compris Update User et Update Dt.
-7. Les préfixes connus de Form Template Name ou de Workflow qui proposent une portée cantonale, modifiable terme par terme. Les marqueurs PHV, WIP, TEST et OLD restent non arbitrés (question 8 du §15 fonctionnel) : en tête du nom, suivis d’un séparateur ou seuls, ils imposent une confirmation de portée par le Gestionnaire, quelle que soit leur casse. Aucune organisation homonyme n’est attribuée automatiquement ; une décision explicite déjà enregistrée reste conservée.
+7. Les préfixes de Form Template Name et Workflow restent dans les clés et le contexte techniques. Depuis le 13.10.2026, ils n'attribuent aucun propriétaire et ne demandent plus de confirmation de portée ; tous les termes DEVCONF appartiennent au référentiel commun.
 8. La règle d’identité et de collision retenue après clarification avec LogObject. Dans la proposition actuelle, les clés restent exactes ; une collision est conservée et signalée, sans choix automatique de première ou dernière ligne.
 9. Les contrôles applicables : longueur maximale si connue, placeholders à préserver et avertissement si la traduction est identique à la source.
 
@@ -69,10 +69,20 @@ Un doublon désigne une occurrence après la première d’une même clé compos
 
 Avec une lecture stricte Windows-1252 et une réécriture Python CSV (`QUOTE_ALL` pour 01–06, `QUOTE_MINIMAL` pour 07, séparateur `;`, CRLF), les fichiers 01–06 sont identiques octet pour octet. Le fichier 07 passe de 71 838 828 à 70 299 490 octets : le lecteur conserve les valeurs mais l’écrivain retire les guillemets facultatifs. Cela invalide l’ancienne description « sans guillemets sauf nécessité » et impose de préserver la représentation brute des cellules inchangées.
 
-L’importeur doit donc garder l’original et la position de ses enregistrements ; un export sans modification le restitue exactement. Un export modifié préserve les cellules non touchées, y compris leurs guillemets, espaces et retours à la ligne, et applique les règles CSV aux seules cellules remplacées. Ces deux cas font l’objet de tests distincts.
+L’importeur doit donc garder l’original et la position de ses enregistrements ; une restitution brute sans modification de cet original le reproduit exactement. L'export applicatif réunit tous les termes connus du type et peut donc dépasser le nombre de lignes de cet original. Un export modifié préserve les cellules non touchées, y compris leurs guillemets, espaces et retours à la ligne, et applique les règles CSV aux seules cellules remplacées. Ces deux cas font l’objet de tests distincts.
 
 L’unique collision exacte Incident code contient des valeurs divergentes : la clé actuelle ne suffit pas pour décider quelle ligne modifier. Les deux lignes sont conservées dans l’import et le rapport. La publication du type concerné est bloquée tant qu’une règle confirmée ne permet pas de les traiter. Aucun ajout automatique de `ID`, aucune fusion et aucune suppression ne sont supposés résoudre ce cas.
 
 L’analyse des collisions lit les groupes et leurs présences par lots de 300, puis compare les clés exactes aux enregistrements originaux. Le résumé JSON conserve au plus 1 000 numéros de ligne dans `collision_rows`, avec `collision_rows_total` et `collision_rows_truncated` pour signaler les lignes restantes. `collisions` continue de compter les occurrences après la première de chaque clé. La liste paginée et le rapport CSV privé téléchargeable conservent le détail de toutes les présences et de tous les blocages ; le plafond du résumé ne retire aucune ligne ni aucun blocage. En cas de collision du hash entre clés différentes, des passages séparés vérifient les identités exactes, sans fusion automatique.
 
 
+
+## Contrat commun du 13.10.2026
+
+L'identité est le type DEVCONF et la clé exacte, sans organisation ni version. Préfixes et métadonnées techniques n'ajoutent aucune variante de traduction. Une empreinte reste un index de candidats ; comparer les composantes exactes, casse et espaces compris. Plusieurs imports peuvent partager une identité ; les ambiguïtés internes à un fichier restent bloquantes.
+
+L'export produit une ligne par terme courant connu du type, depuis sa source technique vérifiée, avec valeur validée commune ou repli importé par cellule. La publication inclut les termes ayant une cellule cible validée et laisse vides les autres cellules cibles. Elle préserve les références et colonnes techniques. Les deux sorties ont un en-tête unique et un ordre stable ; les cellules inchangées conservent leur représentation brute. Les manifestes tracent la source et la révision de chaque ligne, indépendamment du destinataire.
+
+La couverture est contrôlée contre l'ensemble attendu de la sortie, sans exiger qu'un fichier unique le contienne. Sources manquantes ou altérées, positions ou identités invalides, révisions indisponibles, formats incompatibles, encodage et placeholders restent bloquants selon le §9 technique. Les anciens fichiers publiés restent figés.
+
+Les cellules de référence et les cellules cibles sont déterminées par le mappage des colonnes de chaque ligne, et non par une exclusion générale de la langue allemande. Pour les formats par paires, `Default Label` reste la référence à préserver même lorsque `Default Language` vaut `fr` ; une colonne `Translation` associée à `de` constitue alors une vraie cellule cible, qui nécessite une validation pour être renseignée en publication.

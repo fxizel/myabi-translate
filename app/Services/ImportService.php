@@ -8,7 +8,6 @@ use App\Domain\Devconf\FormatRegistry;
 use App\Domain\Devconf\TranslationValidator;
 use App\Models\ImportBatch;
 use App\Models\MyabiVersion;
-use App\Models\Organisation;
 use App\Models\Term;
 use App\Models\User;
 use Carbon\Carbon;
@@ -16,10 +15,6 @@ use Illuminate\Support\Facades\DB;
 
 class ImportService
 {
-    private array $organizations = [];
-
-    private array $provenanceIds = [];
-
     public function __construct(private StorageBudget $budget, private AuditService $audit) {}
 
     private function json(mixed $value): string
@@ -69,7 +64,6 @@ class ImportService
     public function analyze(ImportBatch $import): void
     {
         $format = FormatRegistry::get($import->type);
-        $this->organizations = Organisation::pluck('id', 'code')->all();
         if (hash_file('sha256', $import->originalPath()) !== $import->sha256) {
             throw new \RuntimeException('Original checksum mismatch');
         }
@@ -156,15 +150,14 @@ class ImportService
             if (implode('', $key) === '') {
                 throw new \RuntimeException('Empty identity at record '.$record->number);
             }
-            $owner = $this->owner($format, $row, $import);
             $rawHash = $format->identityHash($row);
-            $prepared[] = [$record, $row, $rawHash, $owner];
+            $prepared[] = [$record, $row, $rawHash];
         }
         $known = $this->known($import, array_column($prepared, 2));
         $inserts = [];
-        foreach ($prepared as [$record,$row,$rawHash,$owner]) {
-            $term = $this->findExact($known->get($rawHash, collect()), $format->identity($row), $owner['id'], $import, $rawHash);
-            $hash = $this->identityHash($format, $row, $term ? $term->organization_id : $owner['id']);
+        foreach ($prepared as [$record,$row,$rawHash]) {
+            $term = $this->findExact($known->get($rawHash, collect()), $format->code, $format->identity($row));
+            $hash = $this->identityHash($format, $row);
             $category = $term ? (($term->semantic_hash === $format->semanticHash($row) && $term->source_hash === $format->sourceHash($row)) ? 'unchanged' : 'changed') : 'new';
             $report[$category]++;
             foreach ($format->attributes($row) as $attribute) {
@@ -206,7 +199,6 @@ class ImportService
             + (int) ($counts['unchanged'] ?? 0) * 64 + 10 * 1024 * 1024;
         $this->budget->ensure($additional);
         $format = FormatRegistry::get($import->type);
-        $this->organizations = Organisation::pluck('id', 'code')->all();
         $technical = User::where('is_technical', true)->firstOrFail();
         $import->update(['status' => 'applying', 'error' => null]);
         $report = $import->report;
@@ -243,7 +235,6 @@ class ImportService
         $new = [];
         $prepared = [];
         $now = now()->format('Y-m-d H:i:s');
-        $reader = new CsvReader;
         foreach ($rows as $presence) {
             $record = $records->current();
             if (! $record || $record->number !== $presence->record_number || $record->offset !== $presence->offset) {
@@ -251,12 +242,14 @@ class ImportService
             }
             $records->next();
             $row = $record->associative($format->headers);
-            $owner = $this->owner($format, $row, $import);
             $key = $format->identity($row);
-            $term = $this->findExact($known->get($presence->raw_identity_hash, collect()), $key, $owner['id'], $import, $presence->raw_identity_hash);
+            $term = $this->findExact($known->get($presence->raw_identity_hash, collect()), $format->code, $key);
             $attrs = $format->attributes($row);
-            $prepared[] = [$presence, $row, $owner, $attrs];
-            if ($term || isset($new[$presence->identity_hash])) {
+            // Exact serialized components, rather than a digest, also separate
+            // newly created terms if a hash bucket contains distinct keys.
+            $exactKey = $this->json([$format->code, $key]);
+            $prepared[] = [$presence, $row, $exactKey, $attrs];
+            if ($term || isset($new[$exactKey])) {
                 continue;
             }
             $label = implode(' / ', $key);
@@ -265,13 +258,13 @@ class ImportService
             foreach ($attrs as $a) {
                 $search .= ' '.implode(' ', array_filter($a['translations'], fn ($value) => $value !== ''));
             }
-            $new[$presence->identity_hash] = ['type' => $format->code, 'organization_id' => $owner['id'], 'identity_hash' => $presence->identity_hash, 'raw_identity_hash' => $presence->raw_identity_hash, 'scope_overridden' => false, 'key' => $this->json($key), 'label' => $label,
+            $new[$exactKey] = ['type' => $format->code, 'identity_hash' => $presence->identity_hash, 'raw_identity_hash' => $presence->raw_identity_hash, 'key' => $this->json($key), 'label' => $label,
                 'context' => mb_substr(match ($format->code) {
                     'form' => $row['Form Template Name'],'workflow' => $row['Workflow'],'incident' => $row['GROUPTYPE'],default => ''
                 }, 0, 255),
                 'source_text' => $reference, 'search_text' => $search, 'semantic_hash' => $format->semanticHash($row), 'source_hash' => $format->sourceHash($row),
                 'source_import_id' => $import->id, 'source_offset' => $presence->offset, 'source_length' => $presence->length, 'validated' => '{}', 'review_needed' => '{}',
-                'revision_no' => 1, 'lock_version' => 1, 'obsolete' => false, 'scope_unconfirmed' => $owner['unconfirmed'], 'created_by' => $technical->id, 'updated_by' => $technical->id, 'created_at' => $now, 'updated_at' => $now];
+                'revision_no' => 1, 'lock_version' => 1, 'obsolete' => false, 'created_by' => $technical->id, 'updated_by' => $technical->id, 'created_at' => $now, 'updated_at' => $now];
         }
         if ($new) {
             DB::table('terms')->insert(array_values($new));
@@ -292,12 +285,12 @@ class ImportService
         $campaignTerms = [];
         $searchUpdates = [];
         $searchAttributes = [];
-        foreach ($prepared as [$presence,$row,$owner,$attrs]) {
-            $term = $this->findExact($known->get($presence->raw_identity_hash, collect()), $format->identity($row), $owner['id'], $import, $presence->raw_identity_hash);
+        foreach ($prepared as [$presence,$row,$exactKey,$attrs]) {
+            $term = $this->findExact($known->get($presence->raw_identity_hash, collect()), $format->code, $format->identity($row));
             if (! $term) {
                 throw new \RuntimeException('Exact identity mismatch');
             }
-            $created = isset($new[$presence->identity_hash]) && ! isset($newSnap[$term->id]);
+            $created = isset($new[$exactKey]) && ! isset($newSnap[$term->id]);
             $changed = ! $created && $isLatest && ! $presence->collision && ($term->semantic_hash !== $format->semanticHash($row) || $term->source_hash !== $format->sourceHash($row));
             if ($changed) {
                 $review = $term->review_needed;
@@ -343,7 +336,7 @@ class ImportService
                     $searchAttributes[$term->id] = $attrs;
                 }
                 $revisions[] = ['term_id' => $term->id, 'number' => $term->revision_no, 'version_id' => $import->version_id, 'source_import_id' => $term->source_import_id, 'source_offset' => $term->source_offset, 'source_length' => $term->source_length,
-                    'validated' => $this->json($term->validated), 'metadata' => $this->json(['organization_id' => $term->organization_id, 'key' => $term->key, 'context' => $term->context, 'obsolete' => false, 'review_needed' => $term->review_needed]),
+                    'validated' => $this->json($term->validated), 'metadata' => $this->json(['key' => $term->key, 'context' => $term->context, 'obsolete' => false, 'review_needed' => $term->review_needed]),
                     'origin' => 'import', 'origin_id' => $import->id, 'created_by' => $technical->id, 'created_at' => $now];
                 $report['revisions_created']++;
                 $newSnap[$term->id] = true;
@@ -398,23 +391,9 @@ class ImportService
         }
     }
 
-    private function owner(FormatDefinition $format, array $row, ImportBatch $import): array
+    public function identityHash(FormatDefinition $format, array $row): string
     {
-        $prefixes = [];
-        foreach (config('referentiel.scope_prefixes') as $code) {
-            $prefixes[$code.'_'] = $code;
-        }
-        $unconfirmedPrefixes = config('referentiel.unconfirmed_scope_prefixes', FormatDefinition::UNCONFIRMED_SCOPE_PREFIXES);
-        $scope = $format->suggestedScope($row, $prefixes, $unconfirmedPrefixes);
-        $unresolved = in_array($scope, $unconfirmedPrefixes, true);
-
-        return ['id' => ! $unresolved && $scope ? ($this->organizations[$scope] ?? null) : null,
-            'unconfirmed' => $unresolved || ($scope !== null && ! isset($this->organizations[$scope]))];
-    }
-
-    public function identityHash(FormatDefinition $format, array $row, ?int $owner): string
-    {
-        return hash('sha256', $this->json([$format->code, $owner, $format->identity($row)]));
+        return $format->identityHash($row);
     }
 
     private function refreshPendingProposals(array $anomalies, string $now): void
@@ -433,59 +412,25 @@ class ImportService
         }
     }
 
-    private function findExact($candidates, array $key, ?int $owner, ImportBatch $import, string $rawHash): ?Term
+    private function findExact($candidates, string $type, array $key): ?Term
     {
         // A digest is only a candidate index: exact components remain authoritative.
-        $exact = $candidates->filter(fn ($term) => $term->key === $key);
-        if ($preferred = $exact->first(fn ($term) => $term->id === ($this->provenanceIds[$rawHash] ?? null))) {
-            return $preferred;
+        $exact = $candidates->filter(fn ($term) => $term->type === $type && $term->key === $key);
+        if ($exact->count() > 1) {
+            throw new \RuntimeException('Conflicting current exact identities; consolidation required.');
         }
-        $common = $exact->filter(fn ($term) => $term->scope_overridden && $term->organization_id === null);
-        if ($common->isNotEmpty()) {
-            return $this->uniqueScope($common);
-        }
-        if ($import->source_kind === 'organization' && $import->organization_id !== null) {
-            $private = $exact->filter(fn ($term) => $term->scope_overridden && $term->organization_id === $import->organization_id);
-            if ($private->isNotEmpty()) {
-                return $this->uniqueScope($private);
-            }
-        }
-        $inferred = $exact->filter(fn ($term) => $term->organization_id === $owner);
 
-        return $inferred->isEmpty() ? null : $this->uniqueScope($inferred);
+        return $exact->first();
     }
 
-    private function uniqueScope($terms): Term
-    {
-        if ($terms->count() !== 1) {
-            throw new \RuntimeException('Conflicting exact identities in the same scope; manual resolution required.');
-        }
-
-        return $terms->first();
-    }
-
-    /** Raw identity remains stable when canton mappings or manually assigned scope change. */
+    /** Source provenance never selects a separate translation identity. */
     private function known(ImportBatch $import, array $hashes)
     {
-        $maria = in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true);
-        $joinOrder = $maria ? 'STRAIGHT_JOIN ' : '';
-        $prior = DB::table('import_rows')->join('import_batches', 'import_batches.id', '=', 'import_rows.import_id')
-            ->where('import_batches.status', 'applied')->where('import_batches.type', $import->type)->where('import_batches.source_kind', $import->source_kind)
-            ->where('import_batches.organization_id', $import->organization_id)->whereIn('import_rows.raw_identity_hash', $hashes)->whereNotNull('term_id')
-            ->groupBy('import_rows.raw_identity_hash')->selectRaw($joinOrder.'import_rows.raw_identity_hash, MAX(import_batches.catalogue_generation) as generation');
-        if ($maria) {
-            // Fresh import statistics can underestimate a whole source as one row.
-            // Always seek this chunk's hashes before looking up source metadata.
-            $prior->forceIndex('import_rows_raw_identity_hash_index');
-        }
-        $links = DB::query()->fromSub($prior, 'latest_presence')
-            ->join('import_rows', 'import_rows.raw_identity_hash', '=', 'latest_presence.raw_identity_hash')
-            ->join('import_batches', fn ($join) => $join->on('import_batches.id', '=', 'import_rows.import_id')->on('import_batches.catalogue_generation', '=', 'latest_presence.generation'))
-            ->where('import_batches.status', 'applied')->where('import_batches.type', $import->type)->where('import_batches.source_kind', $import->source_kind)
-            ->where('import_batches.organization_id', $import->organization_id)->selectRaw($joinOrder.'import_rows.raw_identity_hash, import_rows.term_id')->get();
-        $this->provenanceIds = $links->pluck('term_id', 'raw_identity_hash')->all();
-
-        return Term::where('type', $import->type)->whereIn('raw_identity_hash', $hashes)->get()->groupBy('raw_identity_hash');
+        // Missing historical digests are included and re-indexed in memory so
+        // an interrupted backfill cannot accidentally create a second term.
+        return Term::where('type', $import->type)
+            ->where(fn ($query) => $query->whereIn('raw_identity_hash', $hashes)->orWhereNull('raw_identity_hash'))
+            ->get()->groupBy(fn ($term) => $term->raw_identity_hash ?? hash('sha256', json_encode([$term->type, $term->key], JSON_THROW_ON_ERROR)));
     }
 
     public function progress(ImportBatch $import, string $stage, int $rows): void

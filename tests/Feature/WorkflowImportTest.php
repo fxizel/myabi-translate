@@ -20,7 +20,6 @@ use App\Services\ImportService;
 use App\Services\LocalizedMessage;
 use App\Services\OperationLock;
 use App\Services\ProposalFilter;
-use App\Services\PublicationService;
 use App\Services\SourceRecord;
 use App\Services\WorkflowService;
 use Illuminate\Database\QueryException;
@@ -213,11 +212,8 @@ class WorkflowImportTest extends TestCase
             $service->apply($batch->fresh());
         }
         $this->assertFalse(Term::where('label', 'B')->first()->obsolete);
-        $publicationService = app(PublicationService::class);
-        $publication = $publicationService->enqueue($this->manager, ['version_id' => $this->version->id, 'types' => ['server'], 'recipients' => [$this->manager->organization_id]]);
-        app(OperationLock::class)->run(fn () => $publicationService->build($publication), true);
-        $manifest = $publication->fresh()->manifest;
-        $this->assertSame($a->id, $manifest['recipients'][$this->manager->organization_id]['files'][0]['source_import_id']);
+        $this->assertSame($a->id, Term::where('label', 'A')->firstOrFail()->source_import_id);
+        $this->assertSame($b->id, Term::where('label', 'B')->firstOrFail()->source_import_id);
     }
 
     public function test_reimport_unchanged_or_trace_only_adds_presence_without_duplicate_revision_or_proposal(): void
@@ -447,35 +443,27 @@ class WorkflowImportTest extends TestCase
         }
     }
 
-    public function test_root_and_null_scopes_are_visible_in_catalogue_search_dashboard_and_export(): void
+    public function test_common_catalogue_is_visible_across_organizations_in_search_and_dashboard(): void
     {
         $this->withoutMiddleware(RequireTwoFactor::class);
-        $import = $this->import([
+        $this->import([
             ['Name' => 'Common null', 'de_CH' => 'A', 'fr_CH' => 'Texte A'],
             ['Name' => 'Common root', 'de_CH' => 'B', 'fr_CH' => 'Texte B'],
         ]);
-        $root = Organisation::create(['name' => 'Root', 'code' => 'ARGE', 'is_root' => true, 'active' => true]);
+        $other = Organisation::create(['name' => 'Other', 'code' => 'OTHER', 'active' => true]);
         $term = Term::where('label', 'Common root')->firstOrFail();
-        $this->actingAs($this->manager)->post(route('terms.scope', $term), [
-            'organization_id' => $root->id, 'lock_version' => $term->lock_version,
-        ])->assertSessionHasNoErrors();
-        $term->refresh();
-        $this->assertSame($root->id, $term->organization_id);
-        $this->assertTrue($this->translator->canTranslate('fr', $root->id));
-        $this->assertTrue($this->translator->canSeeOrganisation($root->id));
-        $reader = User::factory()->create(['organization_id' => $this->translator->organization_id, 'roles' => ['reader']]);
+        $this->assertTrue($this->translator->canTranslate('fr'));
+        $reader = User::factory()->create(['organization_id' => $other->id, 'roles' => ['reader']]);
         foreach ([$reader, $this->translator] as $user) {
             $this->actingAs($user)->get(route('terms.show', $term))->assertOk();
-            foreach (['', '?scope=common', '?q=Common'] as $query) {
+            foreach (['', '?q=Common'] as $query) {
                 $response = $this->get('/terms'.$query)->assertOk();
                 $this->assertSame(2, $response->viewData('terms')->total());
                 $this->assertSame(['server' => 2], $response->viewData('typeCounts')->all());
             }
             $this->assertSame(2, $this->get('/')->assertOk()->viewData('stats')['terms']);
         }
-        $this->assertSame(2, app(ProposalFilter::class)->query($this->manager, ['language' => 'fr', 'scope' => 'common'])->count());
-        $sources = app(DevconfExportService::class)->selectSources($this->version->id, ['server'], [$this->manager->organization_id]);
-        $this->assertSame($import->id, $sources[$this->manager->organization_id]['server']->id);
+        $this->assertSame(2, app(ProposalFilter::class)->query($this->manager, ['language' => 'fr'])->count());
         $this->assertDatabaseCount('terms', 2);
     }
 
@@ -499,30 +487,89 @@ class WorkflowImportTest extends TestCase
         $this->assertDatabaseCount('import_batches', 0);
     }
 
-    public function test_reader_cannot_import_or_submit_and_foreign_term_is_protected(): void
+    public function test_reader_can_see_common_catalogue_but_cannot_import_or_submit(): void
     {
         $import = $this->import([['Name' => 'Key', 'de_CH' => 'Wert']]);
         $other = Organisation::create(['code' => 'TI', 'name' => 'Police TI']);
         $term = Term::first();
-        $term->update(['organization_id' => $other->id]);
-        $reader = User::factory()->create(['organization_id' => $this->translator->organization_id, 'roles' => ['reader' => ['fr']]]);
-        $this->actingAs($reader)->get('/terms/'.$term->id)->assertForbidden();
+        $reader = User::factory()->create(['organization_id' => $other->id, 'roles' => ['reader' => ['fr']]]);
+        $this->actingAs($reader)->get('/terms/'.$term->id)->assertOk();
         $this->get('/imports')->assertForbidden();
         $this->get('/imports/'.$import->id.'/original')->assertForbidden();
         $this->post('/terms/'.$term->id.'/proposals', ['attribute' => 'label', 'language' => 'fr', 'value' => 'Valeur', 'lock_version' => 1])->assertForbidden();
     }
 
-    public function test_explicit_scope_survives_same_source_reimport_without_resetting_validated_values(): void
+    public function test_cross_organization_reimport_keeps_common_validated_values(): void
     {
         $row = ['Name' => 'Scoped', 'de_CH' => 'Wert', 'fr_CH' => 'Valeur'];
         $this->import([$row]);
         app(WorkflowService::class)->decide($this->validator, Proposal::first(), 'validate', 1);
         $term = Term::first();
-        $owner = $this->manager->organization_id;
-        $term->update(['organization_id' => $owner, 'identity_hash' => hash('sha256', json_encode(['server', $owner, $term->key], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR))]);
-        $this->import([$row]);
+        $other = Organisation::create(['code' => 'TI', 'name' => 'Police TI']);
+        $service = app(ImportService::class);
+        $import = $service->receive($this->input([$row]), 'source.csv', ['type' => 'server', 'version_id' => $this->version->id,
+            'organization_id' => $other->id, 'source_kind' => 'organization'], $this->manager);
+        $service->analyze($import);
+        $service->apply($import->fresh());
         $this->assertDatabaseCount('terms', 1);
-        $this->assertSame($owner, $term->fresh()->organization_id);
+        $this->assertSame($term->id, DB::table('import_rows')->where('import_id', $import->id)->value('term_id'));
         $this->assertSame('Valeur', $term->fresh()->validated['label']['fr']);
+    }
+
+    public function test_common_workflow_keeps_language_and_account_controls_for_bulk_decisions(): void
+    {
+        $this->import([['Name' => 'Shared', 'de_CH' => 'Wert', 'fr_CH' => 'Valeur', 'it_CH' => 'Valore']]);
+        $proposals = Proposal::orderBy('id')->get();
+        try {
+            app(WorkflowService::class)->bulk($this->validator, $proposals->pluck('lock_version', 'id')->all(), 'validate', null, false);
+            $this->fail('A validator cannot approve a language outside their role.');
+        } catch (HttpException $error) {
+            $this->assertSame(403, $error->getStatusCode());
+        }
+        $this->assertSame([], Term::first()->validated, 'The whole mixed selection must roll back.');
+        $this->assertSame(2, Proposal::where('status', 'pending')->count());
+        $this->assertDatabaseCount('revisions', 1);
+        $term = Term::firstOrFail();
+        $accounts = [
+            User::factory()->create(['roles' => ['translator' => ['fr']], 'active' => false]),
+            User::factory()->create(['roles' => ['manager'], 'is_technical' => true]),
+            User::factory()->create(['roles' => ['admin']]),
+            User::factory()->create(['roles' => ['reader']]),
+        ];
+        foreach ($accounts as $account) {
+            try {
+                app(WorkflowService::class)->propose($account, $term, 'label', 'fr', 'Correction');
+                $this->fail('This account cannot contribute.');
+            } catch (HttpException $error) {
+                $this->assertSame(403, $error->getStatusCode());
+            }
+        }
+        $this->assertDatabaseCount('proposals', 2);
+    }
+
+    public function test_claimed_import_proposal_only_remains_editable_by_its_current_author(): void
+    {
+        $this->import([['Name' => 'Shared', 'de_CH' => 'Wert', 'fr_CH' => 'Valeur']]);
+        $workflow = app(WorkflowService::class);
+        $proposal = $workflow->edit($this->translator, Proposal::firstOrFail(), 'Correction', 1);
+        $other = User::factory()->create(['roles' => ['translator' => ['fr']]]);
+        try {
+            $workflow->edit($other, $proposal, 'Other correction', 2);
+            $this->fail('Another translator cannot overwrite a claimed proposal.');
+        } catch (HttpException $error) {
+            $this->assertSame(403, $error->getStatusCode());
+        }
+        $this->assertSame('Correction', $proposal->fresh()->value);
+        $this->assertSame($this->translator->id, $proposal->fresh()->author_id);
+    }
+
+    public function test_manual_german_proposal_remains_available_for_its_authorized_language(): void
+    {
+        $this->import([['Name' => 'Shared', 'de_CH' => 'Wert']]);
+        $translator = User::factory()->create(['roles' => ['translator' => ['de']]]);
+        $proposal = app(WorkflowService::class)->propose($translator, Term::firstOrFail(), 'label', 'de', 'Neuer Wert');
+        $this->assertSame('de', $proposal->language);
+        $this->assertSame('pending', $proposal->status);
+        $this->assertSame([], Term::first()->validated);
     }
 }

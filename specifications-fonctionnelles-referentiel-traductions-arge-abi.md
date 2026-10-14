@@ -8,7 +8,7 @@
 | Objet | Besoins, règles de gestion et périmètre de l'application web de gestion du référentiel des traductions de myABI/icm (LogObject) |
 | Document associé | [Spécifications techniques](specifications-techniques-referentiel-traductions-arge-abi.md) : formats de fichier prédéfinis, modèle de données, sécurité, exigences non fonctionnelles, architecture et hébergement |
 
-**Cadrage technique du 21.09.2026** : les [spécifications techniques v3.0](specifications-techniques-referentiel-traductions-arge-abi.md) retiennent Laravel, Blade et MariaDB sur alwaysdata gratuit, pour un pilote d’organisation sans but lucratif, accessible sur Internet. Les sept fichiers restent dans le périmètre ; l’objectif de traitement devient 30 minutes. La [liste des exigences techniques](docs/technique/exigences-techniques.md) reprend les décisions des échanges. Le §9 technique recense les contradictions métier restant à résoudre, notamment collisions, portées, anciennes versions et encodage. Les reports de fonctions proposés en technique v2.0 ne sont pas considérés comme acceptés.
+**Cadrage technique du 21.09.2026** : les [spécifications techniques v3.0](specifications-techniques-referentiel-traductions-arge-abi.md) retiennent Laravel, Blade et MariaDB sur alwaysdata gratuit, pour un pilote d’organisation sans but lucratif, accessible sur Internet. Les sept fichiers restent dans le périmètre ; l’objectif de traitement devient 30 minutes. La [liste des exigences techniques](docs/technique/exigences-techniques.md) reprend les décisions des échanges. Le §9 technique recense les contradictions métier restant à résoudre, notamment collisions, anciennes versions et encodage. Les reports de fonctions proposés en technique v2.0 ne sont pas considérés comme acceptés.
 
 ## Sommaire
 
@@ -83,7 +83,7 @@ flowchart LR
 - Les langues de_CH (langue de référence), fr_CH, it_CH, en_US. La colonne technique sa_IN est conservée telle quelle et jamais traduite.
 - L'import et l'export dans les formats CSV produits par les exports DEVCONF de myABI, un format par type.
 - Le workflow de validation, les révisions de terme, le suivi des versions myABI, la traçabilité et la gestion des comptes.
-- La distinction entre éléments communs ARGE-ABI et éléments propres à une police (formulaires ou workflows cantonaux, par exemple préfixés « AG_ »), avec une portée par élément.
+- Tous les termes DEVCONF partagent le même référentiel, sans propriétaire organisationnel ; les préfixes restent dans les clés et le contexte.
 - Un glossaire terminologique commun (terme canonique par concept et par langue) servant de référence aux traducteurs (lot 2).
 
 ### Hors périmètre
@@ -118,9 +118,9 @@ Les termes ci-dessous ont un sens précis dans tout le document.
 | Révision | État figé et numéroté d'un terme (toutes ses traductions et attributs) à un instant donné. Toute modification validée crée une nouvelle révision ; les anciennes restent consultables. |
 | Statut | Position d'une proposition dans le workflow (Proposée, Validée, Rejetée). Les états calculés de la traduction en vigueur (À traduire, Validée, Publiée, À réviser, Obsolète) décrivent sa couverture et sa publication, indépendamment de ce workflow. |
 | Version myABI | Numéro de version du logiciel (ex. 2026.2) pour lequel un terme existe. Un terme peut apparaître, changer de valeur éditeur ou disparaître d'une version à l'autre. |
-| Catalogue | Ensemble des termes et traductions publiés pour une version myABI et un type donnés, c'est-à-dire ce qui est exportable. |
+| Catalogue | Ensemble courant des termes et traductions communes ; l'export inclut tous les termes connus du type, la publication sa sélection validée figée. |
 | Publication | Acte de figer un catalogue pour une version myABI. Une publication porte un numéro (ex. 2026.2-03) et une date. |
-| Portée | Indique si un terme est commun à l'ARGE-ABI ou propre à une organisation (canton). |
+| Origine | Organisation historique de la contribution et imports associés, distincts de l'organisation actuelle du compte. |
 | Organisation | Police membre de l'ARGE-ABI, ou l'ARGE-ABI elle-même. Chaque utilisateur appartient à une organisation. |
 | Concept | Notion métier (ex. « numéro de plaque ») à laquelle on associe un terme canonique par langue dans le glossaire terminologique. Un concept peut être relié à plusieurs termes myABI. |
 | Glossaire terminologique | Liste des concepts et de leurs termes canoniques par langue, avec définition et contexte, servant de référence de cohérence. |
@@ -140,20 +140,20 @@ Cinq rôles applicatifs suffisent. Un utilisateur appartient à une organisation
 
 ### Organisations
 
-- L'ARGE-ABI est l'organisation racine ; elle porte les termes de portée commune.
-- Chaque police membre est une organisation. Ses utilisateurs voient les termes communs et ceux de leur propre police.
-- Un Traducteur ne propose que sur les termes communs et sur ceux de sa police ; un Validateur valide dans ses langues quelle que soit l'organisation propriétaire du terme.
+- Les organisations rattachent les comptes, documentent les contributions et identifient les destinataires des publications.
+- Les utilisateurs autorisés consultent tous les termes courants. Aucun terme n'a de propriétaire organisationnel.
+- Traducteurs et Validateurs contribuent dans leurs langues autorisées sur tous les termes ; les règles de validation et des quatre yeux restent applicables.
 
 ### Matrice des droits
 
-Légende : X = autorisé, L = limité à ses langues, O = limité à son organisation.
+Légende : X = autorisé, L = limité à ses langues. Le téléchargement des publications reste réservé aux destinataires autorisés.
 
 | Action | Lecteur | Traducteur | Validateur | Gestionnaire | Administrateur |
 | --- | --- | --- | --- | --- | --- |
 | Rechercher, consulter, comparer | X | X | X | X | X |
 | Exporter un catalogue publié | X | X | X | X | X |
 | Exporter simplement un type courant |  |  |  | X |  |
-| Proposer une traduction ou corriger une proposition en attente selon la section 6 |  | L, O | L | X |  |
+| Proposer une traduction ou corriger une proposition en attente selon la section 6 |  | L | L | X |  |
 | Valider ou rejeter |  |  | L | X |  |
 | Gérer le glossaire terminologique (lot 2) |  |  | L | X |  |
 | Importer un fichier myABI |  |  |  | X |  |
@@ -210,7 +210,17 @@ Mêmes fichiers.
 
 ### Prise en charge des formats
 
-Chaque format définit les colonnes et leur ordre, la clé d'identité, les attributs traduisibles et leurs langues, la valeur de référence, les attributs techniques à préserver, les règles de portée et de doublons, ainsi que les contrôles de saisie. Les définitions sont versionnées, maintenues par les développeurs et testées sur les fichiers d'exemple. Un nouveau type ou une évolution du format passe par une livraison applicative. L'administration ne comporte pas d'éditeur de formats. Détail : [annexe des formats](docs/technique/formats-devconf.md).
+Chaque format définit les colonnes et leur ordre, la clé d'identité, les attributs traduisibles et leurs langues, la valeur de référence, les attributs techniques à préserver, les règles d'identité exacte et de doublons, ainsi que les contrôles de saisie. Les définitions sont versionnées, maintenues par les développeurs et testées sur les fichiers d'exemple. Un nouveau type ou une évolution du format passe par une livraison applicative. L'administration ne comporte pas d'éditeur de formats. Détail : [annexe des formats](docs/technique/formats-devconf.md).
+
+### Référentiel commun et provenance (décision du 13.10.2026)
+
+Un terme courant est identifié par son type et les composantes exactes de sa clé, sans organisation ni version. Casse, espaces et composantes vides autorisées restent significatifs. Une empreinte sert à retrouver des candidats ; l'égalité exacte doit ensuite être contrôlée. Plusieurs imports peuvent alimenter le même terme ; les doublons ambigus internes à un fichier restent bloquants.
+
+Une seule valeur validée courante existe par terme, attribut et langue. Deux organisations important la même identité réutilisent le même terme ; leurs valeurs divergentes deviennent des propositions concurrentes. Une proposition identique en attente est réutilisable en conservant tous ses liens d'import. Une validation autorisée choisit la valeur commune et supplante les autres propositions en attente de la même cellule.
+
+L'organisation d'origine est enregistrée à la contribution et ne suit pas les changements d'organisation du compte. L'auteur courant et les imports associés sont présentés séparément. Une correction conserve valeurs et provenances précédentes ; elle ne prétend pas que les imports ont fourni la nouvelle valeur corrigée. Le filtre d'origine couvre l'organisation historique et tous les imports associés ; celui d'import couvre le lien principal et les liens supplémentaires, sans double comptage.
+
+La consolidation conserve l'identifiant et les validations de la première fiche compatible, selon création puis identifiant. Les valeurs divergentes des autres fiches deviennent des propositions avec leur provenance. Les anciennes décisions et révisions restent dans leurs lignées immuables, sans renumérotation. Des références ou un sens incompatibles bloquent la reprise. Une seconde exécution ne crée pas de doublon ; les publications figées restent intactes. Voir la [procédure de transition](docs/technique/transition-termes-communs.md).
 
 ## 6. Workflow de validation
 
@@ -311,7 +321,7 @@ stateDiagram-v2
 5. Le Validateur décide directement depuis la file des propositions. Une décision ne porte que sur la valeur qu'il a examinée : si la proposition a été corrigée ou traitée entre-temps, la décision est refusée et la file est actualisée.
 6. Validation et rejet en lot sont possibles sur une sélection filtrée (par type, formulaire, workflow, groupe de codes). Depuis la file, « Valider toutes les propositions filtrées » traite aussi les propositions des autres pages ou pas encore chargées, pour la langue et les filtres actifs. Le nombre total est affiché avant confirmation. Le traitement reprend par lots en arrière-plan, sans limite globale de 500 propositions ; les anomalies bloquantes, les propositions personnelles sans dérogation explicite du Gestionnaire et les cellules avec plusieurs propositions concurrentes restent en attente et sont comptabilisées pour examen. Une modification du référentiel interrompt l’opération et exige une nouvelle confirmation ; les validations déjà enregistrées sont conservées.
 7. Les valeurs traduites importées arrivent au statut Proposée, jamais en Validée. Le Gestionnaire peut lancer une validation initiale en masse d'un import pour constituer l'état de départ ; l'opération est journalisée comme telle et respecte les contrôles bloquants.
-8. Une proposition encore Proposée est corrigeable par son auteur, via une action explicite qui applique les mêmes contrôles que « Proposer » et conserve l'historique des modifications. Une proposition d'import peut être reprise par un Traducteur autorisé pour sa langue et sa portée ; le premier qui la corrige en devient le rédacteur, seul habilité à poursuivre cette correction. Son identité est enregistrée pour le principe des quatre yeux. Une proposition Validée ou Rejetée n'est plus modifiable.
+8. Une proposition encore Proposée est corrigeable par son auteur, via une action explicite qui applique les mêmes contrôles que « Proposer » et conserve l'historique des modifications. Une proposition d'import peut être reprise par un Traducteur autorisé pour sa langue ; le premier qui la corrige en devient le rédacteur, seul habilité à poursuivre cette correction. Son identité est enregistrée pour le principe des quatre yeux. Une proposition Validée ou Rejetée n'est plus modifiable.
 9. Quand une proposition est validée, les autres propositions Proposée sur le même terme, attribut et langue passent à Rejetée avec le motif « supplantée ». Deux propositions concurrentes ne peuvent pas être validées simultanément.
 10. Pour une traduction À réviser, le Validateur peut confirmer la valeur en vigueur sans nouvelle proposition ; la confirmation vaut validation (auteur, date et heure) sans changement de valeur ni nouvelle révision.
 11. Un contrôle automatique bloque l'envoi d'une proposition vide, contenant un caractère non représentable dans l'encodage d'export ou omettant un placeholder de la source (`{}`, `{field}`, `[Tatbestand]`). Les valeurs importées sont conservées même si elles présentent ces anomalies ; leurs propositions sont signalées dans le rapport et dans la file. Toute validation, y compris en masse, vérifie ces contrôles sur la référence actuelle et exige la correction des anomalies bloquantes.
@@ -363,11 +373,11 @@ Un import crée ou met à jour les termes et leur présence dans la version ; la
 ### Publication d'un catalogue
 
 1. Le Gestionnaire choisit une version et un ou plusieurs types ; le système affiche le nombre de termes par état (Validée, À traduire, À réviser) par langue.
-2. La publication fige, pour chaque terme ayant une présence dans la version (y compris les termes portant l'état historique Obsolète), la révision en vigueur à cet instant. Les attributs et langues sans valeur validée ne reçoivent aucune valeur du Référentiel : l'export y place la valeur de repli importée (section 9) ; l'export ne fabrique jamais de valeur.
-3. La publication enregistre, par type et par organisation, le dernier lot appliqué pour la version depuis l'instance de cette organisation, qui servira de lot de repli à l'export ; à défaut, le dernier lot LogObject. Tous les lots appliqués, anciens ou nouveaux, sont éligibles selon les mêmes règles : leur intégrité et leur couverture réelle des termes actifs de la version sont vérifiées, sans classement du lot par mode d'import. Les blocages techniques de la section 9 des spécifications techniques restent applicables. Elle fige aussi la version de la définition de chaque format utilisée pour l'export. Les révisions, lots de repli et définitions de format retenus restent disponibles pour reproduire ses fichiers après une évolution de l'application.
+2. La publication fige les termes ayant au moins une cellule cible validée dans les langues du fichier, même partiellement. Les cellules cibles validées sont renseignées et les autres restent vides. Les cibles sont déterminées par les colonnes du format, indépendamment de la langue : avec Default Language fr, une colonne Translation associée à de est une cible, tandis que Default Label reste la référence préservée. Un terme sans validation cible est exclu ; aucune valeur importée ni proposition en attente ne remplit ces cellules.
+3. La sélection est indépendante du destinataire et du fichier d'origine. La publication conserve par ligne la source technique vérifiée, sa position, la révision et les empreintes, ainsi que la version du format. La couverture est vérifiée contre les termes éligibles ; une source absente, altérée ou ambiguë bloque la génération. Les anciennes publications conservent leurs fichiers et manifestes.
 4. La publication reçoit un numéro composé du numéro de version myABI et d'une séquence (2026.2-03), une date et heure, un auteur et une note de publication libre.
 5. Une publication est immuable. Elle peut être marquée Retirée avec un motif ; elle reste consultable mais n'est plus proposée par défaut à l'export.
-6. Un rapport de publication liste, par type et par langue, les termes publiés, ceux restés en valeur de repli et les différences avec la publication précédente de la même version.
+6. Le rapport distingue par type et langue les cellules validées et les cellules cibles vides, trace les différentes sources et les différences avec la publication précédente.
 
 ## 8. Import myABI
 
@@ -409,7 +419,7 @@ Bloquants sauf mention contraire.
 1. Encodage conforme au format du type ; un fichier UTF-8 avec BOM ou des séquences UTF-8 valides déclenche un avertissement et une conversion proposée.
 2. En-tête identique à la liste de colonnes du format (noms et ordre) ; nombre de colonnes constant par ligne.
 3. Clé d'identité non vide (sauf colonnes autorisées vides).
-4. Doublons de clé dans le fichier : traités selon la règle du type (refus, première ligne, dernière ligne), toujours listés dans le rapport avec leur numéro de ligne ; les lignes écartées ne sont pas réexportées (section 9).
+4. Les doublons ambigus internes à un fichier sont conservés et signalés avec leurs numéros de ligne ; ils bloquent les sorties concernées. La présence d'une même identité dans plusieurs imports ne constitue pas en soi une collision.
 5. Empreinte SHA-256 déjà importée pour la même version et le même type : avertissement non bloquant « fichier déjà traité », l'utilisateur confirme pour poursuivre.
 6. Caractères non représentables dans l'encodage d'export (possibles seulement après conversion d'un fichier UTF-8) : avertissement, la valeur est importée telle quelle ; sa proposition doit être corrigée avant validation. Si la valeur importée est utilisée comme repli, la règle de substitution de la section 9 s'applique à l'export.
 7. Placeholders manquants dans une traduction importée : avertissement dans le rapport et sur la proposition ; la valeur d'origine est conservée et la proposition doit être corrigée avant validation. Une cellule de traduction vide ne crée pas de proposition.
@@ -420,7 +430,7 @@ Chaque ligne est comparée à la révision courante du terme. Les colonnes de tr
 
 | Cas | Effet |
 | --- | --- |
-| Clé inconnue | Terme créé, révision 1, présence dans la version ; portée proposée par la règle du type. Les valeurs traduites non vides du fichier deviennent des propositions au statut Proposée. |
+| Clé inconnue | Terme commun créé, révision 1, présence dans la version ; identité exacte par type et clé. Les valeurs traduites non vides du fichier deviennent des propositions au statut Proposée. |
 | Clé connue, aucune différence | Présence dans la version enregistrée pour ce lot, rien d'autre. |
 | Valeur de référence (de_CH, sinon Default) d'un attribut modifiée | Nouvelle révision d'origine import ; les traductions validées de cet attribut passent À réviser. |
 | Attribut technique modifié (Active, PHV, VALIDTODT, etc.) | Nouvelle révision d'origine import ; aucune action de workflow. |
@@ -444,32 +454,32 @@ Chaque ligne est comparée à la révision courante du terme. Les colonnes de tr
 
 ## 9. Export myABI
 
-Le menu Publications permet de télécharger une publication complète pour une organisation destinataire : un fichier par type présent dans la publication, avec toutes ses lignes et toutes ses langues. Le menu Exports permet au Gestionnaire de télécharger directement un seul type courant. Chaque fichier est strictement conforme au format d'import de myABI : mêmes colonnes, même ordre, même encodage, mêmes guillemets. Un fichier importé puis publié et exporté sans changement est identique octet pour octet, à la seule exception des lignes en doublon écartées à l'import selon la règle du type et listées dans le rapport (section 8) ; ce test automatique est exécuté pour chaque type à chaque livraison du Référentiel. Le sort définitif des doublons dépend des réponses aux questions 4 et 5 (section 15).
+Le menu Publications télécharge les fichiers figés pour un destinataire autorisé. Le menu Exports produit directement un type courant complet. Chaque fichier respecte le format DEVCONF : en-tête unique, colonnes, ordre, encodage et règles CSV. La restitution brute d'un original sans modification reste identique octet pour octet ; les sorties applicatives réunissent les lignes attendues depuis plusieurs sources techniques, avec représentation brute des cellules inchangées.
 
 ### Export simple d'un type
 
 Le menu **Exports**, accessible au Gestionnaire, permet de choisir un type de traduction, une version admissible et une organisation destinataire active, puis de télécharger directement son fichier CSV DEVCONF. Les sept types sont proposés, avec toutes les langues du fichier. La version doit disposer d'un import appliqué, ne pas être archivée et ne pas précéder la dernière version ayant un import appliqué.
 
-L'export utilise la révision courante validée et conserve les valeurs source de repli pour les cellules sans traduction validée. Il privilégie le dernier import appliqué de l'organisation pour ce type et cette version, puis l'import éditeur à défaut. Les propositions en attente ne remplacent aucune cellule. Les contrôles d'intégrité, d'identité, de portée, de couverture et d'encodage restent ceux des publications ; une anomalie bloquante empêche le téléchargement.
+L'export contient tous les termes courants connus du type, une fois chacun, indépendamment des organisations et fichiers d'origine. Les cellules validées prennent la valeur commune ; les autres conservent la valeur importée de leur source technique vérifiée. Les propositions en attente ne remplacent aucune cellule. Plusieurs imports peuvent alimenter un fichier avec un en-tête unique et un ordre stable : 1 200 termes connus sont exportés même si un fichier source n'en contient que 1 000. Les contrôles d'intégrité, d'identité exacte, de couverture de l'ensemble attendu, de révision, de format, d'encodage et de placeholders restent bloquants.
 
 Cette action ne crée aucune publication, ne valide aucune proposition et ne modifie pas l'état publié des termes. Le nom du fichier correspond au nom DEVCONF du type. Le fichier est généré en stockage privé temporaire, puis supprimé après envoi. L'action est journalisée avec l'utilisateur, la version, le type, l'organisation, la source, la version du format, le nombre de lignes et les empreintes SHA-256. Un nouvel export reflète les validations et imports intervenus depuis le précédent ; les publications restent le moyen de conserver un catalogue figé.
 
 ### Téléchargement d'une publication
 
 - L'utilisateur ouvre une publication dans la version myABI concernée puis la télécharge ; la dernière publication Active de la version Courante est proposée par défaut.
-- L'organisation destinataire est celle de l'utilisateur. Le Gestionnaire peut télécharger pour une autre organisation. Ce contexte détermine le lot de repli figé par la publication et le code dans le nom de fichier.
-- Le téléchargement inclut tous les types de la publication, regroupés dans une archive ZIP s'il y en a plusieurs. Toutes les langues et toutes les lignes du catalogue sont incluses, quelle que soit leur portée, afin de ne rien supprimer dans l'instance destinataire tant que la question 3 (section 15) n'est pas tranchée.
-- Le téléchargement d'une publication ne comporte pas de sélection de types, de langues, de portée ou de mode. Le menu Exports offre séparément l'export simple d'un type décrit ci-dessus. Les filtres de consultation et les sélections dans la vue de traduction ne modifient jamais le contenu téléchargé.
+- L'organisation destinataire est celle du compte, sauf choix du Gestionnaire. Elle détermine les droits et le code dans le nom du fichier, sans limiter les termes.
+- Tous les types de la publication sont inclus, regroupés en ZIP. Toutes les langues et les lignes validées éligibles sont communes aux destinataires.
+- Le téléchargement d'une publication ne comporte pas de sélection de types, de langues ou de mode. Le menu Exports offre séparément l'export simple d'un type décrit ci-dessus. Les filtres de consultation et les sélections dans la vue de traduction ne modifient jamais le contenu téléchargé.
 
 ### Contenu de chaque fichier
 
 | Élément | Règle |
 | --- | --- |
-| Lot de repli | Lot retenu et figé par la publication (section 7) pour le type et l'organisation destinataire : dernier lot appliqué depuis son instance pour la version, sinon dernier lot LogObject, à la date de publication. Toutes les « valeurs importées » ci-dessous en proviennent. |
-| Lignes | Tous les termes retenus dans la publication ayant une présence dans la version, indépendamment de leur état global Actif ou Obsolète et de leur portée. Ordre des lignes identique au lot de repli, nouveaux termes en fin. |
+| Sources techniques | Source vérifiée de chaque terme ou révision, avec lot, position et empreintes tracés par ligne ; choix indépendant du destinataire. |
+| Lignes | Export : tous les termes courants connus du type. Publication : termes ayant au moins une cellule cible validée. Une seule ligne par terme, un en-tête par type, ordre stable ; aucune exclusion par organisation ou provenance. |
 | Colonnes | Noms et ordre de la définition du format dont la version est figée par la publication. |
-| Colonnes traduites | Valeur validée figée dans la publication. Sans valeur validée : valeur importée, inchangée. |
-| Colonne de référence de_CH, Default, Caption | Valeur importée, sauf si une correction de l'allemand a été validée et figée dans la publication. |
+| Colonnes traduites | Export : valeur validée commune, sinon repli importé. Publication : valeur validée figée, sinon cellule cible vide. |
+| Colonnes de référence source (de_CH, Default, Caption, Default Label selon le format) | Publication : valeurs source préservées. Export : une correction validée remplace uniquement une colonne traduisible définie par le format, y compris de_CH lorsqu’elle est mappée comme telle. |
 | Colonnes techniques | Valeur importée, telle quelle, y compris les colonnes Update User et Update Dt. |
 | Colonne sa_IN | Valeur importée, jamais modifiée. |
 | Valeurs multilignes, espaces, placeholders | Préservés à l'identique. |
@@ -507,7 +517,7 @@ Chaque utilisateur a un compte nominatif rattaché à une organisation. Le MVP a
 
 ### Autorisation
 
-- Contrôle côté serveur à chaque requête selon la matrice de la section 4, avec le périmètre langues et organisation.
+- Contrôle côté serveur à chaque requête selon la matrice de la section 4, selon les rôles et langues ; l'organisation contrôle les fichiers destinataires, sans limiter les termes.
 - L'interface masque les actions non autorisées ; le serveur les refuse quand même.
 - Les changements de rôle prennent effet à la requête suivante, sans reconnexion.
 
@@ -553,10 +563,10 @@ L'interface est une application web en allemand, français et italien, conçue p
 | Écran | Contenu | Rôles |
 | --- | --- | --- |
 | Tableau de bord | Pour le Validateur : propositions en attente par langue et type, propositions en retard. Pour le Traducteur : termes À traduire et À réviser par type, rejets à corriger. Pour le Gestionnaire : version courante, derniers imports, couverture par type et langue, publication prête ou non. | Tous |
-| Recherche et liste des termes | Filtres : type, version, langue, état, portée et organisation, formulaire, workflow ou groupe de codes, texte libre sur clé, référence et traductions. Tri, pagination serveur, colonnes configurables, sélection multiple pour les actions en lot. | Tous |
-| Fiche terme | Clé, type, portée, présence par version et par lot ; grille attribut × langue avec valeur en vigueur, état et proposition en cours ; actions proposer, corriger une proposition en attente, valider, rejeter, confirmer ; chronologie ; révisions et comparaison ; en lot 2 : commentaires, concept lié, termes ayant la même référence ailleurs. | Tous, actions selon rôle |
+| Recherche et liste des termes | Filtres : type, version, langue, état, formulaire, workflow ou groupe de codes, texte libre sur clé, référence et traductions. Tri, pagination serveur, colonnes configurables, sélection multiple pour les actions en lot. | Tous |
+| Fiche terme | Clé, type, présence par version et par lot ; grille attribut × langue avec valeur en vigueur, état et proposition en cours ; actions proposer, corriger une proposition en attente, valider, rejeter, confirmer ; chronologie ; révisions et comparaison ; en lot 2 : commentaires, concept lié, termes ayant la même référence ailleurs. | Tous, actions selon rôle |
 | Vue de traduction | Tableau : clé, référence de_CH, valeur en vigueur, saisie éditable en ligne, proposition en attente et statut. Filtre « à traduire seulement ». Navigation clavier, action explicite « Proposer », individuellement ou en lot, avec contrôles avant envoi ; correction des propositions encore en attente selon la section 6. | Traducteur, Validateur, Gestionnaire |
-| File de validation | Propositions au statut Proposée de mes langues ; référence, valeur en vigueur et proposition côte à côte, différences surlignées et anomalies bloquantes ; valider ou rejeter avec motif, individuellement ou en lot. | Validateur, Gestionnaire |
+| File de validation | Propositions au statut Proposée de mes langues ; référence, valeur en vigueur et proposition côte à côte, origine historique et imports associés (filtres sans double comptage), différences surlignées et anomalies bloquantes ; valider ou rejeter avec motif, individuellement ou en lot. | Validateur, Gestionnaire |
 | Imports | Liste des lots avec statut et rapport ; assistant en trois étapes (paramètres, analyse, application). | Gestionnaire |
 | Versions et publications | Versions avec statut ; couverture par type et langue ; publication ; liste des publications avec export. | Gestionnaire (lecture pour tous) |
 | Téléchargement d'une publication | Depuis la publication choisie, téléchargement complet pour l'organisation de l'utilisateur ; le Gestionnaire peut choisir l'organisation destinataire. | Tous selon droits |
@@ -650,7 +660,7 @@ flowchart LR
 
 ### Critères d'acceptation du MVP
 
-1. Les 7 fichiers d'exemple s'importent sans erreur bloquante et, après publication sans modification des valeurs, se réexportent à l'identique octet pour octet, hors lignes en doublon écartées à l'import et listées dans le rapport.
+1. La restitution brute sans modification des sept originaux est identique octet pour octet. L'export applicatif inclut tous les termes connus du type, avec validations communes ou repli importé ; la publication inclut les termes validés éligibles, laisse vides les cellules cibles non validées et préserve les colonnes source et techniques. Les collisions ambiguës restent conservées et bloquantes.
 2. Le traitement serveur des sept fichiers complets, dont Incident code d’environ 72 Mo, s’exécute en 30 minutes maximum dans le pilote, analyse et application comprises, avec consultation et progression disponibles. Le transfert et l’attente humaine sont mesurés séparément ; la capacité est testée lors de l’import initial puis d’un réimport de l’ensemble des sept fichiers.
 3. Un fichier exporté après validation de 100 traductions françaises s'importe dans une instance de test myABI et les libellés validés s'affichent correctement.
 4. Un Validateur traite 500 propositions en une session sans quitter la file de validation.
@@ -664,18 +674,18 @@ flowchart LR
 
 ## 15. Questions ouvertes et décisions à prendre
 
-Quatorze questions restent à trancher avant le démarrage du lot 1 ; sept relèvent de LogObject et sept de l'ARGE-ABI.
+Ce journal conserve les questions de cadrage et leurs décisions actées. Les questions techniques encore ouvertes restent soumises aux blocages du §9 technique.
 
 | N° | Question | Impact si non tranchée | À trancher par |
 | --- | --- | --- | --- |
-| 1 | Que fait myABI quand fr_CH est vide : affiche-t-il Caption, Default ou la clé ? | Détermine si l'export peut laisser des colonnes vides ou doit recopier une valeur de repli. | LogObject |
+| 1 | Que fait myABI quand fr_CH est vide : affiche-t-il Caption, Default ou la clé ? | Compatibilité et affichage dans myABI à vérifier ; le contrat retenu distingue repli importé à l'export et cellules cibles non validées vides en publication. | LogObject |
 | 2 | Que contient la colonne sa_IN (identifiant technique ?) et doit-elle être réexportée telle quelle ? | Règle d'export de la colonne. | LogObject |
 | 3 | L'import DEVCONF de myABI écrase-t-il toutes les colonnes, y compris Update User et Update Time ? Supprime-t-il les lignes absentes du fichier ? | Règle des colonnes techniques à l'export ; risque de perte de libellés cantonaux. | LogObject |
 | 4 | Les clés sont-elles sensibles à la casse dans myABI (« Weiter » et « weiter » coexistent dans un même workflow) ? Comment sont traitées les 99 collisions de Name de mRic-js si la casse est ignorée, alors que les clés exactes sont distinctes ? | Règle d’identité par type ; traitement des collisions à l’export (section 9). | LogObject |
 | 5 | La clé GROUPTYPE + CODEVALUE + MASTERTYPE + MASTERVALUE est-elle unique dans myABI (une collision exacte, 15 sans casse) et que contient la colonne ID à l'import ? | Clé d'identité du type Incident code ; traitement des lignes en collision à l’export. | LogObject |
 | 6 | Schéma de numérotation des versions myABI, cadence des livraisons, stabilité des formats DEVCONF entre versions. | Modèle de version et maintenance des formats. | LogObject |
 | 7 | Le fichier Incident code est-il exportable et importable par type ou groupe de codes, plutôt qu'en un seul fichier de 70 Mo ? | Performance et fréquence des imports. | LogObject |
-| 8 | Les formulaires et workflows cantonaux (préfixes ZG, LU, SG, AR, AG, GR, AI) entrent-ils dans le Référentiel commun, ou seulement les éléments communs ? Que signifient les préfixes PHV, WIP, TEST, OLD ? | Périmètre, règle de portée, volume. | ARGE-ABI |
+| 8 | Décision du 13.10.2026 : tous les termes DEVCONF entrent dans le référentiel commun ; les préfixes restent dans les clés et le contexte sans propriétaire. Leur sens technique reste à documenter si nécessaire. | Identité commune sans variante organisationnelle. | ARGE-ABI |
 | 9 | Langues cibles : français et italien confirmés ; l'anglais est-il requis ? Les corrections de l'allemand source sont-elles autorisées dans le Référentiel ? | Configuration des langues et rôles. | ARGE-ABI |
 | 10 | Qui sont les Validateurs par langue et comment se tranchent les désaccords entre polices (groupe de travail, vote, arbitre) ? | Gouvernance du workflow et des décisions terminologiques. | ARGE-ABI |
 | 11 | Quelle instance sert de source au premier import (livraison LogObject, instance d'une police romande, plusieurs instances) et quelles traductions existantes sont validées en masse comme état de départ ? | Plan de reprise initiale. | ARGE-ABI |

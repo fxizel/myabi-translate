@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Domain\Devconf\TranslationValidator;
 use App\Models\Proposal;
+use App\Models\Revision;
 use App\Models\Term;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -29,11 +30,11 @@ class WorkflowService
 
     public function propose(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null): Proposal
     {
-        abort_unless($user->canTranslate($language, $term->organization_id), 403);
+        abort_unless($user->canTranslate($language), 403);
 
         return $this->lock->run(fn () => DB::transaction(function () use ($user, $term, $attribute, $language, $value, $expected, $supersedesId, $revisionId) {
             $term = Term::whereKey($term->id)->lockForUpdate()->firstOrFail();
-            abort_unless($user->canTranslate($language, $term->organization_id), 403);
+            abort_unless($user->canTranslate($language), 403);
             if ($expected !== null && $term->lock_version !== $expected) {
                 $this->stale();
             }
@@ -42,7 +43,8 @@ class WorkflowService
                 abort_unless(Proposal::whereKey($supersedesId)->where('term_id', $term->id)->where('attribute', $attribute)->where('language', $language)->where('status', 'rejected')->exists(), 422);
             }
             if ($revisionId !== null) {
-                abort_unless($term->revisions()->whereKey($revisionId)->exists(), 422);
+                abort_unless(Revision::whereKey($revisionId)->where(fn ($query) => $query->where('term_id', $term->id)
+                    ->orWhereIn('term_id', DB::table('term_consolidations')->where('common_term_id', $term->id)->select('legacy_term_id')))->exists(), 422);
             }
             $proposal = Proposal::create(['term_id' => $term->id, 'attribute' => $attribute, 'language' => $language, 'value' => $value, 'value_hash' => hash('sha256', $value),
                 'status' => 'pending', 'author_id' => $user->id, 'organization_id' => $user->organization_id, 'anomalies' => $warnings, 'edit_history' => [], 'claimed' => true, 'supersedes_id' => $supersedesId, 'restored_revision_id' => $revisionId]);
@@ -59,7 +61,7 @@ class WorkflowService
         return $this->lock->run(fn () => DB::transaction(function () use ($user, $proposal, $value, $expected) {
             $term = Term::whereKey($proposal->term_id)->lockForUpdate()->firstOrFail();
             $p = Proposal::whereKey($proposal->id)->lockForUpdate()->firstOrFail();
-            abort_unless($user->canTranslate($p->language, $term->organization_id), 403);
+            abort_unless($user->canTranslate($p->language), 403);
             abort_unless($p->author_id === $user->id || ($p->import_id && ! $p->claimed), 403);
             if ($p->status !== 'pending' || $p->lock_version !== $expected) {
                 $this->stale();
@@ -67,7 +69,9 @@ class WorkflowService
             $warnings = $this->checkValue($term, $p->attribute, $p->language, $value);
             $before = $p->value;
             $history = $p->edit_history;
-            $history[] = ['value' => $before, 'author_id' => $p->author_id, 'at' => now()->toIso8601String()];
+            $history[] = ['value' => $before, 'author_id' => $p->author_id, 'organization_id' => $p->organization_id,
+                'import_ids' => array_values(array_unique(array_filter([$p->import_id, ...DB::table('proposal_imports')->where('proposal_id', $p->id)->pluck('import_id')->all()]))),
+                'at' => now()->toIso8601String()];
             $p->update(['value' => $value, 'value_hash' => hash('sha256', $value), 'author_id' => $user->id, 'claimed' => true, 'lock_version' => $p->lock_version + 1, 'anomalies' => $warnings, 'edit_history' => $history]);
             $p->update(['context_fingerprint' => app(CampaignService::class)->contextFingerprint($term, $p->attribute, $p->language)]);
             app(SearchText::class)->sync($term);

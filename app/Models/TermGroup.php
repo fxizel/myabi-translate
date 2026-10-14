@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Services\CommonScope;
 use Illuminate\Database\Eloquent\Model;
 
 class TermGroup extends Model
@@ -28,14 +27,6 @@ class TermGroup extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if (! $user->active || $user->is_technical) {
-            return $query->whereRaw('1 = 0');
-        }
-        if ($user->canManage() || $user->canValidateAny()) {
-            return $query;
-        }
-
-        return CommonScope::forOrganization($query, $user->organization_id, 'term_groups.organization_id')
-            ->whereDoesntHave('terms', fn ($q) => $q->whereNotIn('terms.id', Term::visibleTo($user)->select('terms.id')));
+        return $user->canSeeCatalogue() ? $query : $query->whereRaw('1 = 0');
     }
 }

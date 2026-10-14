@@ -1,6 +1,6 @@
 # Référentiel des traductions myABI · ARGE-ABI
 
-Application web commune aux polices membres de l’ARGE-ABI pour gérer les traductions de myABI : import des sept formats DEVCONF de LogObject, recherche des termes, propositions et validation à quatre yeux, révisions, puis publication de catalogues figés par organisation.
+Application web commune aux polices membres de l’ARGE-ABI pour gérer les traductions de myABI : import des sept formats DEVCONF de LogObject, catalogue commun, propositions et validation à quatre yeux, révisions, export complet et publication de traductions validées pour les organisations destinataires.
 
 **Limite de couverture** : les fichiers NLS (CSV) ne contiennent pas toutes les traductions de myABI. Les traductions des masques d’écran sont stockées dans la base de données de myABI et portent sur d’autres termes que ceux du type `Form` déjà pris en charge. L’outil gère uniquement les traductions présentes dans les fichiers DEVCONF pris en charge ; il ne permet pas de gérer ces termes de masques d’écran ni les autres traductions stockées en base et absentes de ces fichiers.
 
@@ -87,7 +87,7 @@ flowchart LR
 | Administrateur | Crée les organisations et invite des comptes nominatifs avec rôles et langues. Les invitations expirent après 72 heures. Consulte le journal d’audit. |
 | Gestionnaire | Crée les versions myABI, téléverse un DEVCONF complet, examine l’analyse et ses anomalies puis confirme l’application ; la progression et le rapport restent consultables. Publie les catalogues pour les organisations choisies. Peut déroger au principe des quatre yeux, avec un motif audité. Consulte le journal d’audit filtrable et l’exporte en CSV. |
 | Validateur | Examine les propositions dans ses langues, valide ou rejette avec un motif. Le serveur contrôle les valeurs examinées et les modifications concurrentes. |
-| Traducteur | Recherche les termes de son périmètre et envoie explicitement ses propositions. Les caractères non exportables et les placeholders manquants bloquent l’envoi. |
+| Traducteur | Recherche les termes communs et envoie explicitement ses propositions dans ses langues autorisées. Les caractères non exportables et les placeholders manquants bloquent l’envoi. |
 | Lecteur | Consulte le référentiel et télécharge les publications disponibles pour son organisation. |
 
 Les fichiers figés d’une publication et leur manifeste permettent de retrouver les valeurs publiées et leurs révisions ; les imports et validations ultérieurs ne les modifient pas. Le profil de chaque utilisateur contient la langue de l’interface, l’activation du résumé quotidien, le second facteur lorsque le serveur l’active (sinon son statut désactivé) et ses dernières actions.

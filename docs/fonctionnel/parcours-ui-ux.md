@@ -1,6 +1,6 @@
 # Parcours UI et UX de myABI Translate
 
-État au 13 octobre 2026, code de référence `346df90`. Ce document décrit les écrans et interactions implémentés dans les vues Blade et les scripts du navigateur. Il ne constitue pas une maquette cible ni une validation visuelle sur une instance déployée. Les droits sont détaillés dans les [personas](personas.md) et les règles dans les [exigences fonctionnelles](exigences-fonctionnelles.md).
+État au 13 octobre 2026, référentiel commun après la transition du 13.10.2026. Ce document décrit les écrans et interactions implémentés dans les vues Blade et les scripts du navigateur. Il ne constitue pas une maquette cible ni une validation visuelle sur une instance déployée. Les droits sont détaillés dans les [personas](personas.md) et les règles dans les [exigences fonctionnelles](exigences-fonctionnelles.md).
 
 ## Organisation des écrans
 
@@ -53,15 +53,15 @@ Les compteurs sont informatifs ; ils ne constituent pas des graphiques interacti
 
 ## UX-03 Trouver un terme et comprendre ses valeurs
 
-**Acteurs :** tous les utilisateurs connectés selon leur périmètre. **Cas :** UC-04. **Règles :** EF-10 à EF-17.
+**Acteurs :** tous les utilisateurs connectés autorisés au catalogue commun. **Cas :** UC-04. **Règles :** EF-10 à EF-17.
 
 1. Dans Traductions, sélectionner une langue de travail, distincte du sélecteur de langue de l’interface.
 2. Saisir la recherche et éventuellement choisir type, version ou état, puis cliquer sur Filtrer. Réinitialiser conserve la langue de travail.
-3. Déplier les filtres supplémentaires pour périmètre, organisation, contexte, tri, mode de recherche et taille de page.
-4. Lire les colonnes clé, référence, valeur actuelle, proposition, état et périmètre ; les badges de type affichent des nombres de résultats et permettent d’affiner le type.
+3. Déplier les filtres supplémentaires pour groupe, contexte, tri, mode de recherche et taille de page.
+4. Lire les colonnes clé, référence, valeur actuelle, proposition et état ; les badges de type affichent des nombres de résultats et permettent d’affiner le type.
 5. Ouvrir une clé ou une référence pour accéder à la fiche et à ses attributs.
 
-Le menu Colonnes masque ou affiche clé, périmètre et état. Les cases de sélection ne sont proposées que pour les lignes admissibles à la saisie groupée. Une cellule sans valeur validée affiche une indication d’absence ; une proposition existante est présentée séparément, avec son nombre et un lien de détail.
+Le menu Colonnes masque ou affiche clé et état. Les cases de sélection ne sont proposées que pour les lignes admissibles à la saisie groupée. Une cellule sans valeur validée affiche une indication d’absence ; une proposition existante est présentée séparément, avec son nombre et un lien de détail.
 
 Pour les formats à plusieurs attributs, la liste utilise le premier attribut. La fiche possède un panneau par attribut, avec référence, valeur actuelle, état, placeholders et, si autorisé, éditeur. Les valeurs du fichier source et les métadonnées techniques se consultent dans des sections repliables.
 
@@ -124,13 +124,13 @@ La fiche présente paramètres, auteur, dates, empreinte du fichier, catégories
 
 La confirmation porte sur l’aperçu examiné. Une évolution du catalogue ou l’expiration de l’aperçu demande une nouvelle préparation ; l’écran ne garantit pas que le nombre affiché auparavant soit encore validable après un tel changement.
 
-## UX-08 Gérer une version ou le périmètre d’un terme
+## UX-08 Gérer une version
 
-**Acteur :** Gestionnaire. **Cas :** UC-12, UC-15. **Règles :** EF-42 à EF-45.
+**Acteur :** Gestionnaire. **Cas :** UC-12. **Règles :** EF-43 à EF-45.
 
 **Version :** dans Publications, le panneau Nouvelle version demande numéro, date de sortie et statut. La table des versions permet ensuite de modifier le statut. Numéro et date y sont affichés sans champ d’édition ; le passage à courante archive les autres versions courantes.
 
-**Périmètre :** dans la fiche de terme, sélectionner Commun ou une organisation, puis enregistrer. L’état « périmètre non confirmé » disparaît si l’enregistrement réussit. Une identité identique dans le périmètre cible ou une modification concurrente produit une erreur et conserve l’état précédent.
+Le formulaire de propriétaire des termes et sa route ont été retirés le 13.10.2026. Les termes courants partagent le référentiel commun ; les anciennes décisions restent dans leurs historiques.
 
 ## UX-09 Produire un export ou une publication
 
@@ -143,7 +143,7 @@ La confirmation porte sur l’aperçu examiné. Une évolution du catalogue ou l
 | Reprise de publication | Sur une fiche en échec, cliquer Réessayer et confirmer. | Retour en attente de construction. |
 | Retrait | Sur une publication publiée, déplier Retirer, saisir le motif et confirmer. | État retiré et motif visible ; archive conservée. |
 
-Le formulaire de publication ne comporte pas de sélection des organisations : il utilise toutes les organisations actives. Les valeurs ne sont figées qu’au moment de la construction. Les références aux fichiers d’origine, les contrôles de périmètre et la validité des traductions déterminent si la sortie peut aboutir.
+Le formulaire de publication ne comporte pas de sélection des organisations : il utilise toutes les organisations actives. Les valeurs ne sont figées qu’au moment de la construction. L’export réunit tous les termes connus du type avec repli importé si nécessaire. La publication inclut les termes au moins partiellement validés, laisse vides les autres cellules cibles et conserve les colonnes source et techniques. La source vérifiable de chaque ligne, l’identité exacte et la validité des traductions déterminent si la sortie peut aboutir.
 
 ## UX-10 Télécharger une publication et gérer son profil
 

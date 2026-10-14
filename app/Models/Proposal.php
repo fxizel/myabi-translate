@@ -46,6 +46,11 @@ class Proposal extends Model
         return $this->belongsTo(Organisation::class, 'organization_id');
     }
 
+    public function imports()
+    {
+        return $this->belongsToMany(ImportBatch::class, 'proposal_imports', 'proposal_id', 'import_id');
+    }
+
     public function import()
     {
         return $this->belongsTo(ImportBatch::class, 'import_id');

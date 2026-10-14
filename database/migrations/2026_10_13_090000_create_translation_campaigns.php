@@ -65,7 +65,7 @@ return new class extends Migration
             $t->timestamp('removed_at')->nullable();
             $t->timestamps();
             $t->unique(['translation_campaign_id', 'term_id']);
-            $t->index(['translation_campaign_id', 'active', 'status']);
+            $t->index(['translation_campaign_id', 'active', 'status'], 'campaign_participations_active_status_index');
         });
         Schema::create('campaign_events', function (Blueprint $t) {
             $t->id();
