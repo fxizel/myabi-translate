@@ -259,8 +259,13 @@ class VpsDeploymentTest(unittest.TestCase):
                 if args != ['synthetic-myabi-check-no-executable']:
                     return super().run(args, cwd=cwd, log_path=log_path)
                 observations.append({key: os.environ.get(key) for key in
-                                     ['APP_ENV', 'MAIL_MAILER', 'DB_DATABASE', 'MYABI_ISOLATED_TESTS', 'APP_CONFIG_CACHE']})
-                observations[-1]['env_exists'] = (Path(cwd) / '.env').is_file()
+                                     ['APP_ENV', 'MAIL_MAILER', 'DB_DATABASE', 'MYABI_ISOLATED_TESTS',
+                                      'APP_CONFIG_CACHE', 'AUTH_PASSWORD_MIN_LENGTH']})
+                env_file = Path(cwd) / '.env'
+                observations[-1]['env_exists'] = env_file.is_file()
+                observations[-1]['dotenv_password_minimum'] = next(
+                    (line.partition('=')[2] for line in env_file.read_text(encoding='utf-8').splitlines()
+                     if line.startswith('AUTH_PASSWORD_MIN_LENGTH=')), None)
                 if fail:
                     raise error_type('Synthetic validation failed.')
 
@@ -626,6 +631,36 @@ class VpsDeploymentTest(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(self.client.DeploymentError):
             command._tests(TARGET)
         self.assertEqual(existing, env_file.read_bytes())
+
+    def test_password_policy_is_seeded_only_in_dotenv_and_previous_export_restored_after_success(self):
+        command, observations = self.validation_deployment()
+        with patch.dict(os.environ, {'AUTH_PASSWORD_MIN_LENGTH': '32'}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            command._tests(TARGET)
+            self.assertEqual('32', os.environ.get('AUTH_PASSWORD_MIN_LENGTH'))
+        self.assertIsNone(observations[0]['AUTH_PASSWORD_MIN_LENGTH'])
+        self.assertEqual('8', observations[0]['dotenv_password_minimum'])
+        self.assertFalse((self.repo / '.env').exists())
+
+    def test_password_policy_export_is_restored_after_failure_without_replacing_existing_dotenv(self):
+        env_file = self.repo / '.env'
+        existing = b'APP_ENV=synthetic\r\nAUTH_PASSWORD_MIN_LENGTH=16\r\nDB_PASSWORD=SYNTHETIC_ONLY\r\n'
+        for preexisting in [False, True]:
+            with self.subTest(preexisting=preexisting):
+                if preexisting:
+                    env_file.write_bytes(existing)
+                command, observations = self.validation_deployment(fail=True)
+                with patch.dict(os.environ, {'AUTH_PASSWORD_MIN_LENGTH': '32'}), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(self.client.DeploymentError):
+                        command._tests(TARGET)
+                    self.assertEqual('32', os.environ.get('AUTH_PASSWORD_MIN_LENGTH'))
+                self.assertIsNone(observations[0]['AUTH_PASSWORD_MIN_LENGTH'])
+                self.assertEqual('16' if preexisting else '8', observations[0]['dotenv_password_minimum'])
+                if preexisting:
+                    self.assertEqual(existing, env_file.read_bytes())
+                else:
+                    self.assertFalse(env_file.exists())
 
     def test_changed_env_vendor_metadata_or_config_cache_invalidates_validation_cache(self):
         command, observations = self.validation_deployment()

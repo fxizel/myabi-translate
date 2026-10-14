@@ -247,16 +247,20 @@ class Deployment:
                    'APP_CONFIG_CACHE': str(self.cache / ('testing-config-' + uuid.uuid4().hex + '.php')),
                    'DB_CONNECTION': 'sqlite', 'DB_DATABASE': ':memory:', 'DB_URL': '',
                    'MAIL_MAILER': 'array', 'CACHE_STORE': 'array', 'SESSION_DRIVER': 'array',
-                   'QUEUE_CONNECTION': 'sync', 'AUTH_PASSWORD_MIN_LENGTH': '8', 'MFA_ENABLED': 'false'}
-        previous = {key: os.environ.get(key) for key in [*testing, 'MYABI_ISOLATED_TESTS']}
+                   'QUEUE_CONNECTION': 'sync', 'MFA_ENABLED': 'false'}
+        previous = {key: os.environ.get(key) for key in [*testing, 'MYABI_ISOLATED_TESTS', 'AUTH_PASSWORD_MIN_LENGTH']}
         env_file = self.repo / '.env'
         created = False
         try:
             os.environ.update(testing)
             os.environ.pop('MYABI_ISOLATED_TESTS', None)
+            # This policy must remain mutable through Laravel's dotenv repository
+            # so its default/override regression can exercise the configuration.
+            os.environ.pop('AUTH_PASSWORD_MIN_LENGTH', None)
             if not env_file.exists():
                 with env_file.open('x', encoding='utf-8', newline='\n') as target:
-                    target.write('\n'.join(key + '=' + value for key, value in testing.items()) + '\n')
+                    fixture = {**testing, 'AUTH_PASSWORD_MIN_LENGTH': '8'}
+                    target.write('\n'.join(key + '=' + value for key, value in fixture.items()) + '\n')
                 env_file.chmod(0o600)
                 created = True
             for index, command in enumerate(self.config['test_commands']):
