@@ -2,6 +2,10 @@
 
 return [
     'events' => [
+        'extension' => [
+            'token_created' => 'Jeton extension créé',
+            'token_revoked' => 'Jeton extension révoqué',
+        ],
         'account' => [
             'invited' => 'Invitation envoyée',
             'created' => 'Compte créé',
@@ -80,6 +84,7 @@ return [
     ],
     'origins' => ['import' => 'Import', 'proposal' => 'Proposition', 'scope' => 'Modification du périmètre'],
     'entities' => [
+        'App\\Models\\PersonalAccessToken' => 'Jeton extension',
         'App\\Models\\User' => 'Compte',
         'App\\Models\\Organisation' => 'Organisation',
         'App\\Models\\ImportBatch' => 'Import',

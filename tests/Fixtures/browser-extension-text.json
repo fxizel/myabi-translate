@@ -1,0 +1,101 @@
+{
+    "normalizationVersion": 2,
+    "cases": [
+        {
+            "name": "next_line_is_not_ecmascript_space",
+            "input": "A\u0085B",
+            "literal": "A\u0085B",
+            "searchKey": "a\u0085b"
+        },
+        {
+            "name": "mongolian_separator_is_not_ecmascript_space",
+            "input": "A\u180eB",
+            "literal": "A\u180eB",
+            "searchKey": "a\u180eb"
+        },
+        {
+            "name": "nul_is_preserved_at_edges",
+            "input": "\u0000 Nul\u0000",
+            "literal": "\u0000 Nul\u0000",
+            "searchKey": "\u0000 nul\u0000"
+        },
+        {
+            "name": "NFC",
+            "input": " échéance  ",
+            "literal": "échéance",
+            "searchKey": "echeance"
+        },
+        {
+            "name": "spaces",
+            "input": "\tBon\n de\r\ncommande  fournisseur　",
+            "literal": "Bon de commande fournisseur",
+            "searchKey": "bon de commande fournisseur"
+        },
+        {
+            "name": "case",
+            "input": "ÉCHÉANCE Proche",
+            "literal": "ÉCHÉANCE Proche",
+            "searchKey": "echeance proche"
+        },
+        {
+            "name": "apostrophes",
+            "input": "L’ordre d‘achat ‛test′ `a´",
+            "literal": "L’ordre d‘achat ‛test′ `a´",
+            "searchKey": "l'ordre d'achat 'test' 'a'"
+        },
+        {
+            "name": "invisible",
+            "input": "Co­m​m‌a‍n‎d‏e⁠‪‫‬‭‮﻿",
+            "literal": "Commande",
+            "searchKey": "commande"
+        },
+        {
+            "name": "icons",
+            "input": "Enregistrermaintenant",
+            "literal": "Enregistrer maintenant",
+            "searchKey": "enregistrer maintenant"
+        },
+        {
+            "name": "literal_wildcards",
+            "input": "  %_!  ",
+            "literal": "%_!",
+            "searchKey": "%_!"
+        },
+        {
+            "name": "non_bmp",
+            "input": "𐐀 𐐷 😀",
+            "literal": "𐐀 𐐷 😀",
+            "searchKey": "𐐨 𐐷 😀"
+        },
+        {
+            "name": "greek_case",
+            "input": "ΟΣ ΟΣΑ",
+            "literal": "ΟΣ ΟΣΑ",
+            "searchKey": "ος οσα"
+        },
+        {
+            "name": "turkish_case",
+            "input": "I İ ı",
+            "literal": "I İ ı",
+            "searchKey": "i i ı"
+        },
+        {
+            "name": "unicode_spaces",
+            "input": " One Two Three Four ",
+            "literal": "One Two Three Four",
+            "searchKey": "one two three four"
+        },
+        {
+            "name": "empty_icons",
+            "input": "­​",
+            "literal": "",
+            "searchKey": ""
+        },
+        {
+            "name": "combining",
+            "input": "Größe À Ç ô é",
+            "literal": "Größe À Ç ô é",
+            "searchKey": "große a c o e"
+        }
+    ]
+}

@@ -9,7 +9,7 @@ import {
 } from '../src/shared/ranking';
 import { applicationBase, buildResultsView, manualSearchLink } from '../src/shared/viewModel';
 import { normalizeSettings } from '../src/shared/settings';
-import { parseSearchResponse } from '../src/api/translationApi';
+import { parseSearchResponse as parseRealSearchResponse } from '../src/api/translationApi';
 import { sampleResult, specResponse } from './helpers';
 
 describe('formatScore', () => {
@@ -22,9 +22,9 @@ describe('formatScore', () => {
 });
 
 describe('isExactMatch', () => {
-    it('compare sans casse ni accents, à la traduction courante ou au texte source', () => {
-        expect(isExactMatch(sampleResult({ currentTranslation: 'Échéance' }), 'echeance')).toBe(true);
-        expect(isExactMatch(sampleResult({ sourceText: 'Bestellung' }), 'bestellung')).toBe(true);
+    it('compare littéralement et respecte les accents, à la traduction courante ou au texte source', () => {
+        expect(isExactMatch(sampleResult({ currentTranslation: 'Échéance' }), 'echeance')).toBe(false);
+        expect(isExactMatch(sampleResult({ sourceText: 'Bestellung' }), 'bestellung')).toBe(false);
         expect(isExactMatch(sampleResult({ currentTranslation: 'Commande fournisseur', sourceText: 'x' }), 'Commande')).toBe(false);
     });
 
@@ -71,12 +71,12 @@ describe('classifyResults', () => {
     });
 
     it('correspondance forte : exacte, score élevé et nettement devant la suivante', () => {
-        expect(classifyResults([exact('A', 0.96), exact('B', 0.71)], 'Commande')).toBe('strong');
+        expect(classifyResults([exact('A', 0.96), approximate('B', 0.71)], 'Commande')).toBe('strong');
         expect(0.96 - 0.71).toBeGreaterThanOrEqual(AMBIGUITY_GAP);
     });
 
-    it('une seule correspondance exacte est forte même avec un score modeste', () => {
-        expect(classifyResults([exact('A', 0.75)], 'Commande')).toBe('strong');
+    it('une seule correspondance exacte à score modeste reste incertaine', () => {
+        expect(classifyResults([exact('A', 0.75)], 'Commande')).toBe('multiple');
     });
 
     it('plusieurs correspondances possibles quand elles sont proches', () => {
@@ -137,3 +137,4 @@ describe('affichage des résultats (modèle de vue)', () => {
         expect(manualSearchLink(normalizeSettings({}), 'x')).toBeNull();
     });
 });
+const parseSearchResponse = (data: unknown) => parseRealSearchResponse(data, 'mock');

@@ -15,8 +15,6 @@ use App\Models\Term;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\ImportService;
-use App\Services\OperationLock;
-use App\Services\PublicationService;
 use App\Services\StorageBudget;
 use App\Services\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -156,110 +154,66 @@ class ImportRecoveryTest extends TestCase
         self::assertSame(5, Proposal::count());
     }
 
-    public function test_confirmed_common_scope_survives_creation_of_a_matching_canton_organization(): void
+    public function test_prefix_identity_survives_creation_of_a_matching_organization(): void
     {
-        $import = $this->receive(1, 'form');
-        $this->analyzeAndApply($import);
+        $this->analyzeAndApply($this->receive(1, 'form'));
         $term = Term::firstOrFail();
-        self::assertTrue($term->scope_unconfirmed);
-        $term->update(['scope_unconfirmed' => false, 'scope_overridden' => true, 'validated' => ['label' => ['fr' => 'Valeur validée {}']]]);
+        $term->update(['validated' => ['label' => ['fr' => 'Valeur validée {}']]]);
         $hash = $term->raw_identity_hash;
         Organisation::create(['name' => 'Aargau', 'code' => 'AG', 'active' => true]);
         $this->analyzeAndApply($this->receive(1, 'form'));
-
         self::assertSame(1, Term::count());
-        self::assertNull($term->fresh()->organization_id);
         self::assertSame($hash, $term->fresh()->raw_identity_hash);
         self::assertSame('Valeur validée {}', $term->fresh()->validated['label']['fr']);
         self::assertSame([$hash], DB::table('import_rows')->distinct()->pluck('raw_identity_hash')->all());
     }
 
-    public function test_confirmed_common_scope_survives_first_import_from_another_source(): void
+    public function test_prefix_identity_reuses_term_from_another_source(): void
     {
         Organisation::create(['name' => 'Aargau', 'code' => 'AG', 'active' => true]);
         $this->analyzeAndApply($this->receive(1, 'form'));
         $term = Term::firstOrFail();
-        self::assertNotNull($term->organization_id);
-        $this->setScope($term, null);
         $this->analyzeAndApply($this->receive(1, 'form', [], 'organization', $this->manager->organization_id));
-
         self::assertSame(1, Term::count());
-        self::assertNull($term->fresh()->organization_id);
+        self::assertSame($term->id, DB::table('import_rows')->latest('id')->value('term_id'));
         self::assertSame(1, DB::table('import_rows')->distinct()->count('term_id'));
+        self::assertSame(1, Revision::count());
     }
 
-    public function test_private_variants_are_not_merged_across_sources_and_each_source_keeps_its_choice(): void
+    public function test_all_sources_reuse_one_common_identity(): void
     {
         $this->analyzeAndApply($this->receive(1));
-        $vaud = Term::firstOrFail();
-        $this->setScope($vaud, $this->manager->organization_id);
+        $term = Term::firstOrFail();
         $fribourg = Organisation::create(['name' => 'Fribourg', 'code' => 'FR', 'active' => true]);
-        $this->analyzeAndApply($this->receive(1, 'mric', [], 'organization', $fribourg->id));
-        $other = Term::whereKeyNot($vaud->id)->firstOrFail();
-        $this->setScope($other, $fribourg->id);
-
-        $vaudImport = $this->receive(1, 'mric', [], 'organization', $this->manager->organization_id);
-        $this->analyzeAndApply($vaudImport);
-        $fribourgImport = $this->receive(1, 'mric', [], 'organization', $fribourg->id);
-        $this->analyzeAndApply($fribourgImport);
-        $publisherImport = $this->receive(1);
-        $this->analyzeAndApply($publisherImport);
-        self::assertSame(2, Term::count());
-        self::assertSame($vaud->id, DB::table('import_rows')->where('import_id', $vaudImport->id)->value('term_id'));
-        self::assertSame($other->id, DB::table('import_rows')->where('import_id', $fribourgImport->id)->value('term_id'));
-        self::assertSame($vaud->id, DB::table('import_rows')->where('import_id', $publisherImport->id)->value('term_id'));
-        self::assertSame($this->manager->organization_id, $vaud->fresh()->organization_id);
-        self::assertSame($fribourg->id, $other->fresh()->organization_id);
+        foreach ([
+            ['organization', $fribourg->id],
+            ['organization', $this->manager->organization_id],
+            ['publisher', null],
+        ] as [$sourceKind, $organizationId]) {
+            $import = $this->receive(1, 'mric', [], $sourceKind, $organizationId);
+            $this->analyzeAndApply($import);
+            self::assertSame($term->id, DB::table('import_rows')->where('import_id', $import->id)->value('term_id'));
+        }
+        self::assertSame(1, Term::count());
+        self::assertSame(1, Proposal::count());
+        self::assertSame(3, DB::table('proposal_imports')->count());
     }
 
-    public function test_raw_identity_backfill_preserves_exact_keys_for_applied_and_staged_rows(): void
-    {
-        $applied = $this->receive(2);
-        $this->analyzeAndApply($applied);
-        $staged = $this->receive(3);
-        app(ImportService::class)->analyze($staged);
-        $expectedTerms = Term::pluck('raw_identity_hash', 'id')->all();
-        $expectedRows = DB::table('import_rows')->pluck('raw_identity_hash', 'id')->all();
-        $sourceHash = hash_file('sha256', $applied->originalPath());
-        DB::table('terms')->update(['raw_identity_hash' => null]);
-        DB::table('import_rows')->update(['raw_identity_hash' => null]);
-        app(AuditService::class)->record('term.scope', Term::first(), [], [], $this->manager);
-
-        $migration = require database_path('migrations/2026_09_21_120000_add_stable_raw_identity.php');
-        $migration->up();
-        self::assertSame($expectedTerms, Term::pluck('raw_identity_hash', 'id')->all());
-        self::assertSame($expectedRows, DB::table('import_rows')->pluck('raw_identity_hash', 'id')->all());
-        self::assertTrue(Term::first()->scope_overridden);
-        self::assertSame($sourceHash, hash_file('sha256', $applied->originalPath()));
-    }
-
-    public function test_provenance_uses_latest_applied_generation_for_each_source_not_upload_order(): void
+    public function test_upload_and_application_order_cannot_select_a_translation_variant(): void
     {
         $this->analyzeAndApply($this->receive(1));
-        $first = Term::firstOrFail();
-        $this->setScope($first, $this->manager->organization_id);
+        $term = Term::firstOrFail();
         $latest = $this->receive(1);
         $uploadedLater = $this->receive(1);
         $this->analyzeAndApply($uploadedLater);
         $this->analyzeAndApply($latest);
         self::assertLessThan($uploadedLater->id, $latest->id);
         self::assertGreaterThan($uploadedLater->fresh()->catalogue_generation, $latest->fresh()->catalogue_generation);
-
-        // Historical sources can retain different private variants of one exact key.
-        $fribourg = Organisation::create(['name' => 'Fribourg', 'code' => 'FR', 'active' => true]);
-        $chosen = $first->replicate();
-        $chosen->organization_id = $fribourg->id;
-        $chosen->identity_hash = hash('sha256', json_encode([$chosen->type, $fribourg->id, $chosen->key], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        $chosen->save();
-        DB::table('import_rows')->where('import_id', $latest->id)->update(['term_id' => $chosen->id]);
-
-        // A newer application from another source must not replace that provenance.
         $this->analyzeAndApply($this->receive(1, 'mric', [], 'organization', $this->manager->organization_id));
         $reimport = $this->receive(1);
         $this->analyzeAndApply($reimport);
-        self::assertSame($chosen->id, DB::table('import_rows')->where('import_id', $reimport->id)->value('term_id'));
-        self::assertSame(2, Term::count());
-        self::assertSame($fribourg->id, $chosen->fresh()->organization_id);
+        self::assertSame($term->id, DB::table('import_rows')->where('import_id', $reimport->id)->value('term_id'));
+        self::assertSame(1, Term::count());
         self::assertSame(1, $reimport->fresh()->report['unchanged']);
     }
 
@@ -281,62 +235,19 @@ class ImportRecoveryTest extends TestCase
         }
     }
 
-    public function test_status_prefixes_require_confirmation_and_reimports_keep_explicit_scope(): void
+    public function test_status_prefixes_are_technical_key_components_and_do_not_create_owners(): void
     {
         Organisation::create(['name' => 'Homonymous organization', 'code' => 'PHV', 'active' => true]);
         $this->analyzeAndApply($this->receive(1, 'form', ['Form Template Name' => 'PHV_Form']));
         $term = Term::where('type', 'form')->firstOrFail();
-        self::assertNull($term->organization_id);
-        self::assertTrue($term->scope_unconfirmed);
-        $publication = app(PublicationService::class)->enqueue($this->manager, ['version_id' => $this->version->id,
-            'types' => ['form'], 'recipients' => [$this->manager->organization_id]]);
-        try {
-            app(OperationLock::class)->run(fn () => app(PublicationService::class)->build($publication), true);
-            self::fail('An unresolved status prefix must block publication.');
-        } catch (ValidationException $error) {
-            self::assertContains(__('ui.publication_scope_unconfirmed'), array_merge(...array_values($error->errors())));
-        }
-        $this->setScope($term, null);
         $this->analyzeAndApply($this->receive(1, 'form', ['Form Template Name' => 'PHV_Form'], 'organization', $this->manager->organization_id));
         self::assertSame(1, Term::where('type', 'form')->count());
-        self::assertFalse($term->fresh()->scope_unconfirmed);
-        self::assertTrue($term->fresh()->scope_overridden);
-        self::assertNull($term->fresh()->organization_id);
-
+        self::assertSame($term->id, DB::table('import_rows')->latest('id')->value('term_id'));
+        self::assertSame('PHV_Form', $term->key[1]);
+        self::assertArrayNotHasKey('organization_id', $term->getAttributes());
+        self::assertArrayNotHasKey('scope_unconfirmed', $term->getAttributes());
         $this->analyzeAndApply($this->receive(1, 'workflow', ['Workflow' => 'Old-Workflow']));
-        $workflow = Term::where('type', 'workflow')->firstOrFail();
-        self::assertTrue($workflow->scope_unconfirmed);
-        self::assertNull($workflow->organization_id);
-    }
-
-    public function test_unresolved_prefix_backfill_preserves_explicit_choices_identities_and_revisions(): void
-    {
-        $this->analyzeAndApply($this->receive(3, 'form', ['Form Template Name' => 'wip Form']));
-        $terms = Term::orderBy('id')->get();
-        $this->setScope($terms[1], null);
-        $this->setScope($terms[2], $this->manager->organization_id);
-        $this->analyzeAndApply($this->receive(1, 'workflow', ['Workflow' => 'OLD_Workflow']));
-        // Simulate records loaded by the former inference rule.
-        DB::table('terms')->update(['scope_unconfirmed' => false]);
-        $before = Term::orderBy('id')->get()->keyBy('id');
-        $generation = (int) DB::table('catalogue_state')->where('id', 1)->value('generation');
-        $migration = require database_path('migrations/2026_09_21_220000_require_unresolved_prefix_scope_confirmation.php');
-        $migration->up();
-        self::assertSame(2, Term::where('scope_unconfirmed', true)->count());
-        foreach (Term::orderBy('id')->get() as $term) {
-            $original = $before[$term->id];
-            self::assertSame($original->key, $term->key);
-            self::assertSame($original->identity_hash, $term->identity_hash);
-            self::assertSame($original->raw_identity_hash, $term->raw_identity_hash);
-            self::assertSame($original->organization_id, $term->organization_id);
-            self::assertSame($original->revision_no, $term->revision_no);
-            self::assertSame($original->validated, $term->validated);
-            self::assertSame($original->lock_version + ($term->scope_overridden ? 0 : 1), $term->lock_version);
-            self::assertSame(! $term->scope_overridden, $term->scope_unconfirmed);
-        }
-        self::assertSame($generation + 1, (int) DB::table('catalogue_state')->where('id', 1)->value('generation'));
-        $migration->up();
-        self::assertSame($generation + 1, (int) DB::table('catalogue_state')->where('id', 1)->value('generation'));
+        self::assertSame('Old-Workflow', Term::where('type', 'workflow')->firstOrFail()->key[0]);
     }
 
     public function test_final_progress_failure_cannot_downgrade_an_already_committed_import(): void
@@ -360,12 +271,6 @@ class ImportRecoveryTest extends TestCase
     {
         app(ImportService::class)->analyze($import);
         app(ImportService::class)->apply($import->fresh());
-    }
-
-    private function setScope(Term $term, ?int $owner): void
-    {
-        $term->update(['organization_id' => $owner, 'scope_overridden' => true, 'scope_unconfirmed' => false,
-            'identity_hash' => hash('sha256', json_encode([$term->type, $owner, $term->key], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR))]);
     }
 
     private function interruptingService(string $stage): ImportService

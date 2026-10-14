@@ -3,11 +3,13 @@
 use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthInvitationController;
+use App\Http\Controllers\BrowserExtensionTokenController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Middleware\EnsureSecureSession;
 use App\Http\Middleware\EnsureValidTwoFactorChallenge;
 use App\Http\Middleware\RequireRole;
 use App\Http\Middleware\RequireTwoFactor;
+use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 use Laravel\Fortify\Http\Controllers\ConfirmablePasswordController;
@@ -36,6 +38,10 @@ Route::middleware(['auth', EnsureSecureSession::class, RequireTwoFactor::class])
     Route::get('/user/confirm-password', [ConfirmablePasswordController::class, 'show'])->name('password.confirm');
     Route::post('/user/confirm-password', [ConfirmablePasswordController::class, 'store'])->middleware('throttle:password-reset')->name('password.confirm.store');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::middleware(RequirePassword::using('password.confirm', 900))->group(function () {
+        Route::post('/profile/extension-tokens', [BrowserExtensionTokenController::class, 'store'])->name('profile.extension-tokens.store');
+        Route::delete('/profile/extension-tokens/{token}', [BrowserExtensionTokenController::class, 'destroy'])->name('profile.extension-tokens.destroy');
+    });
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::patch('/profile/password', [ProfileController::class, 'updatePassword'])->middleware('throttle:password-reset')->name('profile.password.update');
     Route::post('/profile/two-factor', [ProfileController::class, 'enableTwoFactor'])->middleware('throttle:password-reset')->name('profile.two-factor.enable');

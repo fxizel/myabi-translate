@@ -47,7 +47,7 @@ foreach ($cases as $name => $query) {
     $data = $view->getData();
     $html = $view->render();
     echo json_encode(['case' => $name, 'database' => DB::connection()->getDatabaseName(),
-        'scope' => array_key_exists('reader', $options) ? 'reader' : 'account',
+        'role_profile' => array_key_exists('reader', $options) ? 'reader' : 'account',
         'seconds' => round(microtime(true) - $started, 3), 'rows' => $data['terms']->count(), 'total' => $data['terms']->total(),
         'html_bytes' => strlen($html), 'peak_memory_bytes' => memory_get_peak_usage(true)], JSON_THROW_ON_ERROR).PHP_EOL;
 }

@@ -21,7 +21,6 @@ class ProposalFilter
             'version_id' => 'nullable|integer',
             'organization_id' => 'nullable|integer',
             'import_id' => 'nullable|integer',
-            'scope' => 'nullable|in:common,own',
             'overdue' => 'nullable|boolean',
         ])->validate();
         $filters = array_filter($filters, fn ($value) => $value !== null && $value !== '');
@@ -42,9 +41,10 @@ class ProposalFilter
             $query->whereIn('language', $user->roleLanguages('validator'));
         }
         if (isset($filters['import_id'])) {
-            $query->where('import_id', $filters['import_id']);
+            $query->where(fn ($origin) => $origin->where('import_id', $filters['import_id'])
+                ->orWhereHas('imports', fn ($imports) => $imports->where('import_batches.id', $filters['import_id'])));
         }
-        foreach (['type', 'context', 'organization_id'] as $field) {
+        foreach (['type', 'context'] as $field) {
             if (isset($filters[$field])) {
                 $query->whereHas('term', fn ($term) => $term->where($field, $filters[$field]));
             }
@@ -54,11 +54,11 @@ class ProposalFilter
                 ->join('import_batches', 'import_batches.id', '=', 'import_rows.import_id')
                 ->where('import_batches.version_id', $filters['version_id'])->where('status', 'applied')->select('term_id')));
         }
-        if (($filters['scope'] ?? null) === 'common') {
-            $query->whereHas('term', fn ($term) => $term->common());
-        }
-        if (($filters['scope'] ?? null) === 'own') {
-            $query->whereHas('term', fn ($term) => $term->where('organization_id', $user->organization_id));
+        if (isset($filters['organization_id'])) {
+            // EXISTS keeps proposals shared by several imports counted exactly once.
+            $query->where(fn ($origin) => $origin->where('organization_id', $filters['organization_id'])
+                ->orWhereHas('import', fn ($import) => $import->where('organization_id', $filters['organization_id']))
+                ->orWhereHas('imports', fn ($imports) => $imports->where('import_batches.organization_id', $filters['organization_id'])));
         }
         if (isset($filters['q'])) {
             $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $filters['q']).'%';

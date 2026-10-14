@@ -6,6 +6,7 @@ use App\Domain\Devconf\Encoding;
 use App\Domain\Devconf\FormatRegistry;
 use App\Models\ImportBatch;
 use App\Models\MyabiVersion;
+use App\Models\Revision;
 use App\Models\Term;
 use App\Models\User;
 use App\Services\CampaignService;
@@ -13,6 +14,7 @@ use App\Services\GroupService;
 use App\Services\ImportService;
 use App\Services\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -93,6 +95,31 @@ class CampaignImportIntegrationTest extends TestCase
         self::assertSame('confirmed', $participation->fresh()->status);
         self::assertSame('completed', $campaign->fresh()->status);
         self::assertTrue($campaign->events()->where('action', 'confirmed_by_validation')->exists());
+    }
+
+    public function test_legacy_pending_proposal_uses_its_archived_source_lineage_only_when_context_matches(): void
+    {
+        $row = ['Name' => 'Synthetic.A', 'de_CH' => 'Reference A', 'fr_CH' => 'Translation A'];
+        $this->import([$row]);
+        $term = Term::firstOrFail();
+        $second = $this->import([$row]);
+        $presence = DB::table('import_rows')->where('import_id', $second->id)->first();
+        $legacy = $term->replicate();
+        $legacy->fill(['source_import_id' => $second->id, 'source_offset' => $presence->offset, 'source_length' => $presence->length]);
+        $legacy->save();
+        $revision = Revision::create(['term_id' => $legacy->id, 'number' => 1, 'version_id' => $this->version->id,
+            'source_import_id' => $second->id, 'source_offset' => $presence->offset, 'source_length' => $presence->length,
+            'validated' => [], 'metadata' => ['key' => $term->key, 'context' => $term->context],
+            'origin' => 'import', 'origin_id' => $second->id, 'created_by' => $this->manager->id, 'created_at' => now()]);
+        DB::table('term_consolidations')->insert(['legacy_term_id' => $legacy->id, 'common_term_id' => $term->id, 'metadata' => '{}', 'created_at' => now()]);
+        DB::table('terms')->where('id', $legacy->id)->update(['consolidated_into_id' => $term->id]);
+        $proposal = $term->proposals()->where('language', 'fr')->firstOrFail();
+        $proposal->update(['legacy_term_id' => $legacy->id, 'import_id' => $second->id, 'context_fingerprint' => null]);
+
+        self::assertTrue(app(CampaignService::class)->isRelevant($proposal->fresh(), $term->fresh()));
+        self::assertNull($proposal->fresh()->context_fingerprint, 'Checking context must not rewrite historical proposals.');
+        DB::table('revisions')->where('id', $revision->id)->update(['metadata' => json_encode(['key' => $term->key, 'context' => 'Different context'], JSON_THROW_ON_ERROR)]);
+        self::assertFalse(app(CampaignService::class)->isRelevant($proposal->fresh(), $term->fresh()));
     }
 
     public function test_real_reimport_reexamines_open_confirmations_but_preserves_finished_history(): void

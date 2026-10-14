@@ -9,16 +9,23 @@ use App\Models\Organisation;
 use App\Models\User;
 use App\Services\DevconfExportService;
 use App\Services\ImportService;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\DatabaseProcess;
+use Tests\Support\IsolatedDatabaseMigrations;
 use Tests\TestCase;
 
 class ImportTransitionConcurrencyTest extends TestCase
 {
-    use DatabaseMigrations;
+    use IsolatedDatabaseMigrations;
+
+    protected function beforeRefreshingDatabase(): void
+    {
+        if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            $this->markTestSkipped('Requires MariaDB row locks and separate committed connections.');
+        }
+    }
 
     public static function transitions(): array
     {
@@ -28,9 +35,6 @@ class ImportTransitionConcurrencyTest extends TestCase
     #[DataProvider('transitions')]
     public function test_transition_waits_for_the_row_lock_and_rechecks_committed_status(string $action, string $status): void
     {
-        if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
-            $this->markTestSkipped('Requires MariaDB row locks and separate committed connections.');
-        }
         $storage = sys_get_temp_dir().'/myabi-import-concurrency-'.bin2hex(random_bytes(8));
         File::makeDirectory($storage.'/app/private', 0700, true);
         $this->app->useStoragePath($storage);

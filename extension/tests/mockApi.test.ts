@@ -7,11 +7,11 @@ import { createMockServer } from '../scripts/mock-api.mjs';
 import { sampleRequest } from './helpers';
 
 // Test de bout en bout de la couche API : vrai client de l'extension, vrai HTTP, faux serveur.
-const server = createMockServer({ slowMs: 300, log: () => undefined });
+const server = createMockServer({ slowMs: 300, captureRequests: true, log: () => undefined });
 let apiUrl = '';
 
 const call = (text: string, token = 'ok', extra = {}) =>
-    searchTranslations(sampleRequest({ text }), { apiUrl, token, timeoutMs: 2000, ...extra });
+    searchTranslations(sampleRequest({ text }), { backendMode: 'mock', apiUrl, token, timeoutMs: 2000, ...extra });
 
 async function kind(promise: Promise<unknown>): Promise<ApiError> {
     try {
@@ -24,7 +24,7 @@ async function kind(promise: Promise<unknown>): Promise<ApiError> {
 }
 
 function view(text: string, response: Awaited<ReturnType<typeof call>>) {
-    const settings = normalizeSettings({ apiUrl });
+    const settings = normalizeSettings({ apiUrl, backendMode: 'mock' });
     return buildResultsView(response, sampleRequest({ text }), settings);
 }
 
@@ -61,7 +61,7 @@ describe('scénarios de résultats', () => {
     it('« Événement » (avec ou sans accent) : « Ereignis » et une clé très longue', async () => {
         for (const text of ['Événement', 'evenement']) {
             const result = view(text, await call(text));
-            expect(result.state).toBe('strong');
+            expect(result.state).toBe(text === 'Événement' ? 'strong' : 'noExact');
             expect(result.results[0]).toMatchObject({
                 key: 'modulesadministrationManagementcourseCoursesOverviewConfig.Event',
                 sourceText: 'Ereignis',
@@ -72,7 +72,7 @@ describe('scénarios de résultats', () => {
     });
 
     it('« Valider » : une seule correspondance exacte', async () => {
-        expect(view('Valider', await call('Valider')).state).toBe('strong');
+        expect(view('Valider', await call('Valider')).state).toBe('multiple');
     });
 
     it('texte quelconque (MyAB réel) : réponse générée, une exacte et une approximative', async () => {
@@ -96,13 +96,16 @@ describe('scénarios de résultats', () => {
         expect(result.results.map((r) => r.openUrl)).toEqual([null, null]);
     });
 
-    it('respecte maxResults', async () => {
+    it('respecte maxResults sans masquer l’ambiguïté', async () => {
         const response = await searchTranslations(sampleRequest({ text: 'Statut', maxResults: 1 }), {
+            backendMode: 'mock',
             apiUrl,
             token: 'ok',
             timeoutMs: 2000,
         });
         expect(response.results).toHaveLength(1);
+        expect(view('Statut', response).state).toBe('multiple');
+        expect(response.hasMore).toBe(true);
     });
 });
 
@@ -141,7 +144,7 @@ describe('scénarios d’erreur (choisis par le token)', () => {
 
     it('URL d’API erronée : 404', async () => {
         const error = await kind(
-            searchTranslations(sampleRequest(), { apiUrl: `${apiUrl}/inexistant`, token: 'ok', timeoutMs: 2000 }),
+            searchTranslations(sampleRequest(), { backendMode: 'mock', apiUrl: `${apiUrl}/inexistant`, token: 'ok', timeoutMs: 2000 }),
         );
         expect(error.kind).toBe('notFound');
     });
@@ -150,7 +153,7 @@ describe('scénarios d’erreur (choisis par le token)', () => {
 describe('autres routes du faux serveur', () => {
     it('feedback accepté', async () => {
         await expect(
-            sendFeedback({ text: 'Commande', resultId: 1245, key: 'PURCHASE_ORDER', pageUrl: '' }, { apiUrl, token: 'ok', timeoutMs: 2000 }),
+            sendFeedback({ text: 'Commande', resultId: 1245, key: 'PURCHASE_ORDER', pageUrl: '' }, { backendMode: 'mock', apiUrl, token: 'ok', timeoutMs: 2000 }),
         ).resolves.toBeUndefined();
     });
 

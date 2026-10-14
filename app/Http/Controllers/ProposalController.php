@@ -21,8 +21,8 @@ class ProposalController extends Controller
         $language = $filters['language'];
         $generation = (int) DB::table('catalogue_state')->where('id', 1)->value('generation');
         $q = $filter->query($request->user(), $filters)
-            ->select(['id', 'term_id', 'attribute', 'language', 'value', 'lock_version', 'author_id', 'anomalies', 'created_at'])
-            ->with(['term:id,type,label,source_text,validated,source_import_id,source_offset,source_length', 'term.sourceImport:id,path', 'author:id,name']);
+            ->select(['id', 'term_id', 'attribute', 'language', 'value', 'lock_version', 'author_id', 'organization_id', 'import_id', 'edit_history', 'anomalies', 'created_at'])
+            ->with(['term:id,type,label,source_text,validated,source_import_id,source_offset,source_length', 'term.sourceImport:id,path', 'author:id,name', 'organization:id,name,code', 'import:id,organization_id', 'import.organization:id,name,code', 'imports:id,organization_id', 'imports.organization:id,name,code']);
         $showAll = $request->query('per_page') === 'all';
         $proposalTotal = $showAll ? (clone $q)->count() : null;
         $q->orderBy('created_at')->orderBy('id');

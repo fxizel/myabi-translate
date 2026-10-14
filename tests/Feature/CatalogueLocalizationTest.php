@@ -64,7 +64,7 @@ class CatalogueLocalizationTest extends TestCase
             $mock->shouldReceive('row')->andReturn(['Cause Text' => 'Valeur technique originale']);
         });
         $term = Term::create([
-            'type' => 'law', 'organization_id' => null, 'identity_hash' => hash('sha256', 'synthetic-law'), 'key' => ['synthetic-law'],
+            'type' => 'law', 'identity_hash' => hash('sha256', 'synthetic-law'), 'key' => ['synthetic-law'],
             'label' => 'synthetic-law', 'context' => 'test', 'source_text' => 'Unveränderte Referenz', 'search_text' => 'synthetic-law',
             'semantic_hash' => str_repeat('a', 64), 'source_hash' => str_repeat('b', 64), 'source_import_id' => 1,
             'source_offset' => 0, 'source_length' => 1, 'validated' => ['Cause Text' => ['fr' => 'Valeur validée']],

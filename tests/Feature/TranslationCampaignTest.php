@@ -63,7 +63,7 @@ class TranslationCampaignTest extends TestCase
         $key = 'synthetic.'.++$this->sequence;
 
         return Term::create([
-            'type' => 'server', 'organization_id' => null, 'identity_hash' => hash('sha256', $key),
+            'type' => 'server', 'identity_hash' => hash('sha256', $key),
             'raw_identity_hash' => hash('sha256', $key), 'key' => [$key], 'label' => $key,
             'context' => '', 'source_text' => 'Reference', 'search_text' => $key,
             'semantic_hash' => str_repeat('a', 64), 'source_hash' => str_repeat('b', 64),
@@ -433,19 +433,24 @@ class TranslationCampaignTest extends TestCase
     public function test_metrics_count_each_active_term_once_and_never_round_incomplete_work_to_100(): void
     {
         $campaign = $this->campaign();
-        $template = $this->term('Correct')->getAttributes();
+        $first = $this->term('Correct');
+        $template = $first->getAttributes();
         unset($template['id']);
         $terms = [];
-        for ($index = 2; $index <= 2001; $index++) {
-            $terms[] = array_replace($template, ['id' => $index, 'label' => 'metric.'.$index, 'key' => json_encode(['metric.'.$index])]);
+        for ($offset = 1; $offset < 2001; $offset++) {
+            $id = $first->id + $offset;
+            $key = ['metric.'.$id];
+            $hash = hash('sha256', json_encode(['server', $key], JSON_THROW_ON_ERROR));
+            $terms[] = array_replace($template, ['id' => $id, 'label' => $key[0], 'key' => json_encode($key),
+                'identity_hash' => $hash, 'raw_identity_hash' => $hash]);
         }
         foreach (array_chunk($terms, 100) as $chunk) {
             Term::insert($chunk);
         }
         $rows = [];
-        for ($index = 1; $index <= 2001; $index++) {
-            $rows[] = ['translation_campaign_id' => $campaign->id, 'term_id' => $index, 'active' => true, 'direct' => true,
-                'attribute' => 'label', 'status' => $index === 2001 ? 'to_process' : 'confirmed', 'created_at' => now(), 'updated_at' => now()];
+        for ($offset = 0; $offset < 2001; $offset++) {
+            $rows[] = ['translation_campaign_id' => $campaign->id, 'term_id' => $first->id + $offset, 'active' => true, 'direct' => true,
+                'attribute' => 'label', 'status' => $offset === 2000 ? 'to_process' : 'confirmed', 'created_at' => now(), 'updated_at' => now()];
         }
         foreach (array_chunk($rows, 400) as $chunk) {
             CampaignParticipation::insert($chunk);
@@ -455,7 +460,7 @@ class TranslationCampaignTest extends TestCase
         self::assertSame(2000, $metrics['confirmed']);
         self::assertSame(99.9, $metrics['work_progress']);
         self::assertSame(99.9, $metrics['confirmed_progress']);
-        CampaignParticipation::where('translation_campaign_id', $campaign->id)->where('term_id', 2001)->update(['active' => false]);
+        CampaignParticipation::where('translation_campaign_id', $campaign->id)->where('term_id', $first->id + 2000)->update(['active' => false]);
         self::assertSame(100.0, $campaign->fresh()->metrics()['confirmed_progress']);
     }
 

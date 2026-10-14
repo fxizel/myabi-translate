@@ -31,12 +31,13 @@ class SimpleExportService
                     $version = MyabiVersion::findOrFail($versionId);
                     $this->exports->assertCurrentVersion($version);
                     $format = FormatRegistry::get($type);
-                    $source = $this->exports->selectSources($versionId, [$type], [$organizationId])[$organizationId][$type];
+                    $this->exports->assertRecipients([$organizationId]);
+                    $plan = $this->exports->plan($type);
                     $permissions = new PrivateStoragePermissions;
                     $directory = storage_path('app/private/exports');
                     $permissions->ensureDirectory($directory);
                     $this->removeAbandonedFiles($directory);
-                    $this->budget->ensure($source->size * 3 + 10 * 1024 * 1024);
+                    $this->budget->ensure($plan['source_bytes'] * 3 + $plan['records'] * 500 + 10 * 1024 * 1024);
                     $path = $directory.'/'.bin2hex(random_bytes(16)).'.csv';
                     register_shutdown_function(static function () use ($path) {
                         if (is_file($path)) {
@@ -45,15 +46,15 @@ class SimpleExportService
                     });
                     $coverage = [];
                     $count = 0;
-                    $resolver = $this->exports->resolver($source, $format, null, $coverage, $count);
-                    $result = (new RawExporter)->export($source->originalPath(), $path, $resolver, $format);
+                    $records = $this->exports->records($plan, null, $coverage, $count);
+                    $result = (new RawExporter)->exportRecords($plan['header'], $records, $path, $format);
                     $permissions->secureFile($path);
-                    if ($result['records'] !== $source->row_count) {
+                    if ($result['records'] !== $plan['records']) {
                         throw ValidationException::withMessages(['source' => __('ui.publication_source_count')]);
                     }
-                    $this->audit->record('export.downloaded', $source, [], [
+                    $this->audit->record('export.downloaded', $version, [], [
                         'version_id' => $versionId, 'type' => $type, 'organization_id' => $organizationId,
-                        'source_import_id' => $source->id, 'source_sha256' => $source->sha256,
+                        'sources' => $this->exports->sourceManifest($plan),
                         'sha256' => $result['sha256'], 'records' => $result['records'],
                         'format_version' => $result['format_version'], 'coverage' => $coverage,
                     ], $user);

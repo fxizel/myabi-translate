@@ -14,11 +14,11 @@ Le travail s’organise autour de trois valeurs distinctes : la valeur du fichie
 
 | Notion | Sens dans l’application |
 | --- | --- |
-| Terme | Élément identifié par un type DEVCONF, une clé exacte et un périmètre propriétaire. |
+| Terme | Élément identifié par un type DEVCONF et une clé exacte, sans organisation propriétaire. |
 | Attribut | Champ traduisible d’un terme ; certains formats en comportent plusieurs. |
 | Cellule de traduction | Valeur d’un attribut dans une langue pour un terme donné. |
 | Proposition | Valeur soumise à décision, avec auteur, état et provenance éventuelle d’import. |
-| Révision | État conservé d’un terme, notamment lors d’un import qui le crée ou le modifie, d’une validation ou d’un changement de périmètre. |
+| Révision | État conservé d’un terme, notamment lors d’un import qui le crée ou le modifie, d’une validation ; les anciennes décisions de périmètre restent dans l’historique. |
 | Version myABI | Référence de version avec numéro, date de sortie et statut, à laquelle sont rattachés imports et publications. |
 | Publication | Ensemble de fichiers figés à sa construction, avec une archive et une traçabilité par organisation destinataire. |
 
@@ -38,12 +38,12 @@ Les [spécifications historiques](../../specifications-fonctionnelles-referentie
 Chaque compte nominatif possède une organisation, un ou plusieurs rôles et des langues associées aux rôles. Les profils d’usage sont :
 
 - **Lecteur** : consulter les termes accessibles et télécharger les publications de son organisation.
-- **Traducteur** : proposer des valeurs dans ses langues sur le périmètre commun et celui de son organisation.
+- **Traducteur** : proposer des valeurs dans ses langues sur tous les termes courants.
 - **Validateur** : examiner et décider les propositions dans ses langues, toutes organisations confondues ; il peut aussi y proposer des valeurs.
-- **Gestionnaire** : gérer les imports, les périmètres, les versions, les exports et les publications ; proposer et valider dans toutes les langues prises en charge.
+- **Gestionnaire** : gérer les imports, les versions, les exports et les publications ; proposer et valider dans toutes les langues prises en charge.
 - **Administrateur** : gérer les organisations et les comptes, et consulter l’audit. Ce rôle seul ne confère pas les droits métier du Gestionnaire.
 
-Le périmètre commun comprend les termes sans organisation propriétaire et ceux rattachés à une organisation racine. Cette visibilité commune ne fusionne pas leurs identités. Les Lecteurs, Traducteurs et Administrateurs sans rôle métier supplémentaire consultent ce périmètre et celui de leur organisation. Les Validateurs et Gestionnaires consultent l’ensemble du catalogue.
+Tous les utilisateurs autorisés consultent le catalogue courant commun. Les organisations rattachent les comptes, identifient les origines historiques des contributions et les destinataires des fichiers ; elles ne définissent aucune variante de traduction.
 
 L’accès passe par une connexion nominative. Les comptes techniques ne se connectent pas. Un compte désactivé, temporairement verrouillé, rattaché à une organisation inactive ou encore soumis à une invitation non acceptée ne peut pas se connecter.
 
@@ -52,12 +52,11 @@ L’accès passe par une connexion nominative. Les comptes techniques ne se conn
 | Domaine | Capacités présentes | Résultat pour l’utilisateur |
 | --- | --- | --- |
 | Accès et profil | Invitation, activation administrative sans courriel, connexion, récupération et changement de mot de passe, second facteur conditionnel, langue et notifications. | Accéder au référentiel avec les droits du compte et gérer ses préférences. |
-| Tableau de bord | Comptages des termes accessibles, propositions en attente, termes à revoir et propositions anciennes ; imports récents pour le Gestionnaire. | Identifier le travail disponible dans son périmètre. |
+| Tableau de bord | Comptages des termes accessibles, propositions en attente, termes à revoir et propositions anciennes ; imports récents pour le Gestionnaire. | Identifier le travail disponible dans le catalogue partagé. |
 | Catalogue | Recherche, filtres, pagination, affichage des valeurs en vigueur et des propositions, fiche détaillée. | Retrouver un terme et comprendre son état. |
 | Contribution | Proposition individuelle ou depuis plusieurs lignes du catalogue, correction autorisée, nouvelle proposition après rejet, reprise d’une ancienne valeur. | Soumettre explicitement une traduction à décision. |
 | Validation | Décision individuelle, décision sur sélection, validation de tous les résultats filtrés, validation initiale d’un import après aperçu. | Faire entrer les valeurs acceptées dans le référentiel validé. |
 | Imports | Téléversement d’un fichier, analyse à blanc, confirmation d’application, rapport, original et suivi. | Alimenter les termes, leur provenance et leurs propositions. |
-| Périmètres | Affectation ou confirmation de l’organisation propriétaire d’un terme par un Gestionnaire. | Fixer sa visibilité et son admissibilité aux sorties. |
 | Versions | Création avec numéro, date et statut ; changement de statut depuis la liste des publications. | Rattacher les imports et publications à une version myABI. |
 | Exports | Téléchargement d’un CSV DEVCONF pour un type, une version admissible et une organisation active. | Obtenir un fichier calculé sur les valeurs courantes. |
 | Publications | Génération en arrière-plan, fichiers figés par destinataire, manifeste, téléchargement ZIP, retrait motivé et reprise après échec. | Disposer d’un catalogue daté qui reste identique après les changements ultérieurs. |
@@ -77,7 +76,7 @@ L’interface de l’application Laravel existe en allemand, français et italie
 | Law Catalog | Cause Text, Short Justification et Legal Remedies. |
 | Incident code | TEXT, SHORTTEXT, ALTERNATIVE_TEXT_1, ALTERNATIVE_TEXT_2, ADDINFO, ADDINFO1 à ADDINFO6 et USAGE_POLICY. |
 
-La référence affichée provient de l’allemand lorsqu’il est disponible selon le format. Les formats NLS et Law disposent d’un repli sur leurs champs de référence ; Form et Incident Workflow utilisent leur champ `Default Label`. L’étiquette d’interface `de_CH` ne constitue donc pas une détection de la langue réelle de chaque référence.
+La référence affichée provient de l’allemand lorsqu’il est disponible selon le format. Les publications préservent les colonnes de référence source ; les cellules cibles sont déterminées par leur colonne, même lorsque la langue cible est de et que Default Language vaut fr. Les formats NLS et Law disposent d’un repli sur leurs champs de référence ; Form et Incident Workflow utilisent leur champ `Default Label`. L’étiquette d’interface `de_CH` ne constitue donc pas une détection de la langue réelle de chaque référence.
 
 ## Cycle fonctionnel
 
@@ -100,18 +99,18 @@ flowchart TD
     L --> M[Archive figée par organisation]
 ```
 
-Le diagramme montre les dépendances de contenu. La génération d’une sortie reste soumise aux contrôles de version, de source et de périmètre. Lorsqu’aucune valeur validée n’existe pour une cellule, la sortie conserve sa valeur d’origine ; les propositions en attente ne servent pas de remplacement.
+Le diagramme montre les dépendances de contenu. La génération d’une sortie reste soumise aux contrôles de version, de source et d’identité. L’export conserve le repli importé pour une cellule non validée ; la publication laisse cette cellule cible vide ; les propositions en attente ne servent pas de remplacement.
 
 ### Règles qui structurent le produit
 
 1. **Décision explicite.** Les imports créent des propositions, notamment pour les traductions non allemandes non vides qui diffèrent de la valeur validée. Ils ne les valident pas automatiquement.
 2. **Séparation de l’auteur et du validateur.** Un utilisateur ne valide pas sa propre proposition, sauf Gestionnaire ayant coché la dérogation. Cette dérogation est auditée ; le code actuel n’exige pas de motif textuel pour elle. Un rejet exige un motif.
 3. **Concurrence contrôlée.** Une action fondée sur une proposition modifiée entre-temps est refusée. Les opérations de masse sont liées au catalogue examiné et peuvent s’arrêter si ce catalogue change.
-4. **Identités conservées.** Le type, la clé exacte et le périmètre déterminent l’identité. La casse et les espaces des clés restent significatifs. Les collisions sont signalées et bloquent les sorties concernées.
+4. **Identités conservées.** Le type et la clé exacte déterminent l’identité. La casse et les espaces des clés restent significatifs. Les collisions sont signalées et bloquent les sorties concernées.
 5. **Source et validation séparées.** Une modification de la référence lors d’un import récent conserve les valeurs validées et marque celles de l’attribut concerné « à revoir ». Leur confirmation lève ce marquage sans créer de révision supplémentaire.
 6. **Absence sans suppression.** L’absence d’un terme dans un nouvel import ne le supprime pas et ne le rend pas automatiquement obsolète.
 7. **Publication figée à sa construction.** La demande est mise en attente ; la construction capture les valeurs et révisions alors courantes. Une fois publiée, l’archive n’est plus reconstruite à partir des modifications ultérieures.
-8. **Sorties contrôlées.** La source d’une organisation est prioritaire sur celle de l’éditeur. Un périmètre non confirmé, étranger au destinataire ou une provenance incohérente bloque la sortie au lieu de supprimer silencieusement des lignes.
+8. **Sorties contrôlées.** L’export inclut tous les termes connus du type, depuis plusieurs sources si nécessaire, avec valeur validée ou repli importé. La publication inclut les termes au moins partiellement validés et laisse vides les cellules cibles sans validation. Une source technique manquante ou ambiguë bloque le fichier ; l’organisation ne filtre pas les termes.
 
 ### Export et publication
 
@@ -121,6 +120,7 @@ Le diagramme montre les dépendances de contenu. La génération d’une sortie 
 | Choix à l’écran | Type, version, organisation active. | Version, un ou plusieurs types, note facultative. |
 | Destinataires | Une organisation choisie. | Toutes les organisations actives par défaut dans le formulaire actuel. |
 | Résultat | Un CSV DEVCONF téléchargé. | Un ZIP par organisation contenant les CSV et les manifestes de catalogue et de révisions. |
+| Sélection | Tous les termes courants connus du type, sans restriction de provenance. | Termes ayant au moins une cellule cible validée, autres cellules cibles vides. |
 | Moment des valeurs | Génération de l’export. | Construction de la publication en arrière-plan. |
 | Conservation dans l’historique des publications | Aucune publication créée. | Publication numérotée, consultable et retirable avec motif. |
 | Accès au téléchargement | Gestionnaire. | Gestionnaire ou utilisateur de l’organisation destinataire. |
@@ -133,7 +133,7 @@ Les propositions ont trois états : en attente, validée ou rejetée. Les termes
 
 Les imports exposent l’attente, l’analyse, le résultat analysé, l’attente d’application, l’application, le résultat appliqué, l’échec et l’annulation. Les publications exposent l’attente, la construction, la publication, l’échec et le retrait. Les validations en arrière-plan exposent des compteurs de traitement et d’exclusion.
 
-Le tableau de bord compte les propositions âgées d’au moins 30 jours depuis leur création. Le résumé quotidien calcule son compteur de propositions anciennes depuis leur dernière modification. Les publications fournissent une couverture par langue distinguant valeurs validées et valeurs reprises du fichier source. Aucun objectif chiffré de performance ou d’adoption n’est ajouté à ces indicateurs.
+Le tableau de bord compte les propositions âgées d’au moins 30 jours depuis leur création. Le résumé quotidien calcule son compteur de propositions anciennes depuis leur dernière modification. Les publications fournissent une couverture par langue distinguant cellules validées et cellules cibles vides. Aucun objectif chiffré de performance ou d’adoption n’est ajouté à ces indicateurs.
 
 ## Conditions de fonctionnement visibles
 
@@ -145,11 +145,11 @@ Le tableau de bord compte les propositions âgées d’au moins 30 jours depuis 
 
 ## Limite du composant navigateur
 
-Le dépôt contient aussi [MyAB Translation Inspector](../../extension/README.md), un composant navigateur séparé avec son propre code client et une API factice de test. Les routes de recherche et de retour de correspondance attendues par cette extension ne sont pas implémentées dans les routes Laravel examinées. Les parcours intégrés décrits ici portent sur l’application Laravel ; l’extension n’est pas présentée comme une intégration opérationnelle du référentiel.
+Le dépôt contient aussi [MyAB Translation Inspector](../../extension/README.md), un composant navigateur séparé. Son API Laravel version 2 retrouve les cellules du catalogue commun avec un jeton personnel, distingue valeur importée et validée et préserve les ambiguïtés. Le retour de correspondance facultatif ne modifie pas le workflow. Sa [mise en œuvre](../technique/api-extension-implementation.md) décrit la projection, la connexion et la recette ; une API factice reste disponible uniquement en mode de test explicite.
 
 ## Sources de référence de cet état
 
-- Accès et droits : [routes web](../../routes/web.php), [routes d’authentification](../../routes/auth.php), [User](../../app/Models/User.php), [CommonScope](../../app/Services/CommonScope.php).
+- Accès et droits : [routes web](../../routes/web.php), [routes d’authentification](../../routes/auth.php), [User](../../app/Models/User.php), [Term](../../app/Models/Term.php).
 - Catalogue et décisions : [TermController](../../app/Http/Controllers/TermController.php), [WorkflowService](../../app/Services/WorkflowService.php), [ProposalFilter](../../app/Services/ProposalFilter.php).
 - Entrées et sorties : [ImportService](../../app/Services/ImportService.php), [DevconfExportService](../../app/Services/DevconfExportService.php), [PublicationService](../../app/Services/PublicationService.php), [formats](../../app/Domain/Devconf/FormatRegistry.php).
 - Écrans : [vues Blade](../../resources/views), [comportements du navigateur](../../public/js/app.js).

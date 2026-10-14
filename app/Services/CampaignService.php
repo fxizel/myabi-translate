@@ -7,6 +7,7 @@ use App\Domain\Devconf\TranslationValidator;
 use App\Models\CampaignEvent;
 use App\Models\CampaignParticipation;
 use App\Models\Proposal;
+use App\Models\Revision;
 use App\Models\Term;
 use App\Models\TermGroup;
 use App\Models\TranslationCampaign;
@@ -40,7 +41,7 @@ class CampaignService
         return $campaign->status === 'in_progress' && $campaign->archived_at === null
             && $campaign->assignees()->whereKey($user->id)->exists()
             && TranslationCampaign::visibleTo($user)->whereKey($campaign->id)->exists()
-            && ($term === null ? $user->canTranslate($campaign->language, $user->organization_id) : $user->canTranslate($campaign->language, $term->organization_id));
+            && $user->canTranslate($campaign->language);
     }
 
     public function create(User $user, array $data): TranslationCampaign
@@ -373,7 +374,7 @@ class CampaignService
 
             return;
         }
-        $excluded = ! isset($attrs[$attribute]['columns'][$campaign->language]) ? 'missing_column' : ($term->obsolete || $term->scope_unconfirmed ? 'blocked' : null);
+        $excluded = ! isset($attrs[$attribute]['columns'][$campaign->language]) ? 'missing_column' : ($term->obsolete ? 'blocked' : null);
         if ($excluded === null) {
             try {
                 $this->assertSource($term, $campaign->language);
@@ -414,6 +415,20 @@ class CampaignService
 
     public function contextFingerprint(Term $term, string $attribute, string $language, ?array $attributes = null, ?array $row = null): string
     {
+        return hash('sha256', json_encode($this->contextComponents($term, $attribute, $language, $attributes, $row), JSON_THROW_ON_ERROR));
+    }
+
+    /** Reproduces an old digest only; callers must verify the historical source and context. */
+    public function historicalContextFingerprint(Term $term, string $attribute, string $language, ?int $historicalOrganizationId, ?array $attributes = null, ?array $row = null): string
+    {
+        $components = $this->contextComponents($term, $attribute, $language, $attributes, $row);
+        array_splice($components, 2, 0, [$historicalOrganizationId]);
+
+        return hash('sha256', json_encode($components, JSON_THROW_ON_ERROR));
+    }
+
+    private function contextComponents(Term $term, string $attribute, string $language, ?array $attributes, ?array $row): array
+    {
         $attributes ??= $term->attributesForDisplay();
         $a = $attributes[$attribute] ?? [];
         $row ??= $this->source->row($term);
@@ -440,7 +455,7 @@ class CampaignService
         }
         $context = array_diff_key($row, array_fill_keys($excluded, true));
 
-        return hash('sha256', json_encode([$term->type, $term->key, $term->organization_id, $term->context, $context, $attribute, $a['reference'] ?? null, $a['reference_language'] ?? null, $a['columns'][$language] ?? null], JSON_THROW_ON_ERROR));
+        return [$term->type, $term->key, $term->context, $context, $attribute, $a['reference'] ?? null, $a['reference_language'] ?? null, $a['columns'][$language] ?? null];
     }
 
     private function confirmationFingerprint(Term $term, string $attribute, string $language): string
@@ -463,7 +478,7 @@ class CampaignService
 
     public function isRelevant(Proposal $proposal, Term $term, ?array $attributes = null): bool
     {
-        if ($proposal->status !== 'pending' || $proposal->term_id !== $term->id || $proposal->attribute !== $this->primaryAttribute($term) || $term->obsolete || $term->scope_unconfirmed) {
+        if ($proposal->status !== 'pending' || $proposal->term_id !== $term->id || $proposal->attribute !== $this->primaryAttribute($term) || $term->obsolete) {
             return false;
         }
         try {
@@ -483,8 +498,12 @@ class CampaignService
         if ($proposal->import_id === null) {
             return false;
         }
-        $revision = $term->revisions()->where('source_import_id', $proposal->import_id)->first();
-        if ($revision === null || ! array_key_exists('context', $revision->metadata) || data_get($revision->metadata, 'context') !== $term->context || data_get($revision->metadata, 'key') !== $term->key || data_get($revision->metadata, 'organization_id') !== $term->organization_id) {
+        $revision = Revision::where('source_import_id', $proposal->import_id)
+            ->where(fn ($query) => $query->where('term_id', $term->id)
+                ->orWhereIn('term_id', DB::table('term_consolidations')->where('common_term_id', $term->id)->select('legacy_term_id')))
+            ->orderBy('id')->cursor()->first(fn ($candidate) => array_key_exists('context', $candidate->metadata)
+                && data_get($candidate->metadata, 'context') === $term->context && data_get($candidate->metadata, 'key') === $term->key);
+        if ($revision === null) {
             return false;
         }
         $legacyTerm = clone $term;
@@ -579,7 +598,7 @@ class CampaignService
             }
         }
         $row = $this->source->row($term);
-        if ($term->obsolete || $term->scope_unconfirmed || $format->identity($row) !== $term->key || ! isset($term->attributesForDisplay()[$this->primaryAttribute($term)]['columns'][$language])
+        if ($term->obsolete || $format->identity($row) !== $term->key || ! isset($term->attributesForDisplay()[$this->primaryAttribute($term)]['columns'][$language])
             || DB::table('import_rows')->where('import_id', $term->source_import_id)->where('offset', $term->source_offset)->where('collision', true)->exists()) {
             $this->invalid('term', __('campaigns.errors.source_blocked'));
         }
@@ -591,7 +610,7 @@ class CampaignService
         $users = User::whereIn('id', $ids)->where('active', true)->where('is_technical', false)->get();
         abort_unless($users->count() === count($ids), 422);
         foreach ($users as $user) {
-            abort_unless($user->canTranslate($campaign->language, $user->organization_id), 422);
+            abort_unless($user->canTranslate($campaign->language), 422);
         }
         if ($campaign->status === 'in_progress' && $ids === []) {
             $this->invalid('assignee_ids', __('campaigns.errors.last_assignee'));

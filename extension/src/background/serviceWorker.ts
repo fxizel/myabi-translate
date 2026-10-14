@@ -32,6 +32,7 @@ const inFlight = new Map<number, AbortController>();
 function toPanelError(error: unknown): PanelError {
     if (error instanceof ApiError) {
         const panelError: PanelError = { kind: error.kind };
+        if (error.code !== undefined) panelError.code = error.code;
         if (error.status !== undefined) panelError.status = error.status;
         if (error.retryAfterSec !== undefined) panelError.retryAfterSec = error.retryAfterSec;
         return panelError;
@@ -69,7 +70,7 @@ function withTabContext(request: SearchRequest, sender: MessageSender, urlMode: 
         ...request,
         frameUrl: request.pageUrl,
         pageUrl: sanitizeUrl(sender.tab.url, urlMode),
-        pageTitle: cleanString(sender.tab.title, 200) || request.pageTitle,
+        pageTitle: request.pageTitle ? cleanString(sender.tab.title, 200) || request.pageTitle : '',
     };
 }
 
@@ -85,7 +86,17 @@ async function handleSearch(message: Record<string, unknown>, sender: MessageSen
 
     const settings = await loadSettings(api);
     const lang = resolveLanguage(settings.uiLanguage, api.i18n.getUILanguage());
-    const request = withTabContext(cleaned, sender, settings.urlMode);
+    const privateContext: SearchRequest = settings.collectContext ? cleaned : {
+        contractVersion: 2, text: cleaned.text, textTruncated: cleaned.textTruncated,
+        pageUrl: cleaned.pageUrl, pageTitle: '', surroundingText: '', elementTag: '', elementId: '', elementClasses: [], ariaLabel: '', title: '', dataAttributes: {}, lang: cleaned.lang,
+        maxResults: cleaned.maxResults, uiLanguage: lang,
+    };
+    privateContext.pageUrl = sanitizeUrl(privateContext.pageUrl, settings.urlMode);
+    if (privateContext.frameUrl) privateContext.frameUrl = sanitizeUrl(privateContext.frameUrl, settings.urlMode);
+    privateContext.uiLanguage = lang;
+    delete privateContext.searchLanguage;
+    if (settings.searchLanguage !== 'auto') privateContext.searchLanguage = settings.searchLanguage;
+    const request = withTabContext(privateContext, sender, settings.urlMode);
     const manualSearchUrl = manualSearchLink(settings, request.text);
     const fail = async (error: PanelError): Promise<{ ok: boolean }> => {
         await toPanel(tabId, { type: 'panel:error', requestId, request, lang, error, manualSearchUrl });
@@ -124,6 +135,7 @@ async function handleSearch(message: Record<string, unknown>, sender: MessageSen
 
     try {
         const response = await searchTranslations(request, {
+            backendMode: settings.backendMode,
             apiUrl: apiCheck.url,
             token,
             timeoutMs: settings.timeoutMs,
@@ -138,7 +150,10 @@ async function handleSearch(message: Record<string, unknown>, sender: MessageSen
             state: view.state,
             results: view.results,
             manualSearchUrl,
-            feedbackEnabled: settings.feedbackEnabled,
+            feedbackEnabled: settings.feedbackEnabled && view.feedbackAllowed,
+            hasMore: view.hasMore,
+            candidateSetComplete: view.candidateSetComplete,
+            mock: view.mock,
         };
         await toPanel(tabId, results);
         return { ok: true };
@@ -174,7 +189,8 @@ async function handleNoText(message: Record<string, unknown>, sender: MessageSen
 
 async function handleFeedback(message: Record<string, unknown>, sender: MessageSender): Promise<{ ok: boolean }> {
     const request = sanitizeSearchRequest(message.request);
-    const key = cleanString(message.key, 300);
+    const key = typeof message.key === 'string' ? message.key : '';
+    const feedbackProof = typeof message.feedbackProof === 'string' && message.feedbackProof.length <= 4096 ? message.feedbackProof : undefined;
     const resultId = typeof message.resultId === 'number' || typeof message.resultId === 'string' ? message.resultId : key;
     const settings = await loadSettings(api);
     const apiCheck = validateHttpUrl(settings.apiUrl);
@@ -182,11 +198,15 @@ async function handleFeedback(message: Record<string, unknown>, sender: MessageS
     if (!settings.feedbackEnabled || !request || !key || !apiCheck.ok || !token) {
         return { ok: false };
     }
+    if (settings.backendMode === 'real' && (!feedbackProof || typeof resultId !== 'string' || resultId.length > 1024)) return { ok: false };
+    let senderUrl: URL;
+    try { senderUrl = new URL(sender.url ?? sender.tab?.url ?? ''); } catch { return { ok: false }; }
+    if (!isHostAllowed(senderUrl.hostname, senderUrl.protocol, settings.allowedDomains) || !(await api.permissions.contains({ origins: [apiCheck.matchPattern] }))) return { ok: false };
     const tab = withTabContext(request, sender, settings.urlMode);
     try {
         await sendFeedback(
-            { text: tab.text, resultId, key, pageUrl: tab.pageUrl },
-            { apiUrl: apiCheck.url, token, timeoutMs: settings.timeoutMs },
+            { text: tab.text, resultId, key, pageUrl: tab.pageUrl, ...(feedbackProof ? { feedbackProof } : {}) },
+            { backendMode: settings.backendMode, apiUrl: apiCheck.url, token, timeoutMs: settings.timeoutMs },
         );
         return { ok: true };
     } catch {
@@ -204,6 +224,8 @@ async function handleTestConnection(message: Record<string, unknown>): Promise<R
         return { ok: false, error: { kind: 'notConfigured' } satisfies PanelError };
     }
     const probe: SearchRequest = {
+        contractVersion: 2,
+        textTruncated: false,
         text: 'Test',
         pageUrl: '',
         pageTitle: '',
@@ -220,6 +242,7 @@ async function handleTestConnection(message: Record<string, unknown>): Promise<R
     };
     try {
         const response = await searchTranslations(probe, {
+            backendMode: message.backendMode === 'mock' ? 'mock' : message.backendMode === 'real' ? 'real' : settings.backendMode,
             apiUrl: apiCheck.url,
             token,
             timeoutMs: settings.timeoutMs,

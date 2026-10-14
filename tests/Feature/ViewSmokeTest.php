@@ -75,7 +75,7 @@ class ViewSmokeTest extends TestCase
         $this->withoutExceptionHandling();
         $this->actingAs($this->manager);
         $term = Term::firstOrFail();
-        foreach (['/', '/terms', '/terms?language=it&sort=key', '/terms?scope=own&sort=updated', '/terms/'.$term->id, '/terms/'.$term->id.'?from=1&to=1', '/validation', '/imports', '/imports/'.$this->import->id, '/publications', '/profile', '/admin', '/audit', '/help'] as $url) {
+        foreach (['/', '/terms', '/terms?language=it&sort=key', '/terms?sort=updated', '/terms/'.$term->id, '/terms/'.$term->id.'?from=1&to=1', '/validation', '/imports', '/imports/'.$this->import->id, '/publications', '/profile', '/admin', '/audit', '/help'] as $url) {
             $this->get($url)->assertOk()->assertSee('ARGE-ABI')->assertSee('main-content', false);
         }
     }
@@ -186,6 +186,12 @@ class ViewSmokeTest extends TestCase
         $response = $this->get('/publications/'.$publication->id)->assertOk()->assertSee('Police VD')->assertSee('2026.2-01-VD.zip');
         $page = $this->pageXPath($response->getContent());
         $this->assertSame(__('ui.publication_number').' / myABI '.$this->version->number, $page->evaluate('string(//div[@class="page-heading"]//p[@class="eyebrow"])'));
+        $response->assertSee(__('ui.fallback'));
+        $recipient['files'][0]['coverage'] = ['fr' => ['validated' => 1, 'empty' => 2, 'fallback' => 0], 'de' => ['validated' => 0, 'empty' => 0, 'fallback' => 1]];
+        $currentPublication = Publication::create(['version_id' => $this->version->id, 'number' => '2026.2-02', 'status' => 'published', 'types' => ['server'],
+            'recipients' => [$this->manager->organization_id], 'manifest' => ['recipients' => [$this->manager->organization_id => $recipient]],
+            'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
+        $this->get('/publications/'.$currentPublication->id)->assertOk()->assertSee(__('ui.empty_targets'))->assertSee(__('ui.preserved_source_cells'))->assertDontSee(__('ui.fallback'));
         $this->manager->forceFill(['two_factor_secret' => encrypt('JBSWY3DPEHPK3PXP'), 'two_factor_confirmed_at' => null])->save();
         $this->get('/profile')->assertOk()->assertSee('name="code"', false)->assertSee('JBSWY3DPEHPK3PXP');
     }

@@ -38,7 +38,7 @@ describe('normalizeSettings', () => {
         });
         expect(settings.maxResults).toBe(20);
         expect(settings.timeoutMs).toBe(1000);
-        expect(settings.urlMode).toBe('noQuery');
+        expect(settings.urlMode).toBe('origin');
         expect(settings.activationModifier).toBe('alt');
         expect(settings.uiLanguage).toBe('auto');
     });

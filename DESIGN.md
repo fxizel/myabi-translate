@@ -224,7 +224,7 @@ Le logo retenu le 23.09.2026 associe deux tuiles « A » (marine) et « 文 » (
 | Espace | Contenu |
 |---|---|
 | **Traductions** | Barre de langues, recherche et filtres, compteurs par type, tableau : terme et clé, type, valeur de référence, traduction en vigueur, proposition et état. Ouverture d’une fiche dans un nouvel onglet de travail. |
-| **Fiche terme** | Source et métadonnées (clé, type, portée, contexte), valeur en vigueur, proposition, saisie avec contrôle des variables, historique des révisions. |
+| **Fiche terme** | Source et métadonnées (clé, type, contexte), valeur en vigueur, proposition, saisie avec contrôle des variables, historique des révisions. |
 | **Validation** | File des propositions par langue : en-tête du terme, colonnes source / valeur en vigueur / proposition avec différences mises en évidence, auteur, validation ou rejet motivé, actions groupées. |
 | **Imports** | Parcours en trois étapes : dépôt du fichier, analyse et rapport, application en propositions. |
 | **Publications** | Catalogues publiés par organisation et version, figés, téléchargeables ; création d’une nouvelle publication. |
@@ -262,3 +262,7 @@ Contrôle de référence : bureau et 390 px de large, sans débordement horizont
 3. Ajouter tout nouveau style dans `public/css/app.css`, avec les jetons existants ; une nouvelle couleur doit d’abord être ajoutée à ce document.
 4. Vérifier le rendu en DE/FR/IT, en mode compact et confortable, sur bureau et à 390 px.
 5. N’utiliser que des données fictives dans les captures et la documentation.
+
+## Référentiel commun du 13.10.2026
+
+La liste et la fiche de terme ne présentent plus de portée, de propriétaire ou de formulaire de confirmation de périmètre. Les filtres du catalogue restent centrés sur le type, la version, la langue, les états et le contexte. Dans la validation, le filtre « Organisation d’origine » couvre la provenance historique et les imports associés ; les détails distinguent l’auteur courant et les sources, avec une mention des valeurs antérieures lors d’une correction. Les liens vers les anciennes lignées affichent leurs révisions immuables sans renumérotation. Ces adaptations conservent les composants, densités et ressources locales définis ci-dessus.

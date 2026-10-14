@@ -105,7 +105,7 @@ async function readJson(request) {
 }
 
 /**
- * @param {{ slowMs?: number, log?: (line: string) => void }} [options]
+ * @param {{ slowMs?: number, log?: (line: string) => void, captureRequests?: boolean }} [options]
  * @returns {import('node:http').Server & { requests: Array<Record<string, unknown>> }}
  */
 export function createMockServer(options = {}) {
@@ -137,14 +137,16 @@ export function createMockServer(options = {}) {
         const body = await readJson(request);
         const endpoint = url.pathname.slice(BASE_PATH.length + 1);
         // Le token n'est jamais enregistré ni affiché : seul le « mode » demandé l'est.
-        const entry = { endpoint, mode: token ? mode : '(sans token)', body };
+        const safeMode = ['401', 'expired', '403', '409', '413', '415', '422', '426', '429', '500', 'slow', 'empty', 'down', 'badjson'].includes(mode) ? mode : token ? 'ok' : '(sans token)';
+        const entry = { endpoint, mode: safeMode, ...(options.captureRequests ? { body } : {}) };
         requests.push(entry);
         if (requests.length > 50) requests.shift();
-        log(`[mock] ${endpoint} mode=${entry.mode} texte=${JSON.stringify(body?.text ?? null)} champs=${body ? Object.keys(body).length : 0}`);
+        log(`[mock] ${endpoint} mode=${safeMode}`);
 
         if (!token) return json(response, 401, { message: 'Unauthenticated.' });
         if (mode === '401' || mode === 'expired') return json(response, 401, { message: 'Token expired.' });
         if (mode === '403') return json(response, 403, { message: 'Forbidden.' });
+        if (['409', '413', '415', '422', '426'].includes(mode)) return json(response, Number(mode), { error: { code: mode === '422' ? 'search_language_required' : 'invalid_request', message: 'Test error.' } });
         if (mode === '429') return json(response, 429, { message: 'Too many requests.' }, { 'Retry-After': '5' });
         if (mode === '500') return json(response, 500, { message: 'Server error.' });
         if (mode === 'down') return request.socket.destroy();
@@ -160,8 +162,16 @@ export function createMockServer(options = {}) {
         const limit = Number.isInteger(body.maxResults) ? body.maxResults : 5;
         const text = body.text.trim();
         const known = scenarios(origin)[text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')];
-        const results = (mode === 'empty' ? [] : (known ?? generated(text, origin))).slice(0, limit);
-        return json(response, 200, { query: body.text, results });
+        const all = (mode === 'empty' ? [] : (known ?? generated(text, origin))).map((item, index) => ({
+            ...item,
+            exact: !body.textTruncated && item.currentTranslation.normalize('NFC') === text.normalize('NFC') && !(index > 0 && ['commande', 'evenement'].includes(text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, ''))),
+        }));
+        const exactCandidateCount = all.filter((item) => item.exact).length;
+        const candidateSetComplete = body.textTruncated !== true;
+        const strong = exactCandidateCount === 1 && candidateSetComplete && all[0]?.exact && all[0].score >= 0.9 && (!all[1] || all[0].score - all[1].score >= 0.15);
+        const matchState = exactCandidateCount ? strong ? 'strong' : 'multiple' : all.length || !candidateSetComplete ? 'noExact' : 'none';
+        const results = all.slice(0, Math.max(1, Math.min(20, limit)));
+        return json(response, 200, { query: body.text, results, matchState, exactCandidateCount, hasMore: results.length < all.length, candidateSetComplete, feedbackAllowed: true });
     });
 
     server.requests = requests;

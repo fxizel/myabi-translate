@@ -230,7 +230,7 @@ class CampaignController extends Controller
     private function formData(Request $request, TranslationCampaign $campaign): array
     {
         $groups = TermGroup::visibleTo($request->user())->where(fn ($q) => $q->whereNull('archived_at')->when($campaign->exists, fn ($q) => $q->orWhereIn('id', $campaign->groups()->select('term_groups.id'))))->orderBy('title')->get();
-        $assignees = User::where('active', true)->where('is_technical', false)->orderBy('name')->get()->filter(fn ($user) => $user->canValidateAny() || collect(User::LANGUAGES)->contains(fn ($language) => $user->canTranslate($language, $user->organization_id)));
+        $assignees = User::where('active', true)->where('is_technical', false)->orderBy('name')->get()->filter(fn ($user) => $user->canValidateAny() || collect(User::LANGUAGES)->contains(fn ($language) => $user->canTranslate($language)));
 
         return compact('campaign', 'groups', 'assignees');
     }

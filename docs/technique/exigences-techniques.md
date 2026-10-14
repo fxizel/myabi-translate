@@ -38,9 +38,9 @@ Cette liste sert de référence de réalisation et de recette. **D** identifie u
 | T-12 | Séparer proposition et valeur validée ; conserver les contrôles métier. | Import sans validation implicite, quatre yeux, rejet motivé, placeholders et concurrence contrôlés. |
 | T-13 | Préserver les révisions complètes, leur comparaison et l’historique. | Anciennes valeurs consultables ; réimport inchangé sans révision inutile ; aucune suppression liée au quota. |
 | T-14 | Produire des publications immuables et traçables par destinataire. | Manifeste, sources, révisions et empreintes ; mêmes octets téléchargés après évolution du catalogue. |
-| T-15 | Bloquer un export ambigu ou sans source technique complète. | Diagnostic visible ; aucune valeur technique inventée ni diffusion interorganisation non autorisée. |
+| T-15 | Bloquer un export ambigu ou sans source technique complète. | Diagnostic visible ; aucune valeur technique inventée ; sources de chaque terme du catalogue commun vérifiables. |
 | T-16 | Filtrer, rechercher et paginer dans MariaDB, au plus 100 lignes par page. | Objectif inférieur à deux secondes sur le catalogue complet ; accents et casse testés. |
-| T-17 | Contrôler les droits côté serveur, par rôle, langue et organisation. | Tests d’accès direct aux pages, actions, fichiers et rapports hors périmètre. |
+| T-17 | Contrôler les droits côté serveur par rôle, langue et activation ; réserver les fichiers figés aux destinataires autorisés. | Catalogue commun consultable ; tests d’accès direct aux actions, fichiers et rapports selon leurs droits. |
 | T-18 | Conserver l’authentification locale et les règles de session fonctionnelles ; piloter le MFA globalement par `MFA_ENABLED=false` par défaut. | Absence de défi et d’obligation MFA avec `false`, règles TOTP par rôle avec `true`, conservation des secrets et reprise des sessions à la réactivation, invitations, récupération de compte, expiration et révocation testées. |
 | T-19 | Protéger les secrets et fichiers ; servir uniquement le dossier public Laravel. | HTTPS, CSRF, échappement HTML, SQL paramétré, fichiers privés inaccessibles par URL. |
 | T-20 | Conserver un journal d’audit en ajout seul et ses auteurs. | Compte applicatif incapable de modifier/supprimer l’audit ; accès de migration distinct ; dates UTC. |

@@ -55,6 +55,8 @@ export function fakeApi(local: Record<string, unknown> = {}) {
 
 export function sampleRequest(overrides: Partial<SearchRequest> = {}): SearchRequest {
     return {
+        contractVersion: 2,
+        textTruncated: false,
         text: 'Commande',
         pageUrl: 'https://myab.example.test/orders',
         pageTitle: 'Commandes',
@@ -114,6 +116,7 @@ export const specResponse = {
             module: 'Sales',
             status: 'review',
             score: 0.71,
+            exact: false,
             translationUrl: 'https://translations.example.test/translations/678',
         },
     ],

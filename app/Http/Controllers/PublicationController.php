@@ -94,7 +94,7 @@ class PublicationController extends Controller
         abort_unless(is_file($path) && filesize($path) === $archive['bytes'] && hash_file('sha256', $path) === $archive['sha256'], 503);
         $this->audit->record('publication.downloaded', $publication, [], ['organization_id' => $organizationId,
             'types' => $publication->types, 'sha256' => $archive['sha256'], 'withdrawn_explicit' => $publication->status === 'withdrawn',
-            'files' => array_map(fn ($file) => ['type' => $file['type'], 'source_import_id' => $file['source_import_id'], 'format_version' => $file['format_version'], 'records' => $file['records'], 'sha256' => $file['sha256']], $recipient['files'])], $user);
+            'files' => array_map(fn ($file) => ['type' => $file['type'], 'sources' => $file['sources'] ?? (isset($file['source_import_id']) ? [['import_id' => $file['source_import_id']]] : []), 'format_version' => $file['format_version'], 'records' => $file['records'], 'sha256' => $file['sha256']], $recipient['files'])], $user);
 
         return response()->download($path, $archive['name'], ['Content-Type' => 'application/zip', 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
     }

@@ -85,13 +85,17 @@ class PublicationService
                 throw new RuntimeException('Incomplete immutable publication directory.');
             }
             $this->assertCurrentVersion($publication->version);
-            $sources = $this->exports->selectSources($publication->version_id, $publication->types, $publication->recipients);
-            $estimate = array_sum(array_map(fn ($group) => array_sum(array_map(fn ($source) => $source->size * 3 + $source->row_count * 180, $group)), $sources));
+            $this->exports->assertRecipients($publication->recipients);
+            $plans = [];
+            foreach ($publication->types as $type) {
+                $plans[$type] = $this->exports->plan($type, true);
+            }
+            $estimate = count($publication->recipients) * array_sum(array_map(fn ($plan) => $plan['source_bytes'] * 3 + $plan['records'] * 500, $plans));
             $this->budget->ensure($estimate + 10 * 1024 * 1024);
             $permissions->ensureDirectory($staging);
             // The worker's exclusive lock prevents business writes; this transaction also
             // establishes a coherent database snapshot while manifests are streamed to disk.
-            $manifest = DB::transaction(function () use ($publication, $sources, $staging, $permissions) {
+            $manifest = DB::transaction(function () use ($publication, $plans, $staging, $permissions) {
                 $manifest = [
                     'publication_id' => $publication->id, 'publication' => $publication->number,
                     'version' => $publication->version->number, 'version_id' => $publication->version_id,
@@ -99,7 +103,7 @@ class PublicationService
                     'catalogue_generation' => (int) DB::table('catalogue_state')->where('id', 1)->value('generation'),
                     'types' => $publication->types, 'recipients' => [],
                 ];
-                foreach ($sources as $organizationId => $group) {
+                foreach ($publication->recipients as $organizationId) {
                     $organization = Organisation::findOrFail($organizationId);
                     $directory = $staging.'/'.$organizationId;
                     $permissions->ensureDirectory($directory);
@@ -113,18 +117,18 @@ class PublicationService
                     $rowCount = 0;
                     try {
                         $permissions->secureFile($rowManifestPath);
-                        foreach ($group as $type => $source) {
+                        foreach ($plans as $type => $plan) {
                             $format = FormatRegistry::get($type);
                             $filename = pathinfo($format->filename, PATHINFO_FILENAME).'_'.$this->safeName($publication->number).'_'.$this->safeName($organization->code).'.csv';
                             $coverage = [];
-                            $resolver = $this->exports->resolver($source, $format, $rowsFile, $coverage, $rowCount);
-                            $result = (new RawExporter)->export($source->originalPath(), $directory.'/'.$filename, $resolver, $format);
+                            $records = $this->exports->records($plan, $rowsFile, $coverage, $rowCount);
+                            $result = (new RawExporter)->exportRecords($plan['header'], $records, $directory.'/'.$filename, $format);
                             $permissions->secureFile($directory.'/'.$filename);
-                            if ($result['records'] !== $source->row_count) {
+                            if ($result['records'] !== $plan['records']) {
                                 $this->block('source', 'publication_source_count');
                             }
                             $recipient['files'][] = [...$result, 'type' => $type, 'name' => $filename, 'path' => $relative.'/'.$filename,
-                                'source_import_id' => $source->id, 'source_sha256' => $source->sha256, 'coverage' => $coverage];
+                                'sources' => $this->exports->sourceManifest($plan), 'coverage' => $coverage];
                         }
                         if (! fflush($rowsFile)) {
                             throw new RuntimeException('Cannot finalize revision manifest.');

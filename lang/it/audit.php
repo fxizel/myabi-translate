@@ -2,6 +2,10 @@
 
 return [
     'events' => [
+        'extension' => [
+            'token_created' => 'Token dell’estensione creato',
+            'token_revoked' => 'Token dell’estensione revocato',
+        ],
         'account' => [
             'invited' => 'Invito inviato',
             'created' => 'Account creato',
@@ -80,6 +84,7 @@ return [
     ],
     'origins' => ['import' => 'Importazione', 'proposal' => 'Proposta', 'scope' => 'Modifica dell’ambito'],
     'entities' => [
+        'App\\Models\\PersonalAccessToken' => 'Token dell’estensione',
         'App\\Models\\User' => 'Account',
         'App\\Models\\Organisation' => 'Organizzazione',
         'App\\Models\\ImportBatch' => 'Importazione',

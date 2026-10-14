@@ -14,7 +14,7 @@ Contrat fonctionnel : [Groupes de termes et campagnes de traduction](../fonction
 ## Choix de conception
 
 - Titres obligatoires, sans unicité imposée, limités à 200 caractères ; descriptions et consignes à 10 000. Palette et couleur par défaut définies dans [DESIGN.md](../../DESIGN.md).
-- La visibilité respecte le modèle organisationnel actuel. Un groupe ou une campagne contenant des termes ou un historique hors du périmètre de consultation reste masqué dans son ensemble. L’assignation ne donne aucun droit supplémentaire. La refonte vers les termes communs reste un chantier distinct.
+- La consultation suit le catalogue commun depuis le 13.10.2026 : groupes, campagnes, consignes et historiques sont visibles aux comptes autorisés, quelle que soit l’organisation de création. Les opérations de travail conservent les droits de langue, l’assignation et les contrôles d’activation. Les empreintes de pertinence ne dépendent plus d’un propriétaire de terme. Les participations historiques conservent l’accès à leur ancienne lignée ; aucun nouveau parcours de campagne n’est ajouté.
 - La première admission est conservée dans `first_admitted_at` : retirer tous les termes ne déverrouille pas la langue ou l’objectif.
 - La présence de la cellule cible et la valeur validée du premier attribut DEVCONF déterminent l’admission. Les exclusions sont conservées dans le dernier bilan, distinct des compteurs de participation.
 - La synchronisation reste active pour À faire et En cours. Les changements d’appartenance et de source utilisent une synchronisation du terme concerné ; la composition et le réexamen actualisent le périmètre sélectionné. Les campagnes terminées sont figées.

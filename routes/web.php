@@ -29,7 +29,6 @@ Route::middleware(['auth', 'session.secure', '2fa.required'])->group(function ()
         Route::post('/campaigns/{campaign}/terms/{term}/'.$action, [CampaignController::class, $action])->name('campaigns.'.$action);
     }
     Route::get('/terms/{term}', [TermController::class, 'show'])->name('terms.show');
-    Route::post('/terms/{term}/scope', [TermController::class, 'scope'])->name('terms.scope');
     Route::post('/terms/{term}/proposals', [ProposalController::class, 'store'])->name('proposals.store');
     Route::post('/terms/{term}/confirm', [ProposalController::class, 'confirm'])->name('terms.confirm');
     Route::get('/validation', [ProposalController::class, 'index'])->name('validation.index');

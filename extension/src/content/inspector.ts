@@ -47,7 +47,7 @@ export class Inspector {
             onRetry: (request) => void this.send({ type: 'search', requestId: this.nextRequestId(), request }),
             onOpenSettings: () => void this.send({ type: 'openOptions' }),
             onFeedback: async (request, result) => {
-                const reply = await this.send({ type: 'feedback', request, resultId: result.id, key: result.key });
+                const reply = await this.send({ type: 'feedback', request, resultId: result.id, key: result.key, feedbackProof: result.feedbackProof });
                 return isRecord(reply) && reply.ok === true;
             },
         });

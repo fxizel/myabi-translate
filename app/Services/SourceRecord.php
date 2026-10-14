@@ -29,7 +29,7 @@ class SourceRecord
     {
         return Revision::create(['term_id' => $term->id, 'number' => $term->revision_no, 'version_id' => $versionId ?? $term->sourceImport->version_id,
             'source_import_id' => $term->source_import_id, 'source_offset' => $term->source_offset, 'source_length' => $term->source_length,
-            'validated' => $term->validated, 'metadata' => ['organization_id' => $term->organization_id, 'key' => $term->key, 'context' => $term->context, 'obsolete' => $term->obsolete, 'review_needed' => $term->review_needed],
+            'validated' => $term->validated, 'metadata' => ['key' => $term->key, 'context' => $term->context, 'obsolete' => $term->obsolete, 'review_needed' => $term->review_needed],
             'origin' => $origin, 'origin_id' => $originId, 'created_by' => $authorId, 'created_at' => now()]);
     }
 }

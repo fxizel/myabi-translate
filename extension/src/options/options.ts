@@ -78,6 +78,8 @@ function fill(settings: Settings): void {
     $<HTMLTextAreaElement>('domains').value = settings.allowedDomains.join('\n');
     $<HTMLSelectElement>('tokenPersistence').value = settings.tokenPersistence;
     $<HTMLSelectElement>('uiLanguage').value = settings.uiLanguage;
+    $<HTMLSelectElement>('searchLanguage').value = settings.searchLanguage;
+    $<HTMLSelectElement>('backendMode').value = settings.backendMode;
     $<HTMLSelectElement>('activationModifier').value = settings.activationModifier;
     $<HTMLInputElement>('maxResults').value = String(settings.maxResults);
     $<HTMLInputElement>('timeoutSeconds').value = String(Math.round(settings.timeoutMs / 1000));
@@ -99,6 +101,8 @@ function readForm(): FormInput {
         token: $<HTMLInputElement>('token').value,
         tokenPersistence: $<HTMLSelectElement>('tokenPersistence').value,
         uiLanguage: $<HTMLSelectElement>('uiLanguage').value,
+        searchLanguage: $<HTMLSelectElement>('searchLanguage').value,
+        backendMode: $<HTMLSelectElement>('backendMode').value,
         activationModifier: $<HTMLSelectElement>('activationModifier').value,
         maxResults: $<HTMLInputElement>('maxResults').value,
         collectContext: $<HTMLInputElement>('collectContext').checked,
@@ -194,7 +198,7 @@ async function onTest(): Promise<void> {
         return;
     }
     setStatus(t(lang, 'optTesting'));
-    const reply = await api.runtime.sendMessage({ type: 'testConnection', apiUrl: input.apiUrl, token: input.token });
+    const reply = await api.runtime.sendMessage({ type: 'testConnection', apiUrl: input.apiUrl, token: input.token, backendMode: input.backendMode });
     if (isRecord(reply) && reply.ok === true) {
         setStatus(t(lang, 'optTestOk', { count: Number(reply.count ?? 0) }), 'ok');
     } else if (isRecord(reply) && isRecord(reply.error) && typeof reply.error.kind === 'string') {

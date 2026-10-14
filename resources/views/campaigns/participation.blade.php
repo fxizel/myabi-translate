@@ -3,7 +3,7 @@
     $attribute = $campaignService->primaryAttribute($term);
     $display = $term->attributesForDisplay();
     $current = data_get($term->validated, $attribute.'.'.$campaign->language);
-    $canWorkTerm = $participation->active && $canWorkCampaign && auth()->user()->canTranslate($campaign->language, $term->organization_id);
+    $canWorkTerm = $participation->active && $canWorkCampaign && auth()->user()->canTranslate($campaign->language);
     $termPending = $pending->get($term->id, collect())->where('attribute', $attribute);
     $url = url('campaigns/'.$campaign->id.'/terms/'.$term->id);
 @endphp

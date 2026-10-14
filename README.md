@@ -1,6 +1,6 @@
 # Référentiel des traductions myABI · ARGE-ABI
 
-Application web commune aux polices membres de l’ARGE-ABI pour gérer les traductions de myABI : import des sept formats DEVCONF de LogObject, recherche des termes, propositions et validation à quatre yeux, révisions, puis publication de catalogues figés par organisation.
+Application web commune aux polices membres de l’ARGE-ABI pour gérer les traductions de myABI : import des sept formats DEVCONF de LogObject, catalogue commun, propositions et validation à quatre yeux, révisions, export complet et publication de traductions validées pour les organisations destinataires.
 
 **Limite de couverture** : les fichiers NLS (CSV) ne contiennent pas toutes les traductions de myABI. Les traductions des masques d’écran sont stockées dans la base de données de myABI et portent sur d’autres termes que ceux du type `Form` déjà pris en charge. L’outil gère uniquement les traductions présentes dans les fichiers DEVCONF pris en charge ; il ne permet pas de gérer ces termes de masques d’écran ni les autres traductions stockées en base et absentes de ces fichiers.
 
@@ -87,7 +87,7 @@ flowchart LR
 | Administrateur | Crée les organisations et invite des comptes nominatifs avec rôles et langues. Les invitations expirent après 72 heures. Consulte le journal d’audit. |
 | Gestionnaire | Crée les versions myABI, téléverse un DEVCONF complet, examine l’analyse et ses anomalies puis confirme l’application ; la progression et le rapport restent consultables. Publie les catalogues pour les organisations choisies. Peut déroger au principe des quatre yeux, avec un motif audité. Consulte le journal d’audit filtrable et l’exporte en CSV. |
 | Validateur | Examine les propositions dans ses langues, valide ou rejette avec un motif. Le serveur contrôle les valeurs examinées et les modifications concurrentes. |
-| Traducteur | Recherche les termes de son périmètre et envoie explicitement ses propositions. Les caractères non exportables et les placeholders manquants bloquent l’envoi. |
+| Traducteur | Recherche les termes communs et envoie explicitement ses propositions dans ses langues autorisées. Les caractères non exportables et les placeholders manquants bloquent l’envoi. |
 | Lecteur | Consulte le référentiel et télécharge les publications disponibles pour son organisation. |
 
 Les fichiers figés d’une publication et leur manifeste permettent de retrouver les valeurs publiées et leurs révisions ; les imports et validations ultérieurs ne les modifient pas. Le profil de chaque utilisateur contient la langue de l’interface, l’activation du résumé quotidien, le second facteur lorsque le serveur l’active (sinon son statut désactivé) et ses dernières actions.
@@ -116,6 +116,8 @@ php artisan serve --host=127.0.0.1
 ```
 
 La commande d’installation demande le mot de passe de l’administrateur sans l’afficher. L’administrateur crée ensuite les organisations et invite les utilisateurs depuis l’administration. Le compte technique d’import est créé automatiquement et ne peut pas se connecter.
+
+**Taille des imports locaux.** Le serveur intégré ignore `public/.user.ini`. Avant de le lancer, repérer son fichier de configuration avec `php --ini` (ou `.\.runtime\php\php.exe --ini` sur ce poste), puis régler `upload_max_filesize = 100M`, `post_max_size = 110M`, `max_input_time = 1800` et `max_execution_time = 120` dans le `php.ini` indiqué. Conserver une mémoire d’au moins 256 Mio et désactiver `display_errors` ainsi que `display_startup_errors`. Redémarrer ensuite le serveur local. Une erreur 413 avec « POST Content-Length exceeds the limit of 8388608 bytes » signifie que PHP utilise encore la limite de requête par défaut de 8 Mio, avant même la lecture du CSV par l’application. Les options `php -d ... artisan serve` ne suffisent pas : Artisan lance un processus PHP distinct sans ces options.
 
 > [!CAUTION]
 > Ne jamais committer `.env` ni les fichiers privés. Ne pas utiliser les identifiants du pilote ni des données opérationnelles dans les tests.
@@ -180,10 +182,11 @@ Les mesures sur les fichiers complets, l’espace réellement consommé chez l�
 
 ## Extension navigateur MyAB Translation Inspector
 
-Le dossier [`extension/`](extension/README.md) contient une extension Chrome et Firefox (WebExtensions MV3, TypeScript). Un Alt+clic sur un texte de l’ERP MyAB interroge `POST {apiUrl}/search` et affiche dans un panneau flottant la clé, le texte allemand, la traduction, le module et le statut des correspondances, avec les actions Copier la clé, Copier le texte allemand, Ouvrir la traduction et Signaler correcte. Seuls le texte cliqué et son contexte (jamais de HTML) sont transmis, uniquement sur les domaines MyAB configurés.
+Le dossier [`extension/`](extension/README.md) contient une extension Chrome et Firefox (WebExtensions MV3, TypeScript). Alt+clic sur un texte de MyAB interroge la recherche réelle Laravel et affiche les cellules correspondantes : type, clé, attribut, langue, référence, valeur importée et traduction validée. Le verdict conserve les ambiguïtés même si un seul résultat est affiché. Les corrections passent par la fiche web ; un retour de correspondance ne valide aucune traduction.
 
 - L’extension est indépendante de l’application Laravel et hors des livraisons Laravel et Docker. Node 20.19+ n’est requis que pour la développer : `cd extension && npm install && npm run check`.
-- Les routes `POST /api/browser-extension/search` et `/feedback` n’existent pas encore dans cette application. En attendant, `npm run serve:mock` lance une API factice qui permet d’essayer l’extension sur le vrai MyAB.
+- Les routes `POST /api/browser-extension/search` et `/feedback` utilisent le [contrat v2](docs/technique/api-extension-navigateur.md), un jeton personnel créé dans le profil et une projection construite par `php artisan referentiel:extension-search-rebuild`. Voir la [mise en service et la recette](docs/technique/api-extension-implementation.md).
+- `npm run serve:mock` reste disponible dans le mode de test explicite ; aucune erreur de l’API réelle ne provoque de bascule vers lui.
 - Le [README de l’extension](extension/README.md) décrit le build, le chargement dans Chrome et Firefox, la configuration, le contrat de l’API, la sécurité et la page de test.
 
 ## Livraison et exploitation

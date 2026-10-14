@@ -2,6 +2,8 @@
 
 Date : 13 octobre 2026.
 
+> La mise en œuvre est décrite dans [transition-termes-communs.md](transition-termes-communs.md). Les constats d'état ci-dessous documentent la préparation de cette passation avant le développement.
+
 Objectif : supprimer la propriété organisationnelle des termes et partager une seule traduction validée par terme, attribut et langue. Les organisations restent présentes pour rattacher les utilisateurs, identifier les sources des propositions et des imports, et gérer les destinataires des publications.
 
 Cette passation permet de reprendre la mise en œuvre dans une autre session. Elle rassemble les décisions utilisateur, les comportements constatés et le plan technique.
@@ -68,7 +70,7 @@ Une identité retrouvée dans plusieurs imports n'est pas en soi une collision :
 
 ### Droits et visibilité
 
-[User](../../app/Models/User.php), [Term](../../app/Models/Term.php) et [CommonScope](../../app/Services/CommonScope.php) limitent encore certaines consultations et contributions au commun et à l'organisation du compte.
+[User](../../app/Models/User.php), [Term](../../app/Models/Term.php) et l'ancien service `CommonScope` limitaient, lors de cette analyse, certaines consultations et contributions au commun et à l'organisation du compte. Le service de périmètre a depuis été retiré.
 
 La cible ouvre le catalogue aux utilisateurs autorisés et la contribution aux langues autorisées, quel que soit l'ancien propriétaire. Adapter aussi les appels de [WorkflowService](../../app/Services/WorkflowService.php), les contrôleurs et les conditions Blade.
 

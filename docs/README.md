@@ -17,7 +17,9 @@ docs/
 │   ├── exigences-techniques.md
 │   ├── recette.md
 │   ├── recette-design-myabi.md
-│   └── groupes-campagnes-implementation.md
+│   ├── groupes-campagnes-implementation.md
+│   ├── api-extension-navigateur.md
+│   └── api-extension-implementation.md
 ├── deploiement/
 │   ├── deploiement-vps.md
 │   ├── operations.md
@@ -43,6 +45,9 @@ La [spécification des groupes de termes et campagnes de traduction](fonctionnel
 | [Recette du lot 1](technique/recette.md) | Preuves métier, performances, capacité et contrôles restant à effectuer. |
 | [Recette visuelle myABI](technique/recette-design-myabi.md) | Vérifications de l’habillage de l’interface. |
 | [Groupes et campagnes](technique/groupes-campagnes-implementation.md) | Découpage réalisé, transitions, droits, choix de conception et contrôles. |
+| [Référentiel commun](technique/transition-termes-communs.md) | Lots réalisés, diagnostic privé, reprise des historiques et procédure de bascule. |
+| [API de l’extension navigateur](technique/api-extension-navigateur.md) | Contrat version 2, audit du client initial, recherche par cellule, jetons et ambiguïtés. |
+| [Mise en œuvre de l’API](technique/api-extension-implementation.md) | Découpage, connexion de l’extension, reconstruction de la projection et validation. |
 
 ## Déploiement et exploitation
 

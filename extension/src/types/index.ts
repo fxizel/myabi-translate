@@ -3,6 +3,8 @@ export type LangPreference = 'auto' | Lang;
 export type UrlMode = 'full' | 'noQuery' | 'origin';
 export type ActivationModifier = 'alt' | 'altShift' | 'altCtrl';
 export type TokenPersistence = 'local' | 'session';
+export type SearchLanguage = 'de' | 'fr' | 'it' | 'en';
+export type BackendMode = 'real' | 'mock';
 
 /** Sélecteurs CSS optionnels pour adapter l'extraction au DOM réel de MyAB. */
 export interface SelectorSettings {
@@ -22,6 +24,8 @@ export interface Settings {
     /** Domaines MyAB autorisés, forme canonique : « myab.example.test » ou « *.example.test ». */
     allowedDomains: string[];
     uiLanguage: LangPreference;
+    searchLanguage: 'auto' | SearchLanguage;
+    backendMode: BackendMode;
     activationModifier: ActivationModifier;
     maxResults: number;
     collectContext: boolean;
@@ -36,6 +40,7 @@ export interface Settings {
 /** Contexte collecté lors d'un Alt+clic. Les champs de base sont toujours présents. */
 export interface ContextPayload {
     text: string;
+    textTruncated?: boolean;
     pageUrl: string;
     pageTitle: string;
     surroundingText: string;
@@ -64,6 +69,9 @@ export interface ContextPayload {
 }
 
 export interface SearchRequest extends ContextPayload {
+    contractVersion: 2;
+    textTruncated: boolean;
+    searchLanguage?: SearchLanguage;
     maxResults: number;
     uiLanguage: Lang;
 }
@@ -82,11 +90,29 @@ export interface SearchResult {
     translationUrl: string;
     /** Renseigné par l'API si elle sait que la correspondance est exacte. */
     exact?: boolean;
+    termId?: number;
+    type?: string;
+    keyParts?: string[];
+    attribute?: string;
+    importedTranslation?: string;
+    matchedText?: string;
+    valueOrigin?: 'validated' | 'imported' | 'reference';
+    matchReason?: string;
+    pendingCount?: number;
+    previewTruncated?: boolean;
+    feedbackProof?: string;
 }
 
 export interface SearchResponse {
     query: string;
     results: SearchResult[];
+    contractVersion?: 2;
+    matchState?: MatchState;
+    exactCandidateCount?: number;
+    hasMore?: boolean;
+    candidateSetComplete?: boolean;
+    feedbackAllowed?: boolean;
+    mock?: boolean;
 }
 
 export type ApiErrorKind =
@@ -99,6 +125,12 @@ export type ApiErrorKind =
     | 'rateLimited'
     | 'server'
     | 'http'
+    | 'stale'
+    | 'payloadTooLarge'
+    | 'mediaType'
+    | 'invalidRequest'
+    | 'languageRequired'
+    | 'upgradeRequired'
     | 'invalidResponse'
     | 'insecure';
 
@@ -114,6 +146,7 @@ export interface PanelError {
     kind: PanelErrorKind;
     status?: number;
     retryAfterSec?: number;
+    code?: string;
 }
 
 export type MatchState = 'none' | 'noExact' | 'strong' | 'multiple';

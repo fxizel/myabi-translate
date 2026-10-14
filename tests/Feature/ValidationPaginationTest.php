@@ -41,11 +41,11 @@ class ValidationPaginationTest extends TestCase
         $this->proposal('other-import', proposal: ['import_id' => 8]);
         $this->proposal('other-type', term: ['type' => 'mric']);
         $this->proposal('other-context', term: ['context' => 'other']);
-        $this->proposal('other-scope', term: ['organization_id' => $this->validator->organization_id]);
+        $this->proposal('other-origin', proposal: ['organization_id' => null]);
         $this->proposal('other-search', term: ['search_text' => 'unrelated synthetic reference']);
         $query = [
             'per_page' => 'all', 'page' => 2, 'language' => 'fr', 'type' => 'server',
-            'context' => 'test', 'scope' => 'common', 'import_id' => 7, 'q' => 'match%',
+            'context' => 'test', 'organization_id' => $this->validator->organization_id, 'import_id' => 7, 'q' => 'match%',
         ];
 
         $response = $this->get('/validation?'.http_build_query($query))->assertOk();
@@ -166,7 +166,7 @@ class ValidationPaginationTest extends TestCase
     private function proposal(string $label, array $proposal = [], array $term = []): Proposal
     {
         $source = Term::create(array_merge([
-            'type' => 'server', 'organization_id' => null, 'identity_hash' => hash('sha256', $label), 'key' => [$label],
+            'type' => 'server', 'identity_hash' => hash('sha256', $label), 'key' => [$label],
             'label' => $label, 'context' => 'test', 'source_text' => 'Synthetic reference', 'search_text' => 'match% '.$label,
             'semantic_hash' => str_repeat('a', 64), 'source_hash' => str_repeat('b', 64), 'source_import_id' => 1,
             'source_offset' => 0, 'source_length' => 1, 'validated' => [], 'review_needed' => [],

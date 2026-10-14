@@ -73,18 +73,18 @@ L’hébergement ne nécessite ni VM à administrer, ni Docker, serveur Node.js,
 
 | Ensemble | Contenu |
 | --- | --- |
-| Utilisateurs et organisations | Comptes, rôles, langues et portées autorisées |
+| Utilisateurs et organisations | Comptes, rôles, langues ; organisation des comptes, origine des contributions et destinataires |
 | Versions et imports | Version myABI, source, format, empreinte, original, état et rapport |
 | Présence des lignes | Import, position de l’enregistrement, identité exacte et lien vers le terme |
-| Termes et valeurs courantes | Clés, portée, attributs, références, traductions validées et états |
+| Termes et valeurs courantes | Type et clés exactes, attributs, référence courante, traductions communes validées et états |
 | Propositions | Valeur, auteur, origine, statut, décision et motif |
 | Révisions | États complets et numérotés du terme, auteur, date, origine et différences |
-| Publications | Révisions, sources de repli, destinataires, manifeste et fichiers figés |
+| Publications | Révisions, sources techniques par ligne, destinataires, manifestes et fichiers figés |
 | Journal et traitements | Actions métier ; étapes, progression, erreurs et reprise des opérations |
 
 Les clés de recherche, langues, statuts et relations sont indexés. Les attributs variables et états de révision peuvent être regroupés en JSON. Le schéma ne matérialise pas toutes les cellules vides possibles et ne recopie pas tout le catalogue à chaque import : un terme inchangé ne reçoit pas de nouvelle révision.
 
-L’identité métier tient compte du type et de sa portée ; elle reste indépendante de la recherche insensible à la casse. Pour les clés longues, une empreinte indexée retrouve les candidats, puis les composantes exactes sont comparées, espaces finaux compris. Une empreinte identique ne suffit pas à fusionner deux lignes.
+L’identité métier tient compte du type et des composantes exactes de la clé, sans organisation ni version ; elle reste indépendante de la recherche insensible à la casse. Pour les clés longues, une empreinte indexée retrouve les candidats, puis les composantes exactes sont comparées, espaces finaux compris. Une empreinte identique ne suffit pas à fusionner deux lignes.
 
 Les révisions restent immuables, consultables et comparables. Les propositions rejetées et décisions sont conservées. La déduplication physique de fichiers identiques est possible par empreinte, avec des références distinctes pour la provenance et les droits.
 
@@ -108,23 +108,33 @@ Le transfert du fichier de 72 Mo est testé depuis le navigateur. Les limites PH
 
 Un import crée des propositions sans valider de traduction. Il conserve les valeurs validées et signale les références modifiées. Il traite les lignes présentes sans retirer ni rendre obsolètes les termes absents du fichier ; leur état, leurs présences antérieures, leurs valeurs et leur historique sont conservés. Les termes portant déjà l’état historique Obsolète le conservent jusqu’à leur réapparition dans un import, qui les réactive.
 
+### Transition vers les termes communs
+
+La reprise diagnostique les anciennes variantes dans un rapport privé, sans valeurs métier dans les journaux publics. Elle refuse toute ambiguïté de référence ou de sens. Pour un groupe compatible, le premier terme selon création puis identifiant reste courant avec ses validations ; les divergences des autres deviennent des propositions traçables. Une correspondance relie chaque ancienne fiche au terme commun, et conserve les révisions dans leurs lignées initiales. Les liens d'import et de proposition restent consultables ; les publications figées ne sont pas modifiées.
+
+La migration supprime la propriété des termes après consolidation contrôlée, conserve les marqueurs de lignées historiques et invalide la génération du catalogue et les aperçus anciens. Elle reprend après interruption et refuse les écritures ou traitements incompatibles pendant la bascule. Les tests d'installation neuve, de mise à niveau et de réexécution utilisent des données synthétiques. La procédure privée de bascule et de retour depuis une sauvegarde cohérente est décrite dans [transition-termes-communs.md](docs/technique/transition-termes-communs.md).
+
 ### Traduction et validation
 
 Les contrôles serveur couvrent droits, placeholders, caractères exportables, valeur examinée et principe des quatre yeux. Une validation enregistre valeur, révision et décision dans une transaction. Le verrouillage de la cellule et un numéro de modification évitent d’approuver une valeur devenue obsolète. Rejets motivés, confirmations et validations en masse suivent le document fonctionnel.
 
 ### Publication et téléchargement
 
-La publication capture révisions, lots de repli et destinataires dans une transaction à lecture cohérente, afin que les validations simultanées ne produisent pas un mélange d’états. La génération en flux utilise ensuite ces références immuables, sous le verrou des traitements lourds. Elle conserve les CSV définitifs, leur ZIP et un manifeste : versions, sources, nombres de lignes et empreintes SHA-256.
+La publication capture révisions, sources techniques par ligne et destinataires dans une transaction à lecture cohérente, afin que les validations simultanées ne produisent pas un mélange d’états. La génération en flux utilise ensuite ces références immuables, sous le verrou des traitements lourds. Elle conserve les CSV définitifs, leur ZIP et un manifeste : versions, sources, nombres de lignes et empreintes SHA-256.
 
-Tout lot appliqué, ancien ou nouveau, peut être sélectionné comme source selon les règles de version, type et organisation. Le drapeau historique `is_complete` n’entre pas dans cette sélection. L’intégrité du lot et sa couverture réelle des termes actifs de la version sont contrôlées ; une source manquante, altérée ou ne couvrant pas ces termes reste bloquante. Les contrôles d’identité et de source technique du §9 restent applicables.
+Les termes publiés ont au moins une traduction cible validée ; les autres cellules cibles sont vides. La sélection est indépendante du destinataire et de la provenance. Chaque ligne provient de la source du terme ou de sa révision, contrôlée en intégrité, format, position, identité exacte et encodage. Les sources peuvent couvrir plusieurs imports ; la couverture s'évalue contre l'ensemble éligible, et toute source attendue manquante bloque la génération. Le drapeau historique is_complete reste inutilisé.
 
 Les fichiers sont préparés dans un dossier privé temporaire, vérifiés puis déplacés sur le même volume vers leur destination définitive. Une transaction rend ensuite la publication disponible. Une interruption laisse des fichiers privés identifiables pour reprise ou nettoyage ; aucun résultat incomplet n’est téléchargeable.
 
-L’export remplace seulement les cellules autorisées par les valeurs validées figées. Une identité ambiguë ou une source technique manquante bloque le fichier concerné. Le téléchargement contrôle le destinataire et ses droits, journalise l’action et sert les fichiers conservés, sans recalcul depuis le catalogue courant. Les arbitrages de portée, de version et d’encodage figurent au §9.
+L’export remplace seulement les cellules autorisées par les valeurs validées figées. Une identité ambiguë ou une source technique manquante bloque le fichier concerné. Le téléchargement contrôle le destinataire et ses droits, journalise l’action et sert les fichiers conservés, sans recalcul depuis le catalogue courant. Les blocages d’identité, de source, de version et d’encodage du §9 restent applicables.
+
+L'organisation historique des propositions est immuable, même lors d'une correction ou d'un changement d'organisation du compte. Le filtre de validation couvre cette origine et les imports principal et supplémentaires avec des EXISTS, sans multiplication des résultats. La correction conserve les provenances et valeurs antérieures dans l'historique. Le catalogue et ses compteurs portent sur les termes courants globaux ; aucun index organisationnel de terme n'est imposé.
 
 ### Export simple d'un type
 
 Les routes `GET /exports` et `POST /exports/download` sont réservées au Gestionnaire authentifié, avec les mêmes contrôles de session et de MFA que les autres écrans métier. Le formulaire choisit un type DEVCONF, une version admissible et une organisation active. `DevconfExportService` mutualise avec les publications la sélection des sources, les contrôles du §9 et la résolution des révisions validées ; `RawExporter` conserve les cellules techniques et la représentation brute des cellules inchangées.
+
+L'export réunit tous les termes courants connus du type depuis leurs sources techniques vérifiées, avec une valeur validée commune ou le repli importé par cellule. Ni le destinataire ni un fichier unique ne limitent les lignes. Une seule ligne par terme et un en-tête unique sont écrits dans un ordre stable ; le manifeste trace les sources et révisions par ligne.
 
 `SimpleExportService` prépare le CSV sous le verrou exclusif des traitements lourds, dans une transaction de lecture cohérente, avec lectures SQL par lots bornés. Le quota est vérifié avant création du fichier dans `storage/app/private/exports`. La réponse n'envoie aucun octet avant la fin des contrôles. Elle sert une pièce jointe CSV Windows-1252 avec `Cache-Control: private, no-store`, puis supprime le fichier temporaire ; les erreurs de génération suppriment le résultat incomplet. L'événement `export.downloaded` conserve les identifiants, compteurs et empreintes, sans valeurs métier. Aucune publication ni marqueur de publication n'est créé ou modifié. Les téléchargements de publications existantes continuent à servir leurs fichiers figés.
 
@@ -138,7 +148,7 @@ Le booléen `MFA_ENABLED` de `.env`, lu via `config('fortify.mfa_enabled')`, vau
 
 L’Administrateur peut aussi activer un compte et définir son mot de passe sans invitation par e-mail. Cette opération transactionnelle conserve `email_verified_at`, clôt l’invitation, invalide les liens de récupération, révoque les sessions et conserve la configuration TOTP. Le compte technique et les organisations inactives sont exclus ; l’audit identifie l’administrateur sans enregistrer le mot de passe ni son empreinte.
 
-Seul le dossier public de Laravel est servi sur Internet. Fichiers privés, sauvegardes, configurations et journaux restent hors de ce dossier. HTTPS, cookies sécurisés, protection CSRF, échappement HTML et SQL paramétré s’appliquent dès le pilote. Les droits sont contrôlés côté serveur par rôle, langue et organisation, y compris pour rapports et téléchargements.
+Seul le dossier public de Laravel est servi sur Internet. Fichiers privés, sauvegardes, configurations et journaux restent hors de ce dossier. HTTPS, cookies sécurisés, protection CSRF, échappement HTML et SQL paramétré s’appliquent dès le pilote. Les droits sont contrôlés côté serveur par rôle et langue pour les termes ; les destinataires restent contrôlés pour les rapports et téléchargements.
 
 Les secrets restent hors de Git et des journaux. MariaDB utilise l’hôte et les paramètres fournis par alwaysdata ; aucune base locale ni réseau privé ne sont supposés. Les accès SQL, SSH et au panneau sont limités aux responsables. Le compte SQL applicatif doit pouvoir lire et ajouter au journal d’audit, sans modifier ni supprimer ses entrées ; les migrations utilisent un accès distinct. La configuration de ces droits est vérifiée sur le compte choisi.
 
@@ -209,7 +219,7 @@ Le code peut être développé progressivement ; le pilote utilisable reste cond
 | --- | --- |
 | Capacité Free | À mesurer selon le §7, réimports et espace transitoire compris |
 | Identité des lignes | Réponse LogObject sur casse et collision exacte ; toutes les lignes conservées |
-| Portée des exports | Le fonctionnel limite la visibilité par organisation mais prévoit toutes les portées à l’export ; harmonisation avant diffusion interorganisation |
+| Termes communs | Décision du 13.10.2026 : catalogue global, identité type/clé exacte, export de tous les termes connus avec repli importé et publication des cellules validées, autres cellules cibles vides |
 | Source technique incomplète | Exiger une source complète identifiée par ligne, sans inventer de colonnes |
 | Anciennes versions | Publications existantes téléchargeables ; choix des révisions pour une nouvelle publication d’une ancienne version à clarifier |
 | UTF-8 et substitution | Le fonctionnel propose conversion et remplacement par « ? » dans certains cas ; arbitrage conservé. Aucun export altéré par substitution n’est diffusé dans l’attente |

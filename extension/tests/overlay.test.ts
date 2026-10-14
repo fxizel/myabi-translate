@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Overlay, type OverlayHandlers } from '../src/content/overlay';
 import type { PanelErrorMessage, PanelLoadingMessage, PanelResultsMessage } from '../src/shared/messages';
 import { buildResultsView } from '../src/shared/viewModel';
-import { parseSearchResponse } from '../src/api/translationApi';
+import { parseSearchResponse as parseRealSearchResponse } from '../src/api/translationApi';
 import { normalizeSettings } from '../src/shared/settings';
 import { sampleRequest, sampleResult, specResponse } from './helpers';
+
+const parseSearchResponse = (data: unknown) => parseRealSearchResponse(data, 'mock');
 
 const settings = normalizeSettings({ apiUrl: 'https://translations.example.test/api/browser-extension' });
 const request = sampleRequest();
@@ -90,7 +92,7 @@ describe('panneau — résultats', () => {
         const first = root().querySelector('.card')!;
         expect(Array.from(first.querySelectorAll('button')).map((button) => button.textContent)).toEqual([
             'Copier la clé',
-            'Copier le texte allemand',
+            'Copier le texte source',
         ]);
         const open = first.querySelector<HTMLAnchorElement>('a.button')!;
         expect(open.textContent).toBe('Ouvrir la traduction');
@@ -255,7 +257,7 @@ describe('panneau — erreurs compréhensibles', () => {
         expect(texts('.banner')).toEqual(['Starke Übereinstimmung']);
         expect(texts('.detected')).toEqual(['Commande']);
         const labels = Array.from(root().querySelectorAll('.card:first-child button')).map((button) => button.textContent);
-        expect(labels).toEqual(['Schlüssel kopieren', 'Text kopieren (Deutsch)']);
+        expect(labels).toEqual(['Schlüssel kopieren', 'Quelltext kopieren']);
     });
 });
 

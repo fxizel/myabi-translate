@@ -15,6 +15,11 @@
             <section>
                 <h2 data-i18n="optSectionApi"></h2>
                 <div class="field">
+                    <label for="backendMode" data-i18n="optBackend"></label>
+                    <select id="backendMode"><option value="real" data-i18n="optReal"></option><option value="mock" data-i18n="optMock"></option></select>
+                    <small data-i18n="mockWarning"></small>
+                </div>
+                <div class="field">
                     <label for="apiUrl" data-i18n="optApiUrl"></label>
                     <input id="apiUrl" type="url" inputmode="url" spellcheck="false" placeholder="https://translations.example.test/api/browser-extension">
                     <small data-i18n="optApiUrlHelp"></small>
@@ -60,6 +65,10 @@
                             <option value="de">Deutsch</option>
                             <option value="en">English</option>
                         </select>
+                    </div>
+                    <div class="field">
+                        <label for="searchLanguage" data-i18n="optSearchLanguage"></label>
+                        <select id="searchLanguage"><option value="auto" data-i18n="optSearchAuto"></option><option value="de">Deutsch</option><option value="fr">Français</option><option value="it">Italiano</option><option value="en">English</option></select>
                     </div>
                     <div class="field">
                         <label for="activationModifier" data-i18n="optModifier"></label>

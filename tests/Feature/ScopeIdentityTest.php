@@ -19,8 +19,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Testing\TestResponse;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ScopeIdentityTest extends TestCase
@@ -59,173 +57,125 @@ class ScopeIdentityTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_an_exact_identity_in_the_target_scope_blocks_without_business_writes(): void
+    public function test_organizations_reuse_one_exact_term_and_submit_concurrent_proposals(): void
     {
-        $this->import([['Name' => 'Exact key']]);
+        $other = Organisation::create(['name' => 'Fribourg', 'code' => 'FR', 'active' => true]);
+        $first = $this->import([['Name' => 'Shared', 'fr_CH' => 'Vaud {}']], 'server', 'organization', $this->manager->organization_id);
         $term = Term::firstOrFail();
-        $this->variant($term, $this->manager->organization_id);
-        $before = $term->getRawOriginal();
-        $revisions = Revision::count();
-        $generation = DB::table('catalogue_state')->where('id', 1)->value('generation');
-
-        $this->changeScope($term, $this->manager->organization_id)->assertSessionHasErrors('scope');
-
-        self::assertSame($before, $term->fresh()->getRawOriginal());
-        self::assertSame($revisions, Revision::count());
-        self::assertSame($generation, DB::table('catalogue_state')->where('id', 1)->value('generation'));
-        self::assertSame(0, DB::table('audit_events')->where('action', 'term.scope')->count());
+        $second = $this->import([['Name' => 'Shared', 'fr_CH' => 'Fribourg {}']], 'server', 'organization', $other->id);
+        self::assertSame(1, Term::count());
+        self::assertSame(1, Revision::count());
+        self::assertSame([], $term->fresh()->validated);
+        self::assertSame([$term->id, $term->id], DB::table('import_rows')->orderBy('id')->pluck('term_id')->all());
+        self::assertSame([$first->id, $second->id], Proposal::orderBy('id')->pluck('import_id')->all());
+        self::assertSame([$this->manager->organization_id, $other->id], Proposal::orderBy('id')->pluck('organization_id')->all());
+        app(WorkflowService::class)->decide($this->manager, Proposal::where('import_id', $second->id)->firstOrFail(), 'validate', 1);
+        self::assertSame('Fribourg {}', $term->fresh()->validated['label']['fr']);
+        self::assertSame('rejected', Proposal::where('import_id', $first->id)->first()->status);
+        self::assertSame('superseded', Proposal::where('import_id', $first->id)->first()->rejection_reason);
+        self::assertArrayNotHasKey('organization_id', Revision::latest('id')->first()->metadata);
     }
 
-    public function test_confirming_a_terms_existing_scope_does_not_conflict_with_itself(): void
+    public function test_identical_pending_value_keeps_all_import_origins_without_duplicate(): void
     {
-        $this->import([['Name' => 'Self']]);
-        $term = Term::firstOrFail();
-
-        $this->changeScope($term, null)->assertSessionHasNoErrors();
-
-        self::assertNull($term->fresh()->organization_id);
-        self::assertTrue($term->fresh()->scope_overridden);
-        self::assertSame(2, $term->fresh()->revision_no);
+        $other = Organisation::create(['name' => 'Fribourg', 'code' => 'FR', 'active' => true]);
+        $first = $this->import([['Name' => 'Shared']], 'server', 'organization', $this->manager->organization_id);
+        $second = $this->import([['Name' => 'Shared']], 'server', 'organization', $other->id);
+        self::assertSame(1, Proposal::count());
+        $proposal = Proposal::firstOrFail();
+        self::assertSame($first->id, $proposal->import_id);
+        self::assertSame($this->manager->organization_id, $proposal->organization_id);
+        self::assertSame([$second->id], DB::table('proposal_imports')->where('proposal_id', $proposal->id)->pluck('import_id')->all());
     }
 
-    public function test_case_and_leading_or_trailing_spaces_remain_distinct_in_one_scope(): void
+    public function test_claiming_a_proposal_and_moving_its_author_preserves_historical_origin(): void
+    {
+        $other = Organisation::create(['name' => 'Fribourg', 'code' => 'FR', 'active' => true]);
+        $first = $this->import([['Name' => 'Shared']], 'server', 'organization', $this->manager->organization_id);
+        $second = $this->import([['Name' => 'Shared']], 'server', 'organization', $other->id);
+        $translator = User::factory()->create(['organization_id' => $other->id, 'roles' => ['translator' => ['fr']]]);
+        $proposal = app(WorkflowService::class)->edit($translator, Proposal::firstOrFail(), 'Correction {}', 1);
+        $translator->update(['organization_id' => $this->manager->organization_id]);
+        self::assertSame($this->manager->organization_id, $proposal->fresh()->organization_id);
+        self::assertSame($translator->id, $proposal->author_id);
+        self::assertSame('Traduction {}', $proposal->edit_history[0]['value']);
+        self::assertSame([$first->id, $second->id], $proposal->edit_history[0]['import_ids']);
+        self::assertSame($this->manager->organization_id, $proposal->edit_history[0]['organization_id']);
+        self::assertSame($first->id, $proposal->import_id);
+    }
+
+    public function test_case_spaces_and_empty_allowed_components_remain_exact(): void
     {
         $keys = ['Clé', 'clé', 'Clé ', ' Clé'];
         $this->import(array_map(fn ($key) => ['Name' => $key], $keys));
-        $terms = Term::orderBy('id')->get();
-
-        foreach ($terms as $term) {
-            $this->changeScope($term, $this->manager->organization_id)->assertSessionHasNoErrors();
-        }
-
         self::assertSame(array_map(fn ($key) => [$key], $keys), Term::orderBy('id')->pluck('key')->all());
-        self::assertSame(4, Term::where('organization_id', $this->manager->organization_id)->count());
-        self::assertSame(4, DB::table('audit_events')->where('action', 'term.scope')->count());
+        $row = ['Form Type' => 'Form', 'Form Template Name' => 'VD_Form', 'Control Name' => '', 'Column Name' => 'Caption',
+            'Default Language' => 'de_CH', 'Default Label' => 'Quelle {}', 'Language 1' => 'fr_CH', 'Translation 1' => 'Traduction {}'];
+        $this->import([$row], 'form');
+        $this->import([$row], 'form', 'organization', $this->manager->organization_id);
+        self::assertSame(1, Term::where('type', 'form')->count());
+        self::assertSame(['Form', 'VD_Form', '', 'Caption'], Term::where('type', 'form')->first()->key);
     }
 
-    public function test_private_variants_only_conflict_in_the_requested_target_scope(): void
-    {
-        $this->import([['Name' => 'Private variant']]);
-        $term = Term::firstOrFail();
-        $other = Organisation::create(['name' => 'Fribourg', 'code' => 'FR', 'active' => true]);
-        $variant = $this->variant($term, $other->id);
-        $variant->update(['raw_identity_hash' => null]);
-
-        $this->changeScope($term, $this->manager->organization_id)->assertSessionHasNoErrors();
-        self::assertSame($this->manager->organization_id, $term->fresh()->organization_id);
-        self::assertSame($other->id, $variant->fresh()->organization_id);
-
-        $this->changeScope($term->fresh(), $other->id)->assertSessionHasErrors('scope');
-        self::assertSame($this->manager->organization_id, $term->fresh()->organization_id);
-        self::assertSame(2, Term::count());
-    }
-
-    #[DataProvider('missingRawHashes')]
-    public function test_missing_raw_hashes_do_not_bypass_exact_scope_conflicts(bool $currentMissing, bool $candidateMissing): void
+    public function test_historical_missing_hash_reuses_unicode_exact_key(): void
     {
         $this->import([['Name' => 'Clé historique']]);
         $term = Term::firstOrFail();
-        $candidate = $this->variant($term, $this->manager->organization_id);
-        if ($currentMissing) {
-            $term->update(['raw_identity_hash' => null]);
-        }
-        if ($candidateMissing) {
-            $candidate->update(['raw_identity_hash' => null]);
-        }
-
-        $this->changeScope($term, $this->manager->organization_id)->assertSessionHasErrors('scope');
-
-        self::assertNull($term->fresh()->organization_id);
-        self::assertSame(1, $term->fresh()->revision_no);
-        self::assertSame($currentMissing, $term->fresh()->raw_identity_hash === null);
-        self::assertSame($candidateMissing, $candidate->fresh()->raw_identity_hash === null);
-    }
-
-    public static function missingRawHashes(): array
-    {
-        return ['current' => [true, false], 'candidate' => [false, true], 'both' => [true, true]];
-    }
-
-    public function test_matching_raw_and_scoped_digests_do_not_merge_distinct_exact_keys(): void
-    {
-        $this->import([['Name' => 'First exact key'], ['Name' => 'Different exact key']]);
-        [$term, $candidate] = Term::orderBy('id')->get()->all();
-        $candidate->update(['organization_id' => $this->manager->organization_id,
-            'raw_identity_hash' => $term->raw_identity_hash, 'identity_hash' => $this->scopedHash($term, $this->manager->organization_id)]);
-
-        $this->changeScope($term, $this->manager->organization_id)->assertSessionHasNoErrors();
-
-        self::assertSame(2, Term::count());
-        self::assertSame(['First exact key'], $term->fresh()->key);
-        self::assertSame(['Different exact key'], $candidate->fresh()->key);
-        self::assertSame($candidate->identity_hash, $term->fresh()->identity_hash);
-        self::assertSame($this->manager->organization_id, $term->fresh()->organization_id);
-    }
-
-    public function test_another_type_cannot_block_the_same_exact_key_even_with_matching_digests(): void
-    {
-        $this->import([['Name' => 'Shared key']], 'server');
-        $this->import([['Name' => 'Shared key']], 'mric');
-        $term = Term::where('type', 'server')->firstOrFail();
-        $candidate = Term::where('type', 'mric')->firstOrFail();
-        $candidate->update(['organization_id' => $this->manager->organization_id,
-            'raw_identity_hash' => $term->raw_identity_hash, 'identity_hash' => $this->scopedHash($term, $this->manager->organization_id)]);
-
-        $this->changeScope($term, $this->manager->organization_id)->assertSessionHasNoErrors();
-
-        self::assertSame(2, Term::count());
-        self::assertSame('server', $term->fresh()->type);
-        self::assertSame('mric', $candidate->fresh()->type);
-        self::assertSame($this->manager->organization_id, $term->fresh()->organization_id);
-    }
-
-    public function test_confirmed_common_scope_preserves_identity_provenance_and_revisions_on_reimport(): void
-    {
-        $rows = [['Form Type' => 'Form', 'Form Template Name' => 'VD_Form', 'Control Name' => 'Control', 'Column Name' => 'Caption',
-            'Default Language' => 'de_CH', 'Default Label' => 'Quelle {}', 'Language 1' => 'fr_CH', 'Translation 1' => 'Traduction {}']];
-        $original = $this->import($rows, 'form');
-        $term = Term::firstOrFail();
-        app(WorkflowService::class)->decide($this->manager, Proposal::firstOrFail(), 'validate', 1);
-        $term->refresh();
-        $rawHash = $term->raw_identity_hash;
-        $initialHash = $term->identity_hash;
-        $initialPresence = (array) DB::table('import_rows')->where('import_id', $original->id)->first();
-        $priorRevisions = Revision::orderBy('id')->get()->map(fn ($revision) => $revision->getRawOriginal())->all();
-        $validated = $term->validated;
-
-        $this->changeScope($term, null)->assertSessionHasNoErrors();
-        $term->refresh();
-        self::assertNotSame($initialHash, $term->identity_hash);
-        self::assertSame($rawHash, $term->raw_identity_hash);
-        $scopeRevision = $term->revisions()->where('number', $term->revision_no)->firstOrFail();
-        self::assertSame('scope', $scopeRevision->origin);
-        self::assertNull($scopeRevision->metadata['organization_id']);
-        self::assertSame($term->key, $scopeRevision->metadata['key']);
-        self::assertSame($validated, $scopeRevision->validated);
-        self::assertSame($original->id, $scopeRevision->source_import_id);
-        $snapshot = $scopeRevision->getRawOriginal();
-        $revisionCount = Revision::count();
-
-        $sameSource = $this->import($rows, 'form');
-        $otherSource = $this->import($rows, 'form', 'organization', $this->manager->organization_id);
-
+        $term->update(['raw_identity_hash' => null]);
+        $this->import([['Name' => 'Clé historique']], 'server', 'organization', $this->manager->organization_id);
         self::assertSame(1, Term::count());
-        self::assertNull($term->fresh()->organization_id);
-        self::assertTrue($term->fresh()->scope_overridden);
-        self::assertFalse($term->fresh()->scope_unconfirmed);
-        self::assertSame($validated, $term->fresh()->validated);
-        self::assertSame($rawHash, $term->fresh()->raw_identity_hash);
-        self::assertSame($revisionCount, Revision::count());
-        self::assertSame($priorRevisions, Revision::where('number', '<', $scopeRevision->number)->orderBy('id')->get()->map(fn ($revision) => $revision->getRawOriginal())->all());
-        self::assertSame($snapshot, $scopeRevision->fresh()->getRawOriginal());
-        self::assertSame($initialPresence, (array) DB::table('import_rows')->where('import_id', $original->id)->first());
-        foreach ([$sameSource, $otherSource] as $reimport) {
-            $presence = DB::table('import_rows')->where('import_id', $reimport->id)->first();
-            self::assertSame($term->id, $presence->term_id);
-            self::assertSame($rawHash, $presence->raw_identity_hash);
-            self::assertSame($term->identity_hash, $presence->identity_hash);
-            self::assertSame(1, $reimport->report['unchanged']);
+        self::assertSame(1, DB::table('import_rows')->distinct()->count('term_id'));
+    }
+
+    public function test_unconsolidated_exact_duplicates_block_instead_of_source_preference(): void
+    {
+        $this->import([['Name' => 'Ambiguous']]);
+        $term = Term::firstOrFail();
+        $copy = $term->replicate();
+        $copy->raw_identity_hash = null;
+        $copy->save();
+        $revisions = Revision::count();
+        $generation = DB::table('catalogue_state')->where('id', 1)->value('generation');
+        try {
+            $this->import([['Name' => 'Ambiguous']], 'server', 'organization', $this->manager->organization_id);
+            self::fail('Ambiguous current terms must require consolidation.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('Conflicting current exact identities; consolidation required.', $error->getMessage());
         }
+        self::assertSame($revisions, Revision::count());
+        self::assertSame($generation, DB::table('catalogue_state')->where('id', 1)->value('generation'));
+    }
+
+    public function test_digest_collision_does_not_merge_distinct_keys_during_creation(): void
+    {
+        $format = FormatRegistry::get('server');
+        $path = $this->isolatedStorage.'/collision.csv';
+        $stream = fopen($path, 'wb');
+        foreach ([$format->headers, array_map(fn ($col) => $col === 'Name' ? 'First' : '', $format->headers), array_map(fn ($col) => $col === 'Name' ? 'Different' : '', $format->headers)] as $values) {
+            fwrite($stream, Encoding::encode('"'.implode('";"', $values).'"')."\r\n");
+        }
+        fclose($stream);
+        $service = app(ImportService::class);
+        $import = $service->receive($path, $format->filename, ['type' => 'server', 'version_id' => $this->version->id, 'source_kind' => 'publisher'], $this->manager);
+        $service->analyze($import);
+        $hash = DB::table('import_rows')->where('import_id', $import->id)->value('raw_identity_hash');
+        DB::table('import_rows')->where('import_id', $import->id)->update(['raw_identity_hash' => $hash, 'identity_hash' => $hash]);
+        $service->apply($import->fresh());
+        self::assertSame([['First'], ['Different']], Term::orderBy('id')->pluck('key')->all());
+        self::assertSame(2, Revision::count());
+        self::assertSame(2, DB::table('import_rows')->where('import_id', $import->id)->distinct()->count('term_id'));
+    }
+
+    public function test_type_is_part_of_exact_identity_even_with_matching_digests(): void
+    {
+        $this->import([['Name' => 'Shared']], 'server');
+        $this->import([['Name' => 'Shared']], 'mric');
+        $server = Term::where('type', 'server')->firstOrFail();
+        $mric = Term::where('type', 'mric')->firstOrFail();
+        $mric->update(['identity_hash' => $server->identity_hash, 'raw_identity_hash' => $server->raw_identity_hash]);
+        $this->import([['Name' => 'Shared']], 'server');
+        self::assertSame(2, Term::count());
+        self::assertSame($server->id, DB::table('import_rows')->latest('id')->value('term_id'));
     }
 
     public function test_index_migration_resumes_from_partial_states_without_changing_columns_or_data(): void
@@ -262,27 +212,6 @@ class ScopeIdentityTest extends TestCase
             self::assertSame($terms, DB::table('terms')->get()->map(fn ($row) => (array) $row)->all());
             self::assertSame($presences, DB::table('import_rows')->get()->map(fn ($row) => (array) $row)->all());
         }
-    }
-
-    private function changeScope(Term $term, ?int $owner): TestResponse
-    {
-        return $this->from('/terms/'.$term->id)->post(route('terms.scope', $term), [
-            'organization_id' => $owner, 'lock_version' => $term->lock_version,
-        ])->assertRedirect('/terms/'.$term->id);
-    }
-
-    private function variant(Term $term, int $owner): Term
-    {
-        $variant = $term->replicate();
-        $variant->fill(['organization_id' => $owner, 'identity_hash' => $this->scopedHash($term, $owner), 'scope_overridden' => true]);
-        $variant->save();
-
-        return $variant;
-    }
-
-    private function scopedHash(Term $term, ?int $owner): string
-    {
-        return hash('sha256', json_encode([$term->type, $owner, $term->key], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 
     private function import(array $rows, string $type = 'server', string $sourceKind = 'publisher', ?int $organizationId = null): ImportBatch

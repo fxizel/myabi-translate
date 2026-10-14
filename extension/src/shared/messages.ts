@@ -1,5 +1,5 @@
 import type { Lang, MatchState, PanelError, PanelResult, SearchRequest } from '../types';
-import { cleanString, isRecord, truncate } from './text';
+import { characterLength, cleanString, isRecord, normalizeText, truncate } from './text';
 
 /* ---- Content script → background -------------------------------------------------------------------------------- */
 
@@ -16,6 +16,7 @@ export interface FeedbackMessage {
     type: 'feedback';
     request: SearchRequest;
     resultId: string | number;
+    feedbackProof?: string;
     key: string;
 }
 export interface CloseInspectorMessage {
@@ -48,6 +49,9 @@ export interface PanelResultsMessage {
     results: PanelResult[];
     manualSearchUrl: string | null;
     feedbackEnabled: boolean;
+    hasMore?: boolean;
+    candidateSetComplete?: boolean;
+    mock?: boolean;
 }
 export interface PanelErrorMessage {
     type: 'panel:error';
@@ -106,12 +110,17 @@ export function sanitizeSearchRequest(raw: unknown): SearchRequest | null {
     if (!isRecord(raw)) {
         return null;
     }
+    if (raw.contractVersion !== undefined && raw.contractVersion !== 2) return null;
+    if (raw.textTruncated !== undefined && typeof raw.textTruncated !== 'boolean') return null;
+    if (raw.searchLanguage !== undefined && !['de', 'fr', 'it', 'en'].includes(String(raw.searchLanguage))) return null;
     const text = cleanString(raw.text, 500);
     if (!text) {
         return null;
     }
     const request: SearchRequest = {
         text,
+        contractVersion: 2,
+        textTruncated: raw.textTruncated === true || characterLength(normalizeText(typeof raw.text === 'string' ? raw.text : '')) > 500,
         pageUrl: truncate(typeof raw.pageUrl === 'string' ? raw.pageUrl : '', 2000),
         pageTitle: cleanString(raw.pageTitle, 200),
         surroundingText: cleanString(raw.surroundingText, 600),
@@ -120,12 +129,14 @@ export function sanitizeSearchRequest(raw: unknown): SearchRequest | null {
         elementClasses: cleanStringList(raw.elementClasses, 20, 60),
         ariaLabel: cleanString(raw.ariaLabel, 200),
         title: cleanString(raw.title, 200),
-        dataAttributes: cleanStringMap(raw.dataAttributes, 20, 100),
+        dataAttributes: isRecord(raw.dataAttributes) && typeof raw.dataAttributes['data-i18n-key'] === 'string' && characterLength(raw.dataAttributes['data-i18n-key']) <= 100
+            ? { 'data-i18n-key': raw.dataAttributes['data-i18n-key'] } : {},
         lang: cleanString(raw.lang, 12).toLowerCase(),
-        maxResults: typeof raw.maxResults === 'number' ? Math.min(20, Math.max(1, Math.round(raw.maxResults))) : 5,
+        maxResults: typeof raw.maxResults === 'number' && Number.isFinite(raw.maxResults) ? Math.min(20, Math.max(1, Math.round(raw.maxResults))) : 5,
         uiLanguage: raw.uiLanguage === 'de' || raw.uiLanguage === 'en' ? raw.uiLanguage : 'fr',
     };
 
+    if (raw.searchLanguage === 'de' || raw.searchLanguage === 'fr' || raw.searchLanguage === 'it' || raw.searchLanguage === 'en') request.searchLanguage = raw.searchLanguage;
     const alternatives = cleanStringList(raw.alternativeTexts, 3, 300);
     if (alternatives.length) request.alternativeTexts = alternatives;
     const frameUrl = typeof raw.frameUrl === 'string' ? truncate(raw.frameUrl, 2000) : '';

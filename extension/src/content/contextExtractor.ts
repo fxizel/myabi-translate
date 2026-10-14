@@ -1,5 +1,5 @@
-import type { ContextPayload, Lang, SearchRequest, SelectorSettings, UrlMode } from '../types';
-import { excerptAround, hasMeaningfulText, normalizeText, truncate } from '../shared/text';
+import type { ContextPayload, Lang, SearchLanguage, SearchRequest, SelectorSettings, UrlMode } from '../types';
+import { characterLength, excerptAround, hasMeaningfulText, normalizeText, truncate } from '../shared/text';
 import { sanitizeUrl } from '../shared/url';
 import { closestComposed, isFormControl, parentOf, safeMatches, safeQuery, safeQueryAll } from './dom';
 import {
@@ -15,6 +15,7 @@ export interface ContextSettings {
     urlMode: UrlMode;
     selectors: SelectorSettings;
     maxResults: number;
+    searchLanguage?: 'auto' | SearchLanguage;
 }
 
 const SURROUNDING_MAX = 500;
@@ -58,13 +59,13 @@ function collectDataAttributes(elements: readonly Element[]): Record<string, str
     const out: Record<string, string> = {};
     for (const element of elements) {
         for (const attribute of Array.from(element.attributes)) {
-            if (!attribute.name.startsWith('data-') || attribute.name.startsWith('data-myab-ti')) {
+            if (attribute.name !== 'data-i18n-key' || characterLength(attribute.value) > 100) {
                 continue;
             }
             if (attribute.name in out || Object.keys(out).length >= 20) {
                 continue;
             }
-            out[attribute.name] = truncate(normalizeText(attribute.value), 100);
+            out[attribute.name] = attribute.value;
         }
     }
     return out;
@@ -298,7 +299,7 @@ function surroundingTextOf(container: Element, text: string, options: ExtractOpt
 
 /**
  * Construit le contexte envoyé à l'API. Jamais de HTML, jamais de valeur de champ de saisie.
- * Avec `collectContext` désactivé : texte, URL, titre et langue uniquement.
+ * Avec `collectContext` désactivé : texte, URL et langue uniquement.
  */
 export function buildContext(resolved: ResolvedText, settings: ContextSettings): ContextPayload {
     const { container, target, text } = resolved;
@@ -306,9 +307,10 @@ export function buildContext(resolved: ResolvedText, settings: ContextSettings):
     const options = extractOptions(settings.selectors);
 
     const payload: ContextPayload = {
-        text,
+        text: truncate(text, 500),
+        textTruncated: resolved.textTruncated === true || characterLength(text) > 500,
         pageUrl: sanitizeUrl(doc.location?.href ?? '', settings.urlMode),
-        pageTitle: truncate(normalizeText(doc.title), 200),
+        pageTitle: settings.collectContext ? truncate(normalizeText(doc.title), 200) : '',
         surroundingText: '',
         elementTag: '',
         elementId: '',
@@ -387,5 +389,13 @@ export function buildContext(resolved: ResolvedText, settings: ContextSettings):
 }
 
 export function buildSearchRequest(resolved: ResolvedText, settings: ContextSettings, uiLanguage: Lang): SearchRequest {
-    return { ...buildContext(resolved, settings), maxResults: settings.maxResults, uiLanguage };
+    const context = buildContext(resolved, settings);
+    return {
+        ...context,
+        contractVersion: 2,
+        textTruncated: context.textTruncated === true,
+        ...(settings.searchLanguage && settings.searchLanguage !== 'auto' ? { searchLanguage: settings.searchLanguage } : {}),
+        maxResults: settings.maxResults,
+        uiLanguage,
+    };
 }

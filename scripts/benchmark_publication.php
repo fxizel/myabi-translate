@@ -10,6 +10,7 @@ use App\Models\AuditEvent;
 use App\Models\ImportBatch;
 use App\Models\Organisation;
 use App\Models\Proposal;
+use App\Models\Revision;
 use App\Models\Term;
 use App\Models\User;
 use App\Services\AuditService;
@@ -69,7 +70,7 @@ try {
     $selection = [];
     $termIds = [];
     $candidates = Proposal::with('term.sourceImport')->where('language', 'fr')->where('attribute', 'label')->where('status', 'pending')
-        ->whereHas('term', fn ($query) => $query->where('type', 'mric')->whereNull('organization_id')->where('scope_unconfirmed', false)->where('obsolete', false))
+        ->whereHas('term', fn ($query) => $query->where('type', 'mric')->where('obsolete', false))
         ->whereExists(fn ($query) => $query->selectRaw('1')->from('import_rows')->whereColumn('import_rows.term_id', 'proposals.term_id')->where('import_rows.import_id', $source->id))
         ->orderBy('id');
     foreach ($candidates->lazyById(300) as $proposal) {
@@ -130,10 +131,12 @@ try {
             requireAcceptance($filesBefore[$path] === $file['sha256'] && filesize($path) === $file['bytes'], 'Frozen file integrity mismatch.');
         }
         $selectedRecords = [];
+        $provenance = [];
         $manifestRecords = 0;
         $manifestFile = fopen($service->artifactPath($publication, $recipient['row_manifest']['path']), 'rb');
         while (($line = fgets($manifestFile)) !== false) {
             $row = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            $provenance[$row['record']] = $row;
             $manifestRecords++;
             if (isset($termIds[$row['term_id']])) {
                 requireAcceptance($row['revision'] === $frozenTerms[$row['term_id']]->revision_no, 'Captured revision mismatch.');
@@ -143,24 +146,36 @@ try {
         fclose($manifestFile);
         requireAcceptance(count($selectedRecords) === 100, 'The frozen manifest did not capture every selected term.');
 
-        $recipientSource = ImportBatch::findOrFail($csv['source_import_id']);
+        $recipientSources = ImportBatch::whereIn('id', array_column($csv['sources'], 'import_id'))->get()->keyBy('id');
         $format = FormatRegistry::get('mric');
         $frColumn = array_search('fr_CH', $format->headers, true);
         requireAcceptance($frColumn !== false, 'French native column is missing.');
-        $originalRecords = (new CsvReader)->records($recipientSource->originalPath());
         $records = 0;
         $selectedValues = 0;
         foreach ((new CsvReader)->records($csvPath) as $record) {
-            requireAcceptance($originalRecords->valid(), 'Export has more records than its source.');
-            $original = $originalRecords->current();
-            requireAcceptance($record->number === $original->number && $record->ending === $original->ending, 'Native record order or line endings changed.');
             if ($record->number === 0) {
                 $format->validateHeader($record->values);
+                $original = (new CsvReader)->readAt($recipientSources->first()->originalPath(), 0, 0);
                 requireAcceptance($record->raw() === $original->raw(), 'Native header changed.');
             } else {
                 $records++;
+                $rowProvenance = $provenance[$record->number] ?? null;
+                requireAcceptance($rowProvenance !== null, 'A row lacks source provenance.');
+                $original = (new CsvReader)->readAt($recipientSources[$rowProvenance['source_import_id']]->originalPath(),
+                    $rowProvenance['source_offset'], $rowProvenance['source_record_number'], $rowProvenance['source_length']);
+                requireAcceptance($record->ending === $original->ending, 'Native line endings changed.');
+                $originalRow = $original->associative($format->headers);
+                $editable = array_flip($format->editableColumns($originalRow));
                 foreach ($original->rawCells as $index => $raw) {
-                    requireAcceptance($index === $frColumn || $record->rawCells[$index] === $raw, 'A technical or non-French source cell changed.');
+                    requireAcceptance(isset($editable[$format->headers[$index]]) || $record->rawCells[$index] === $raw, 'A technical source cell changed.');
+                }
+                $revision = Revision::findOrFail($rowProvenance['revision_id']);
+                foreach ($format->attributes($originalRow) as $attribute => $definition) {
+                    foreach ($definition['columns'] as $language => $column) {
+                        $expected = $language === 'de' ? $originalRow[$column] : ($revision->validated[$attribute][$language] ?? '');
+                        requireAcceptance($record->values[array_search($column, $format->headers, true)] === $expected,
+                            'A published cell differs from its frozen validation or empty target.');
+                    }
                 }
                 if (isset($selectedRecords[$record->number])) {
                     $expected = $frozenTerms[$selectedRecords[$record->number]]->validated['label']['fr'];
@@ -168,10 +183,8 @@ try {
                     $selectedValues++;
                 }
             }
-            $originalRecords->next();
         }
-        requireAcceptance(! $originalRecords->valid(), 'Export has fewer records than its source.');
-        requireAcceptance($records === $recipientSource->row_count && $manifestRecords === $records && $selectedValues === 100, 'Frozen record counts differ.');
+        requireAcceptance($records === $csv['records'] && $manifestRecords === $records && $selectedValues === 100, 'Frozen record counts differ.');
         $zip = new ZipArchive;
         requireAcceptance($zip->open($archivePath) === true, 'Archive cannot be opened.');
         foreach ([$csv, $recipient['row_manifest']] as $file) {
@@ -184,7 +197,7 @@ try {
         }
         requireAcceptance($zip->numFiles === 3 && $zip->locateName('catalogue.json') !== false, 'Archive contents are incomplete.');
         $zip->close();
-        $recipientResults[] = ['organization_id' => (int) $organizationId, 'source_import_id' => $recipientSource->id, 'records' => $records,
+        $recipientResults[] = ['organization_id' => (int) $organizationId, 'source_import_ids' => $recipientSources->keys()->all(), 'records' => $records,
             'captured_terms' => count($selectedRecords), 'validated_values_verified' => $selectedValues,
             'csv_sha256' => $csv['sha256'], 'archive_sha256' => $archive['sha256'], 'archive_bytes' => $archive['bytes'],
             'technical_cells_and_line_endings_preserved' => true, 'archive_members_verified' => true];

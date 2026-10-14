@@ -9,18 +9,18 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\OperationLock;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
 use Tests\Support\DatabaseProcess;
+use Tests\Support\IsolatedDatabaseMigrations;
 use Tests\TestCase;
 
 class AdminConcurrencyTest extends TestCase
 {
-    use DatabaseMigrations;
+    use IsolatedDatabaseMigrations;
 
     protected function beforeRefreshingDatabase(): void
     {

@@ -48,17 +48,17 @@ class CatalogueSearchTest extends TestCase
         self::assertSame(31, $second->total());
     }
 
-    public function test_counts_and_pages_apply_the_same_scope_and_prefix_filters(): void
+    public function test_counts_and_pages_apply_the_same_global_prefix_filters(): void
     {
         $common = $this->term('Code Common');
         $own = $this->term('Code Own', organizationId: $this->reader->organization_id);
         $other = Organisation::create(['code' => 'FR', 'name' => 'Fribourg', 'active' => true]);
-        $this->term('Code Private', organizationId: $other->id);
+        $external = $this->term('Code External', organizationId: $other->id);
         $this->term('Other Code');
         $response = $this->get('/terms?q=code&search_mode=prefix&sort=key')->assertOk();
-        self::assertSame([$common->id, $own->id], $response->viewData('terms')->pluck('id')->all());
-        self::assertSame(2, $response->viewData('terms')->total());
-        self::assertSame(['server' => 2], $response->viewData('typeCounts')->all());
+        self::assertSame([$common->id, $external->id, $own->id], $response->viewData('terms')->pluck('id')->all());
+        self::assertSame(3, $response->viewData('terms')->total());
+        self::assertSame(['server' => 3], $response->viewData('typeCounts')->all());
         $empty = $this->get('/terms?q=absent')->assertOk();
         self::assertSame(0, $empty->viewData('terms')->total());
         self::assertSame([], $empty->viewData('typeCounts')->all());
@@ -108,15 +108,15 @@ class CatalogueSearchTest extends TestCase
         $italian = $this->proposal($own, 'it');
         $this->proposal($private, 'fr');
         $response = $this->get('/terms?state=pending&language=fr')->assertOk();
-        self::assertSame([$common->id], $response->viewData('terms')->pluck('id')->all());
-        self::assertSame(['server' => 1], $response->viewData('typeCounts')->all());
+        self::assertSame([$common->id, $private->id], $response->viewData('terms')->pluck('id')->all());
+        self::assertSame(['server' => 2], $response->viewData('typeCounts')->all());
         self::assertSame([$own->id], $this->get('/terms?state=pending&language=it')->assertOk()->viewData('terms')->pluck('id')->all());
         $first->update(['status' => 'validated']);
-        self::assertSame(1, $this->get('/terms?state=pending&language=fr')->assertOk()->viewData('terms')->total());
+        self::assertSame(2, $this->get('/terms?state=pending&language=fr')->assertOk()->viewData('terms')->total());
         $duplicate->update(['status' => 'rejected']);
-        self::assertSame(0, $this->get('/terms?state=pending&language=fr')->assertOk()->viewData('terms')->total());
+        self::assertSame(1, $this->get('/terms?state=pending&language=fr')->assertOk()->viewData('terms')->total());
         $italian->update(['language' => 'fr']);
-        self::assertSame([$own->id], $this->get('/terms?state=pending&language=fr&scope=own')->assertOk()->viewData('terms')->pluck('id')->all());
+        self::assertSame([$own->id, $private->id], $this->get('/terms?state=pending&language=fr')->assertOk()->viewData('terms')->pluck('id')->all());
         $this->reader->update(['roles' => ['manager']]);
         $this->actingAs($this->reader->fresh());
         $managed = $this->get('/terms?state=pending&language=fr')->assertOk()->viewData('terms');
@@ -133,7 +133,7 @@ class CatalogueSearchTest extends TestCase
 
     private function term(string $label, string $type = 'server', ?int $organizationId = null): Term
     {
-        return Term::create(['type' => $type, 'organization_id' => $organizationId, 'identity_hash' => hash('sha256', $type.$label), 'key' => [$label],
+        return Term::create(['type' => $type, 'identity_hash' => hash('sha256', $type.$label), 'key' => [$label],
             'label' => $label, 'context' => '', 'source_text' => 'Reference', 'search_text' => $label.' Reference',
             'semantic_hash' => str_repeat('a', 64), 'source_hash' => str_repeat('b', 64), 'source_import_id' => 1,
             'source_offset' => 0, 'source_length' => 1, 'validated' => [], 'review_needed' => [],

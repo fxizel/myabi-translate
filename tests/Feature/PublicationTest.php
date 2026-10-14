@@ -97,7 +97,7 @@ class PublicationTest extends TestCase
         self::assertFalse($source->fresh()->is_complete);
     }
 
-    public function test_organization_source_with_legacy_false_flag_keeps_priority_over_publisher(): void
+    public function test_legacy_completeness_flag_never_changes_the_current_source(): void
     {
         [$publisher, $term] = $this->source('mric');
         [$local] = $this->source('mric', $this->organization->id, existing: $term);
@@ -113,8 +113,8 @@ class PublicationTest extends TestCase
         $this->build($publication);
         $publication->refresh();
         self::assertSame('published', $publication->status);
-        self::assertSame($local->id, $publication->manifest['recipients'][$this->organization->id]['files'][0]['source_import_id']);
-        self::assertSame($publisher->id, $publication->manifest['recipients'][$this->other->id]['files'][0]['source_import_id']);
+        self::assertSame($publisher->id, $publication->manifest['recipients'][$this->organization->id]['files'][0]['sources'][0]['import_id']);
+        self::assertSame($publisher->id, $publication->manifest['recipients'][$this->other->id]['files'][0]['sources'][0]['import_id']);
         self::assertFalse($local->fresh()->is_complete);
         self::assertTrue($publisher->fresh()->is_complete);
         self::assertDatabaseCount('import_batches', 2);
@@ -141,7 +141,7 @@ class PublicationTest extends TestCase
         $recipient = $publication->manifest['recipients'][$this->organization->id];
         self::assertCount(1, $recipient['files']);
         self::assertSame('mric', $recipient['files'][0]['type']);
-        self::assertSame($source->id, $recipient['files'][0]['source_import_id']);
+        self::assertSame($source->id, $recipient['files'][0]['sources'][0]['import_id']);
         self::assertSame($source->sha256, $recipient['files'][0]['sha256']);
         self::assertFalse($source->fresh()->is_complete);
         self::assertDatabaseCount('import_batches', 1);
@@ -251,10 +251,12 @@ class PublicationTest extends TestCase
         $original = iterator_to_array((new CsvReader)->records($source->originalPath()));
         self::assertSame('Version validée {}', $csv[1]->associative(FormatRegistry::get('mric')->headers)['fr_CH']);
         foreach ($original[1]->rawCells as $index => $raw) {
-            if ($index !== 5) {
+            if (! in_array(FormatRegistry::get('mric')->headers[$index], ['fr_CH', 'it_CH', 'en_US'], true)) {
                 self::assertSame($raw, $csv[1]->rawCells[$index]);
             }
         }
+        self::assertSame('', $csv[1]->associative(FormatRegistry::get('mric')->headers)['it_CH']);
+        self::assertSame('', $csv[1]->associative(FormatRegistry::get('mric')->headers)['en_US']);
         $before = file_get_contents($this->path($publication, $recipient['archive']['path']));
         $term->update(['validated' => ['label' => ['fr' => 'Une autre valeur {}']], 'revision_no' => 2]);
         $this->build($publication);
@@ -289,15 +291,19 @@ class PublicationTest extends TestCase
         }
     }
 
-    public function test_recipient_uses_its_instance_source_and_other_recipient_uses_publisher(): void
+    public function test_recipients_receive_the_same_catalogue_and_current_term_source(): void
     {
         [$publisher, $term] = $this->source('mric');
         [$local] = $this->source('mric', $this->organization->id, existing: $term);
         $publication = $this->enqueue(['mric'], [$this->organization->id, $this->other->id]);
         $this->build($publication);
         $publication->refresh();
-        self::assertSame($local->id, $publication->manifest['recipients'][$this->organization->id]['files'][0]['source_import_id']);
-        self::assertSame($publisher->id, $publication->manifest['recipients'][$this->other->id]['files'][0]['source_import_id']);
+        $first = $publication->manifest['recipients'][$this->organization->id]['files'][0];
+        $second = $publication->manifest['recipients'][$this->other->id]['files'][0];
+        self::assertSame($publisher->id, $first['sources'][0]['import_id']);
+        self::assertSame($first['sources'], $second['sources']);
+        self::assertSame($first['sha256'], $second['sha256']);
+        self::assertSame(1, $first['records']);
     }
 
     public function test_readers_cannot_publish_withdraw_or_download_another_organization_archive(): void
@@ -337,13 +343,12 @@ class PublicationTest extends TestCase
         self::assertFalse($source->fresh()->is_complete);
     }
 
-    public function test_foreign_and_unconfirmed_scope_block_instead_of_omitting_lines(): void
+    public function test_validated_terms_from_another_organization_are_included(): void
     {
-        [, $term] = $this->source('mric');
-        $term->update(['organization_id' => $this->other->id]);
-        $this->assertBuildBlocked('publication_foreign_scope');
-        $term->update(['organization_id' => null, 'scope_unconfirmed' => true]);
-        $this->assertBuildBlocked('publication_scope_unconfirmed');
+        [$source] = $this->source('mric', $this->other->id);
+        $publication = $this->enqueue(['mric']);
+        $this->build($publication);
+        self::assertSame($source->id, $publication->fresh()->manifest['recipients'][$this->organization->id]['files'][0]['sources'][0]['import_id']);
     }
 
     public function test_missing_source_and_modified_original_block_publication(): void
@@ -357,11 +362,117 @@ class PublicationTest extends TestCase
         $this->assertBuildBlocked('publication_source_checksum');
     }
 
-    public function test_missing_term_in_fallback_source_is_not_silently_omitted(): void
+    public function test_multi_source_publication_keeps_partially_validated_terms_and_excludes_unvalidated_terms(): void
+    {
+        [$first, $firstTerm] = $this->source('mric', validated: ['label' => ['fr' => 'Commun {}', 'it' => null]]);
+        [$second, $secondTerm] = $this->source('mric', $this->other->id, ['label' => ['it' => 'Comune {}']]);
+        [, $excluded] = $this->source('mric', validated: ['label' => ['fr' => null]]);
+        $publication = $this->enqueue(['mric']);
+        $this->build($publication);
+        $recipient = $publication->fresh()->manifest['recipients'][$this->organization->id];
+        $file = $recipient['files'][0];
+        $records = iterator_to_array((new CsvReader)->records($this->path($publication, $file['path'])));
+        self::assertCount(3, $records);
+        $row = $records[1]->associative(FormatRegistry::get('mric')->headers);
+        self::assertSame('Commun {}', $row['fr_CH']);
+        self::assertSame('', $row['it_CH']);
+        self::assertSame('Quelle {}', $row['de_CH']);
+        $row = $records[2]->associative(FormatRegistry::get('mric')->headers);
+        self::assertSame('', $row['fr_CH']);
+        self::assertSame('Comune {}', $row['it_CH']);
+        self::assertSame([$first->id, $second->id], array_column($file['sources'], 'import_id'));
+        $rows = array_map(fn ($line) => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($this->path($publication, $recipient['row_manifest']['path']), FILE_IGNORE_NEW_LINES));
+        self::assertSame([$firstTerm->id, $secondTerm->id], array_column($rows, 'term_id'));
+        self::assertSame([$first->id, $second->id], array_column($rows, 'source_import_id'));
+        self::assertSame([1, 2], array_column($rows, 'record'));
+        self::assertNull($excluded->fresh()->last_publication_id);
+    }
+
+    public function test_missing_source_of_an_eligible_term_blocks_multi_source_publication(): void
     {
         $this->source('mric');
+        [$second] = $this->source('mric');
+        $publication = $this->enqueue(['mric']);
+        $second->update(['status' => 'analyzed']);
+        $this->assertBuildBlocked('publication_source_missing', $publication);
+    }
+
+    public function test_partial_validation_applies_per_attribute_for_all_seven_formats_and_preserves_source_cells(): void
+    {
+        foreach (FormatRegistry::all() as $type => $format) {
+            $attribute = $format->attributeNames[0];
+            [$source] = $this->source($type, validated: [$attribute => ['fr' => 'Cible validée {}', 'de' => 'Source corrigée {}']]);
+            $publication = $this->enqueue([$type]);
+            $this->build($publication);
+            $file = $publication->fresh()->manifest['recipients'][$this->organization->id]['files'][0];
+            $records = iterator_to_array((new CsvReader)->records($this->path($publication, $file['path'])));
+            $original = iterator_to_array((new CsvReader)->records($source->originalPath()))[1];
+            $row = $records[1]->associative($format->headers);
+            $sourceRow = $original->associative($format->headers);
+            $targets = [];
+            foreach ($format->attributes($sourceRow) as $name => $definition) {
+                foreach ($definition['columns'] as $language => $column) {
+                    if ($language === 'de') {
+                        self::assertSame($sourceRow[$column], $row[$column]);
+                    } else {
+                        $targets[$column] = true;
+                        self::assertSame($name === $attribute && $language === 'fr' ? 'Cible validée {}' : '', $row[$column]);
+                    }
+                }
+            }
+            foreach ($original->rawCells as $index => $raw) {
+                if (! isset($targets[$format->headers[$index]])) {
+                    self::assertSame($raw, $records[1]->rawCells[$index]);
+                }
+            }
+        }
+    }
+
+    public function test_pairs_with_french_reference_publish_a_validated_german_target_and_keep_the_french_source(): void
+    {
+        [$source, $included] = $this->source('form', validated: ['label' => ['de' => 'Deutsches Ziel {}']], referenceLanguage: 'fr_CH');
+        [, $excluded] = $this->source('form', validated: ['label' => ['fr' => 'Référence corrigée {}']], referenceLanguage: 'fr_CH');
+        $publication = $this->enqueue(['form']);
+        $this->build($publication);
+        $file = $publication->fresh()->manifest['recipients'][$this->organization->id]['files'][0];
+        $records = iterator_to_array((new CsvReader)->records($this->path($publication, $file['path'])));
+        self::assertCount(2, $records);
+        $row = $records[1]->associative(FormatRegistry::get('form')->headers);
+        self::assertSame('fr_CH', $row['Default Language']);
+        self::assertSame('Quelle {}', $row['Default Label']);
+        self::assertSame('de_CH', $row['Language 1']);
+        self::assertSame('Deutsches Ziel {}', $row['Translation 1']);
+        self::assertSame('', $row['Translation 2']);
+        self::assertSame('', $row['Translation 3']);
+        self::assertSame('Import {}', $row['Translation 4']);
+        self::assertSame([$source->id], array_column($file['sources'], 'import_id'));
+        self::assertSame($publication->id, $included->fresh()->last_publication_id);
+        self::assertNull($excluded->fresh()->last_publication_id);
+    }
+
+    public function test_unvalidated_terms_with_unavailable_sources_are_excluded_without_creating_missing_row_requirements(): void
+    {
         $this->source('mric');
-        $this->assertBuildBlocked('publication_source_missing_rows');
+        [$unused, $term] = $this->source('mric', validated: []);
+        $unused->update(['status' => 'analyzed']);
+        $publication = $this->enqueue(['mric']);
+        $this->build($publication);
+        self::assertSame(1, $publication->fresh()->manifest['recipients'][$this->organization->id]['files'][0]['records']);
+        self::assertNull($term->fresh()->last_publication_id);
+    }
+
+    public function test_corrupt_non_string_validation_blocks_publication_without_frozen_artifacts(): void
+    {
+        $this->source('mric', validated: ['label' => ['fr' => 'Commun {}', 'it' => 17]]);
+        $publication = $this->enqueue(['mric']);
+        try {
+            $this->build($publication);
+            self::fail('A corrupt revision value must stop publication.');
+        } catch (\InvalidArgumentException) {
+            self::assertSame('failed', $publication->fresh()->status);
+            self::assertNull($publication->fresh()->manifest);
+            self::assertDirectoryDoesNotExist(storage_path('app/private/publications/'.$publication->id));
+        }
     }
 
     public function test_unavailable_revision_and_stale_placeholders_fail_without_downloadable_files(): void
@@ -467,7 +578,7 @@ class PublicationTest extends TestCase
     }
 
     /** Synthetic sources contain no institutional data. */
-    private function source(string $type, ?int $organizationId = null, array $validated = [], ?Term $existing = null): array
+    private function source(string $type, ?int $organizationId = null, ?array $validated = null, ?Term $existing = null, string $referenceLanguage = 'de_CH'): array
     {
         $format = FormatRegistry::get($type);
         $row = array_fill_keys($format->headers, '');
@@ -476,9 +587,9 @@ class PublicationTest extends TestCase
             $row[$column] = $key[$index];
         }
         if ($format->layout === 'pairs') {
-            $row['Default Language'] = 'de_CH';
+            $row['Default Language'] = $referenceLanguage;
             $row['Default Label'] = 'Quelle {}';
-            foreach (['it_CH', 'fr_CH', 'en_US', 'sa_IN'] as $index => $language) {
+            foreach ($referenceLanguage === 'fr_CH' ? ['de_CH', 'it_CH', 'en_US', 'sa_IN'] : ['it_CH', 'fr_CH', 'en_US', 'sa_IN'] as $index => $language) {
                 $row['Language '.($index + 1)] = $language;
                 $row['Translation '.($index + 1)] = 'Import {}';
             }
@@ -500,11 +611,12 @@ class PublicationTest extends TestCase
             'organization_id' => $organizationId, 'source_kind' => $organizationId ? 'organization' : 'publisher', 'is_complete' => true,
             'filename' => $format->filename, 'path' => $path, 'sha256' => hash('sha256', $bytes), 'size' => strlen($bytes), 'status' => 'applied',
             'row_count' => 1, 'analysis_offset' => strlen($bytes), 'report' => [], 'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
-        $term = $existing ?? Term::create(['type' => $type, 'organization_id' => null, 'identity_hash' => $format->identityHash($row), 'key' => $key,
+        $validated ??= array_map(fn ($attribute) => array_filter($attribute['translations'], fn ($language) => $language !== 'de', ARRAY_FILTER_USE_KEY), $format->attributes($row));
+        $term = $existing ?? Term::create(['type' => $type, 'identity_hash' => $format->identityHash($row), 'key' => $key,
             'label' => implode(' / ', $key), 'context' => '', 'source_text' => 'Quelle {}', 'search_text' => 'Quelle {}',
             'semantic_hash' => $format->semanticHash($row), 'source_hash' => $format->sourceHash($row), 'source_import_id' => $source->id,
             'source_offset' => $record->offset, 'source_length' => $record->length, 'validated' => $validated, 'review_needed' => [],
-            'revision_no' => 1, 'lock_version' => 1, 'obsolete' => false, 'scope_unconfirmed' => false, 'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
+            'revision_no' => 1, 'lock_version' => 1, 'obsolete' => false, 'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
         DB::table('import_rows')->insert(['import_id' => $source->id, 'record_number' => 1, 'offset' => $record->offset, 'length' => $record->length,
             'identity_hash' => $format->identityHash($row), 'term_id' => $term->id, 'collision' => false, 'category' => 'new']);
         if (! $existing) {

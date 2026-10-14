@@ -2,16 +2,16 @@
 
 namespace App\Models;
 
-use App\Services\CommonScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     public const ROLES = ['reader', 'translator', 'validator', 'manager', 'admin'];
 
@@ -97,7 +97,7 @@ class User extends Authenticatable
         return $this->canManage() || ($this->hasRole('validator') && ($language === null || in_array(strtolower(substr($language, 0, 2)), $this->roleLanguages('validator'), true)));
     }
 
-    public function canTranslate(?string $language = null, ?int $ownerId = null): bool
+    public function canTranslate(?string $language = null): bool
     {
         if (! $this->active || $this->is_technical) {
             return false;
@@ -107,8 +107,7 @@ class User extends Authenticatable
         }
 
         return $this->hasRole('translator')
-            && ($language === null || in_array(strtolower(substr($language, 0, 2)), $this->roleLanguages('translator'), true))
-            && ($ownerId === (int) $this->organization_id || CommonScope::contains($ownerId));
+            && ($language === null || in_array(strtolower(substr($language, 0, 2)), $this->roleLanguages('translator'), true));
     }
 
     public function canValidateAny(): bool
@@ -116,16 +115,9 @@ class User extends Authenticatable
         return $this->canValidate();
     }
 
-    public function canSeeOrganisation(?int $ownerId): bool
+    public function canSeeCatalogue(): bool
     {
-        if (! $this->active || $this->is_technical) {
-            return false;
-        }
-        if ($ownerId === (int) $this->organization_id || $this->canManage() || $this->canValidate()) {
-            return true;
-        }
-
-        return CommonScope::contains($ownerId);
+        return $this->active && ! $this->is_technical;
     }
 
     public function needsTwoFactor(): bool
