@@ -127,7 +127,7 @@ Le backend Laravel expose `POST /api/browser-extension/search` et `POST /api/bro
 
 Les recherches réelles envoient `contractVersion: 2` et `textTruncated`, avec la langue du texte inspecté, distincte de celle du panneau. Chaque résultat identifie une cellule par terme, type DEVCONF, tuple exact, attribut et langue. La valeur importée, la référence et la traduction validée sont affichées séparément. Les propositions pending sont comptées, sans sélection arbitraire d’une traduction en vigueur.
 
-La version reconstruite pour cette API est **0.2.0**. Vérifier cette version dans la fiche de l’extension après chargement. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation et faire autoriser son origine côté API si nécessaire.
+La version reconstruite pour cette API est **0.2.1**. Vérifier cette version dans la fiche de l’extension après chargement. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation. Le serveur accepte automatiquement les origines Chrome et Firefox : aucun identifiant d’installation ni utilisateur n’est à déclarer côté API.
 
 Le serveur calcule `matchState`, `exactCandidateCount`, `hasMore` et `candidateSetComplete` avant la limite d’affichage. Plusieurs exacts restent ambigus avec `maxResults: 1`. Le client respecte `exact: false` et annonce les aperçus tronqués. Le feedback est facultatif, signé et sans effet sur la validation ou les campagnes.
 
@@ -137,8 +137,10 @@ Le mode **API de test** accepte encore les réponses du mock ; il est choisi exp
 
 1. Dans le référentiel, ouvrir **Profil → Extension navigateur**, confirmer le mot de passe et créer un jeton. Copier le secret immédiatement ; la MFA applicable doit avoir été satisfaite à la connexion.
 2. Dans les paramètres de l’extension, choisir **API réelle**, l’URL `https://translations.example.org/api/browser-extension` et ce jeton. Pour la recette locale, utiliser le port du serveur Laravel, par exemple `http://127.0.0.1:8000/api/browser-extension`.
-3. Ajouter le domaine MyAB, accepter les permissions et tester la connexion. Si la langue de la page est absente ou inconnue, choisir celle du texte dans le réglage dédié.
+3. Ajouter le domaine MyAB, accepter les permissions et tester la connexion. Aucun enregistrement de l’installation sur le serveur n’est nécessaire : le jeton personnel authentifie chaque appel. Si la langue de la page est absente ou inconnue, choisir celle du texte dans le réglage dédié.
 4. Activer l’inspecteur et recharger l’onglet MyAB. Alt+clic ouvre les correspondances ; leur lien vers la fiche exige la connexion web habituelle.
+
+Si l’API refuse encore l’origine de l’extension (403), mettre à jour le serveur et recharger sa configuration, puis recharger l’extension et rouvrir ses paramètres. Un serveur resté sur l’ancienne version peut encore exiger une liste d’origines ; la nouvelle version supprime cette exigence. Une erreur de jeton (401), de droits ou de MFA (403) conserve son diagnostic propre.
 
 Après installation des dépendances PHP et migrations, construire la projection avec `php artisan referentiel:extension-search-rebuild`. Une projection manquante ou périmée produit 503. Le serveur factice du port 8787 reste un outil de test et ne consulte pas le référentiel.
 

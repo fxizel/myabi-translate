@@ -1,7 +1,7 @@
 import type { ActivationModifier, Lang, LangPreference, PanelError } from '../types';
 
 const fr = {
-    errorOriginForbidden: 'L’API refuse l’origine de cette extension (403). Faites autoriser son identifiant côté serveur.',
+    errorOriginForbidden: 'L’API refuse l’origine de cette extension (403). Vérifiez que le serveur est à jour, puis rechargez l’extension Chrome ou Firefox.',
     errorMfaForbidden: 'Une authentification à deux facteurs est requise (403). Connectez-vous au référentiel puis créez un nouveau jeton.',
     errorPermissionForbidden: 'Accès au référentiel non autorisé (403). Vérifiez les droits du compte et les permissions du jeton.',
     errorFeedbackForbidden: 'Le retour de correspondance est désactivé ou non autorisé (403). Vérifiez ses droits et son activation.',
@@ -167,7 +167,7 @@ const fr = {
 export type MessageKey = keyof typeof fr;
 
 const de: Record<MessageKey, string> = {
-    errorOriginForbidden: 'Die API lehnt den Ursprung dieser Erweiterung ab (403). Die Erweiterungs-ID muss auf dem Server freigegeben werden.',
+    errorOriginForbidden: 'Die API lehnt den Ursprung dieser Erweiterung ab (403). Prüfen Sie, ob der Server aktuell ist, und laden Sie die Chrome- oder Firefox-Erweiterung neu.',
     errorMfaForbidden: 'Zwei-Faktor-Authentifizierung erforderlich (403). Im Katalog anmelden und ein neues Token erstellen.',
     errorPermissionForbidden: 'Katalogzugriff nicht erlaubt (403). Konto- und Tokenberechtigungen prüfen.',
     errorFeedbackForbidden: 'Rückmeldungen sind deaktiviert oder nicht erlaubt (403). Berechtigungen und Aktivierung prüfen.',
@@ -327,7 +327,7 @@ const de: Record<MessageKey, string> = {
 };
 
 const en: Record<MessageKey, string> = {
-    errorOriginForbidden: 'The API refuses this extension’s origin (403). Ask for its extension ID to be allowed on the server.',
+    errorOriginForbidden: 'The API refuses this extension’s origin (403). Check that the server is up to date, then reload the Chrome or Firefox extension.',
     errorMfaForbidden: 'Two-factor authentication is required (403). Sign in to the catalogue, then create a new token.',
     errorPermissionForbidden: 'Catalogue access is not allowed (403). Check the account and token permissions.',
     errorFeedbackForbidden: 'Match feedback is disabled or not allowed (403). Check its permissions and activation.',

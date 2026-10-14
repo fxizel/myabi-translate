@@ -100,6 +100,16 @@ describe('bornes et collecte v2', () => {
 });
 
 describe('erreurs et feedback v2', () => {
+    it.each([
+        ['fr', 'serveur est à jour', 'rechargez', 'autoriser son identifiant'],
+        ['de', 'Server aktuell', 'neu', 'Erweiterungs-ID'],
+        ['en', 'server is up to date', 'reload', 'extension ID'],
+    ] as const)('propose une mise à jour plutôt qu’une déclaration d’installation en %s', (lang, serverAction, reloadAction, obsoleteAction) => {
+        const message = errorMessage(lang, { kind: 'forbidden', status: 403, code: 'origin_not_allowed' });
+        expect(message).toContain(serverAction);
+        expect(message).toContain(reloadAction);
+        expect(message).not.toContain(obsoleteAction);
+    });
     it.each(['fr', 'de', 'en'] as const)('distingue les causes connues de 403 en %s et garde le repli générique', lang => {
         const generic = errorMessage(lang, { kind: 'forbidden', status: 403 });
         const codes = ['origin_not_allowed', 'mfa_required', 'permission_denied', 'feedback_not_allowed'];

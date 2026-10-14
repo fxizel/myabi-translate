@@ -39,7 +39,7 @@ afterEach(() => { inspector?.stop(); inspector = undefined; vi.unstubAllGlobals(
 
 describe('message content → sanitizer background → HTTP réel', () => {
     it.each([
-        ['origin_not_allowed', 'origine de cette extension'],
+        ['origin_not_allowed', 'serveur est à jour'],
         ['mfa_required', 'authentification à deux facteurs'],
         ['permission_denied', 'permissions du jeton'],
         ['feedback_not_allowed', 'retour de correspondance'],

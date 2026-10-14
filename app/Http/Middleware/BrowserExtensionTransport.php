@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\BrowserExtension\ApiProblem;
+use App\Services\BrowserExtension\ExtensionOrigin;
 use App\Services\BrowserExtension\RateLimits;
 use Closure;
 use Illuminate\Http\Request;
@@ -25,8 +26,7 @@ class BrowserExtensionTransport
             throw new ApiProblem(400, 'https_required');
         }
         $origin = $request->header('Origin');
-        $allowed = config('browser-extension.allowed_origins', []);
-        if ($origin && ! in_array($origin, $allowed, true)) {
+        if ($origin !== null && ! ExtensionOrigin::isAllowed($origin)) {
             throw new ApiProblem(403, 'origin_not_allowed');
         }
         $retry = app(RateLimits::class)->consume([

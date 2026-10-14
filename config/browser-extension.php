@@ -7,7 +7,6 @@ return [
     'token_max_days' => 30,
     'password_confirmation_seconds' => 900,
     'force_https' => (bool) env('BROWSER_EXTENSION_FORCE_HTTPS', env('APP_ENV') === 'production'),
-    'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('BROWSER_EXTENSION_ALLOWED_ORIGINS', ''))))),
     'max_request_bytes' => 64 * 1024,
     'max_response_bytes' => 256 * 1024,
     // A database cache coordinates PHP workers without requiring Redis.

@@ -247,17 +247,116 @@ class BrowserExtensionSecurityTest extends TestCase
             ->assertStatus(400)->assertJsonPath('error.code', 'https_required');
     }
 
-    public function test_preflight_uses_only_configured_origins_without_cookies_and_actual_bearer_remains_required(): void
+    #[DataProvider('extensionOrigins')]
+    public function test_extension_installations_need_no_registration_but_always_require_a_current_bearer(string $origin): void
     {
-        $origin = 'chrome-extension://synthetic-extension-id';
-        config(['browser-extension.allowed_origins' => [$origin]]);
         $this->call('OPTIONS', '/api/browser-extension/search', [], [], [], [
             'HTTP_ORIGIN' => $origin, 'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
             'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'authorization,content-type,accept',
-        ])->assertNoContent()->assertHeader('Access-Control-Allow-Origin', $origin)->assertHeaderMissing('Access-Control-Allow-Credentials');
-        $this->probe(null, ['Origin' => $origin])->assertUnauthorized()->assertHeader('Access-Control-Allow-Origin', $origin)
-            ->assertHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-ID');
-        $this->probe(null, ['Origin' => 'https://foreign.example.org'])->assertForbidden();
+        ])->assertNoContent()->assertHeader('Access-Control-Allow-Origin', $origin)
+            ->assertHeader('Vary', 'Origin')->assertHeaderMissing('Access-Control-Allow-Credentials');
+
+        $user = $this->user();
+        $bearer = $this->token($user);
+        $this->probe($bearer, ['Origin' => $origin])->assertOk()->assertJsonPath('userId', $user->id)
+            ->assertHeader('Access-Control-Allow-Origin', $origin)->assertHeaderMissing('Access-Control-Allow-Credentials');
+
+        $this->actingAs($user, 'web');
+        foreach (['search', 'feedback'] as $endpoint) {
+            $this->postJson('/api/browser-extension/'.$endpoint, ['contractVersion' => 2], ['Origin' => $origin])
+                ->assertUnauthorized()->assertJsonPath('error.code', 'unauthenticated')
+                ->assertHeader('Access-Control-Allow-Origin', $origin)
+                ->assertHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-ID')
+                ->assertHeaderMissing('Access-Control-Allow-Credentials');
+        }
+
+        PersonalAccessToken::sole()->forceFill(['revoked_at' => now()])->save();
+        $this->probe($bearer, ['Origin' => $origin])->assertUnauthorized()
+            ->assertJsonPath('error.code', 'unauthenticated')->assertHeader('Access-Control-Allow-Origin', $origin);
+    }
+
+    public static function extensionOrigins(): array
+    {
+        return [
+            'Chrome first installation' => ['chrome-extension://'.str_repeat('a', 32)],
+            'Chrome other installation' => ['chrome-extension://'.str_repeat('p', 32)],
+            'Firefox first profile' => ['moz-extension://01234567-89ab-4cde-8f01-23456789abcd'],
+            'Firefox other profile' => ['moz-extension://fedcba98-7654-4321-8765-abcdef012345'],
+        ];
+    }
+
+    #[DataProvider('forbiddenOrigins')]
+    public function test_web_and_malformed_origins_are_refused_even_with_a_valid_token(string $origin): void
+    {
+        $bearer = $this->token($this->user());
+        $this->probe($bearer, ['Origin' => $origin])->assertForbidden()
+            ->assertJsonPath('error.code', 'origin_not_allowed')->assertHeaderMissing('Access-Control-Allow-Origin');
+        $this->call('OPTIONS', '/api/browser-extension/search', [], [], [], [
+            'HTTP_ORIGIN' => $origin, 'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
+            'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'authorization,content-type',
+        ])->assertForbidden()->assertJsonPath('error.code', 'origin_not_allowed')
+            ->assertHeaderMissing('Access-Control-Allow-Origin');
+        $this->assertNull(PersonalAccessToken::sole()->last_used_at);
+    }
+
+    public static function forbiddenOrigins(): array
+    {
+        $chrome = 'chrome-extension://'.str_repeat('a', 32);
+        $firefox = 'moz-extension://01234567-89ab-4cde-8f01-23456789abcd';
+
+        return [
+            'web page' => ['https://foreign.example.org'],
+            'application web origin' => ['http://localhost'],
+            'opaque origin' => ['null'],
+            'empty header' => [''],
+            'universal origin' => ['*'],
+            'missing Chrome identifier' => ['chrome-extension://'],
+            'short Chrome identifier' => ['chrome-extension://'.str_repeat('a', 31)],
+            'long Chrome identifier' => [$chrome.'a'],
+            'invalid Chrome alphabet' => ['chrome-extension://'.str_repeat('q', 32)],
+            'Chrome path' => [$chrome.'/options.html'],
+            'Chrome trailing slash' => [$chrome.'/'],
+            'Chrome port' => [$chrome.':443'],
+            'Chrome credentials' => ['chrome-extension://user@'.str_repeat('a', 32)],
+            'Chrome query' => [$chrome.'?origin=extension'],
+            'Chrome fragment' => [$chrome.'#extension'],
+            'Chrome suffix' => [$chrome.'.example.org'],
+            'Chrome trailing newline' => [$chrome."\n"],
+            'missing Firefox UUID' => ['moz-extension://'],
+            'invalid Firefox UUID' => ['moz-extension://not-a-uuid'],
+            'Firefox path' => [$firefox.'/options.html'],
+            'Firefox suffix' => [$firefox.'.example.org'],
+            'Firefox port' => [$firefox.':443'],
+        ];
+    }
+
+    public function test_preflight_refuses_undocumented_methods_headers_and_missing_origins(): void
+    {
+        $headers = [
+            'HTTP_ORIGIN' => 'chrome-extension://'.str_repeat('a', 32),
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
+            'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'authorization,content-type,accept',
+        ];
+        foreach ([
+            ['HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'GET'],
+            ['HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'authorization,cookie'],
+            ['HTTP_ORIGIN' => null],
+        ] as $invalid) {
+            $this->call('OPTIONS', '/api/browser-extension/search', [], [], [], array_replace($headers, $invalid))
+                ->assertForbidden()->assertJsonPath('error.code', 'origin_not_allowed');
+        }
+    }
+
+    public function test_quota_errors_remain_readable_to_an_extension_without_registration(): void
+    {
+        config(['browser-extension.limits.ip' => 1]);
+        $origin = 'moz-extension://01234567-89ab-4cde-8f01-23456789abcd';
+        $bearer = $this->token($this->user());
+        $this->probe($bearer, ['Origin' => $origin])->assertOk();
+        $this->probe($bearer, ['Origin' => $origin])->assertStatus(429)->assertJsonPath('error.code', 'rate_limited')
+            ->assertHeader('Access-Control-Allow-Origin', $origin)->assertHeader('Retry-After')
+            ->assertHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-ID')
+            ->assertHeaderMissing('Access-Control-Allow-Credentials');
     }
 
     public function test_failed_audit_rolls_back_token_creation(): void

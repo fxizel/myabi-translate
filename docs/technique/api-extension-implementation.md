@@ -35,13 +35,12 @@ Les imports et décisions synchronisent la projection dans leur transaction. Une
 | `APP_URL` | URL canonique des liens vers les fiches ; HTTPS en production. |
 | `BROWSER_EXTENSION_ENABLED` | Activation du service, par défaut vrai. |
 | `BROWSER_EXTENSION_FEEDBACK_ENABLED` | Activation du feedback, par défaut vrai ; exige aussi permission du token et choix local de l’utilisateur. |
-| `BROWSER_EXTENSION_ALLOWED_ORIGINS` | Origines d’extension autorisées, séparées par une virgule si le navigateur transmet `Origin` ; aucune origine universelle ni cookie. |
 | `BROWSER_EXTENSION_RATE_LIMIT_STORE` | Cache partagé des quotas, par défaut `database`, indépendant du cache général. |
 | `BROWSER_EXTENSION_FORCE_HTTPS` | Contrôle HTTPS, activé par défaut en production ; configurer le frontal et les proxys de confiance. |
 
-Les origines autorisées sont celles de l’extension, pas le domaine de MyAB. Les appels sans `Origin` exigent toujours le bearer. Un prévol configuré n’accorde aucun droit sur les termes. Les réponses d’erreur exposent `Retry-After` et `X-Request-ID` aux origines autorisées.
+Les origines d’extension Chrome (`chrome-extension://` suivi d’un identifiant de 32 lettres de `a` à `p`) et Firefox (`moz-extension://` suivi d’un UUID) sont acceptées automatiquement, sans déclaration d’utilisateur, de profil ou d’installation. Les origines de sites web, `null` et les origines malformées sont refusées ; aucune origine universelle ni authentification par cookie n’est activée. Les appels sans `Origin` restent possibles et exigent toujours le bearer. Un prévol ne donne aucun droit sur les termes. Les réponses d’erreur exposent `Retry-After` et `X-Request-ID` aux origines d’extension acceptées.
 
-Pour Chrome, relever l’identifiant de l’extension dans `chrome://extensions` en mode développeur et autoriser son origine `chrome-extension://<identifiant>`. Pour Firefox, relever l’UUID d’origine du module dans le profil utilisé ; il peut changer lors d’un nouveau chargement temporaire. Une autre installation ou un autre chemin de chargement peut donc exiger une nouvelle origine autorisée. Un refus `origin_not_allowed` concerne cette configuration, indépendamment des permissions du jeton. Après une reconstruction du client, recharger l’extension et rouvrir ses paramètres pour utiliser le nouveau bundle.
+Le parcours utilisateur consiste à installer l’extension, renseigner l’URL de l’API et son jeton personnel, puis accorder les permissions d’hôte demandées par le navigateur. Le serveur vérifie sur chaque appel le jeton, son expiration et sa révocation, les droits courants du compte et la MFA applicable. L’origine indique seulement un format d’appel accepté et ne prouve aucune identité. L’ancien paramètre `BROWSER_EXTENSION_ALLOWED_ORIGINS` est supprimé ; une valeur encore présente dans un fichier privé est ignorée après mise à jour du serveur et rechargement de sa configuration. Un refus `origin_not_allowed` avec le client officiel demande de vérifier la version du serveur et de recharger l’extension, sans inscrire son identifiant. Après une reconstruction du client, recharger l’extension et rouvrir ses paramètres pour utiliser le nouveau bundle.
 
 ## Connexion de l’extension
 
@@ -81,6 +80,14 @@ Le [benchmark](../../app/Console/Commands/BenchmarkBrowserExtensionSearch.php) e
 ```bash
 php artisan referentiel:extension-search-benchmark --terms=100000 --samples=30
 ```
+
+### Mise à jour 0.2.1 : connexion sans déclaration d’installation
+
+Déployer le code serveur et recharger sa configuration dans le processus web selon la [procédure de déploiement](../deploiement/deploiement-vps.md). Cette mise à jour ne crée aucune migration. Un ancien `BROWSER_EXTENSION_ALLOWED_ORIGINS` peut être retiré du fichier privé ; il n’est plus lu. L’URL de l’API et les jetons existants restent utilisables tant que leurs droits et leur validité sont conservés.
+
+Construire les paquets avec `cd extension && npm run package`. Pour Chrome, recharger l’installation existante depuis le dossier reconstruit `extension/dist/chrome`, puis rouvrir les paramètres et tester la connexion. Pour Firefox, recharger le module temporaire depuis `extension/dist/firefox` en recette, ou livrer une version signée pour l’installation durable. Aucun identifiant de profil ou d’installation n’est à relever côté serveur.
+
+Contrôles de cette mise à jour : 526 tests PHP réussis (12 145 assertions, 19 tests ignorés selon leurs prérequis), dont 51 tests de sécurité API ; 28 tests JavaScript Laravel ; 297 tests de l’extension, contrôle TypeScript et constructions/paquets Chrome et Firefox 0.2.1. Pint et `git diff --check` sont conformes. Les tests couvrent plusieurs installations Chrome et profils Firefox, les origines web ou malformées refusées, les prévols restreints, le refus des cookies seuls et des jetons révoqués, ainsi que les erreurs CORS lisibles. La recette navigateur réelle et les contrôles MariaDB/DEVCONF ci-dessous décrivent la livraison initiale ; ils n’ont pas été relancés pour cette modification du transport.
 
 ### Résultats de recette du 14 octobre 2026
 

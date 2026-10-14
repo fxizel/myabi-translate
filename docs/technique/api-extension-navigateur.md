@@ -75,7 +75,7 @@ Le service utilise Laravel/PHP et MariaDB en production, sans Node, Redis ou mot
 
 En-têtes : `Authorization: Bearer <jeton>`, `Content-Type: application/json`, `Accept: application/json`. Les réponses portent `Cache-Control: no-store`, un identifiant technique `X-Request-ID` sans contenu métier, et un JSON UTF-8. Le client conserve `credentials: 'omit'` et `cache: 'no-store'`.
 
-Les appels partent du service worker autorisé par les permissions d’hôte, comme dans le client existant. Les origines d’extension ne sont pas assimilées aux domaines MyAB ni à une preuve d’identité. Aucun CORS universel avec cookies : si un prévol doit être pris en charge dans les navigateurs ciblés, autoriser uniquement les origines configurées, `POST`, `OPTIONS`, `Authorization`, `Content-Type`, `Accept`, sans credentials. Tester les origines réelles Chrome et Firefox, y compris les extensions chargées localement. Le contrôle bearer reste obligatoire même pour un appel sans en-tête `Origin`.
+Les appels partent du service worker autorisé par les permissions d’hôte, comme dans le client existant. Les origines d’extension ne sont pas assimilées aux domaines MyAB ni à une preuve d’identité. Accepter automatiquement les origines Chrome `chrome-extension://<identifiant de 32 lettres a-p>` et Firefox `moz-extension://<UUID>`, sans déclaration par installation. Refuser les origines de sites web, opaques et malformées, ainsi que les chemins, ports, credentials, query-strings et fragments dans `Origin`. Les prévols acceptent uniquement `POST`, `Authorization`, `Content-Type` et `Accept` ; les réponses CORS reflètent l’origine d’extension acceptée, sans `Access-Control-Allow-Credentials` ni origine universelle. Les réponses d’erreur appliquent la même règle et exposent `Retry-After` et `X-Request-ID`. Le contrôle bearer reste obligatoire sur chaque recherche et retour de correspondance, même après un prévol réussi ou pour un appel sans en-tête `Origin`.
 
 Limiter le corps à 64 Kio avant décodage et la réponse à 256 Kio. Rejeter le JSON invalide, les types incorrects, les champs hors limites et les versions inconnues avant la recherche. Une validation échouée ne recopie aucune valeur reçue dans le message d’erreur. Utiliser des paramètres SQL liés ; `%`, `_` et `!` sont des caractères littéraux, jamais des opérateurs fournis par le client. L’API n’accepte ni regex, SQL ni sélecteur CSS à exécuter.
 
@@ -251,7 +251,7 @@ Format uniforme : `{"error":{"code":"...","message":"..."},"requestId":"..."}`. 
 | --- | --- | --- |
 | 200 | Recherche réussie, éventuellement sans résultat | Afficher le verdict serveur et les limites indiquées. |
 | 401 | `unauthenticated` | Token absent, invalide, expiré/révoqué, version de sécurité périmée ou compte indisponible ; demander un nouveau jeton. |
-| 403 | `permission_denied`, `mfa_required`, `feedback_not_allowed` | Expliquer le droit ou la configuration à corriger. |
+| 403 | `permission_denied`, `mfa_required`, `feedback_not_allowed`, `origin_not_allowed` | Expliquer le droit ou la configuration à corriger ; une origine refusée avec le client officiel demande de vérifier la version du serveur, sans déclaration d’installation. |
 | 404 | Route inconnue ou preuve non accessible | Vérifier URL/configuration, sans révéler une identité étrangère. |
 | 409 | `result_stale` | Refaire une recherche avant feedback. |
 | 413 | `payload_too_large` | Réduire le contexte ; ne pas réessayer automatiquement le même corps. |
