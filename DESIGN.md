@@ -153,7 +153,9 @@ Une icône de 16 px peut précéder le libellé ; un bouton d’icône seule por
 - `.input` : 29 px, bordure `#cad5e0`, rayon 3 px ; la zone de texte fait 95 px de haut, 14 px, redimensionnable verticalement. Lecture seule : fond `--soft`.
 - Recherche : icône loupe bleue placée dans le champ, retrait gauche de 31 px.
 - `.toolbar` : barre grise `#f8fafc` alignant recherche (base 220 px) et filtres (base 160 px), puis « Plus de filtres » dans un `details` qui ouvre une grille de quatre colonnes.
-- `.type-counts` : sous la barre d’outils, un onglet par type DEVCONF avec son compteur ; le type courant est blanc, encadré et en gras.
+- Dans le catalogue, une seule sélection dans la première colonne sert aux propositions, à l’affectation aux groupes et à la composition des campagnes. La colonne Groupe de termes affiche uniquement le groupe actuel. L’action Proposer prend uniquement les termes éligibles de la sélection ; les actions de gestion prennent toute la sélection.
+- Dans le catalogue, les filtres Groupe de termes (dont Sans groupe) et Campagne restent visibles sous la barre d’outils et partagent le bouton Filtrer. Le type de document se choisit uniquement dans la liste déroulante ; aucune ligne d’onglets redondante.
+- Les actions de composition et de classement sont dans un panneau blanc distinct, titré et séparé des filtres et du tableau par 14 px. Les contrôles Groupe de termes et Campagne ont chacun leur libellé visible ; une aide indique les cases à cocher dans le tableau.
 
 ### Barre de langues
 
@@ -223,7 +225,7 @@ Le logo retenu le 23.09.2026 associe deux tuiles « A » (marine) et « 文 » (
 
 | Espace | Contenu |
 |---|---|
-| **Traductions** | Barre de langues, recherche et filtres, compteurs par type, tableau : terme et clé, type, valeur de référence, traduction en vigueur, proposition et état. Ouverture d’une fiche dans un nouvel onglet de travail. |
+| **Traductions** | Barre de langues, recherche et filtres (type, groupe, campagne), panneau d’actions sur la sélection, tableau : terme et clé, type, valeur de référence, traduction en vigueur, proposition et état. Ouverture d’une fiche dans un nouvel onglet de travail. |
 | **Fiche terme** | Source et métadonnées (clé, type, contexte), valeur en vigueur, proposition, saisie avec contrôle des variables, historique des révisions. |
 | **Validation** | File des propositions par langue : en-tête du terme, colonnes source / valeur en vigueur / proposition avec différences mises en évidence, auteur, validation ou rejet motivé, actions groupées. |
 | **Imports** | Parcours en trois étapes : dépôt du fichier, analyse et rapport, application en propositions. |

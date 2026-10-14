@@ -57,7 +57,7 @@ function fixture(rows, {bulk = false, confirmedForm = false} = {}) {
         if (bulkForm) {
             const checkbox = {
                 checked: !!row.selected,
-                dataset: {termId: String(index + 1)},
+                dataset: {termId: String(index + 1), proposalEligible: row.eligible === false ? '0' : '1'},
                 matches: selector => selector === '[data-select-item]' || (selector === '[data-select-item]:checked' && checkbox.checked),
                 closest: () => ({querySelector: () => form}),
             };
@@ -87,8 +87,9 @@ function fixture(rows, {bulk = false, confirmedForm = false} = {}) {
             editors[index].value = value;
             editors[index].dispatch(event('input', editors[index]));
         },
-        submit(form = editors[0].form, afterDocument) {
+        submit(form = editors[0].form, afterDocument, submitter) {
             const submission = event('submit', form);
+            Object.defineProperty(submission, 'submitter', {value: submitter});
             form.dispatch(submission);
             document.dispatch(submission);
             if (afterDocument) afterDocument(submission);
@@ -226,4 +227,46 @@ test('editing a value after submission does not exempt the new value', () => {
     page.submit();
     page.change(0, 'New draft');
     assert.equal(page.warns(), true);
+});
+
+test('a shared selection proposes only eligible rows and confirms their count', () => {
+    const page = fixture([{selected: true}, {selected: true, eligible: false}], {bulk: true});
+    page.change(0, 'New proposal');
+    page.change(1, 'Unsent draft');
+    assert.equal(page.submit(page.bulkForm).defaultPrevented, false);
+    assert.deepEqual(page.confirmations, ['Send 1?']);
+    assert.equal(page.bulkForm.elements['rows[1][selected]'].value, '1');
+    assert.equal(page.bulkForm.elements['rows[1][value]'].value, 'New proposal');
+    assert.equal(page.bulkForm.elements['rows[2][selected]'], undefined);
+    assert.equal(page.bulkForm.elements['rows[2][value]'], undefined);
+    assert.equal(page.warns(), true);
+});
+
+test('a selection without eligible proposals cannot submit proposals', () => {
+    const page = fixture([{selected: true, eligible: false}], {bulk: true});
+    assert.equal(page.submit(page.bulkForm).defaultPrevented, true);
+    assert.deepEqual(page.confirmations, []);
+    assert.equal(page.bulkForm.elements['rows[1][value]'], undefined);
+});
+
+test('group and campaign actions do not confirm or send drafts as proposals', () => {
+    const page = fixture([{selected: true}], {bulk: true});
+    page.change(0, 'Draft to keep');
+    assert.equal(page.submit(page.bulkForm, undefined, {dataset: {catalogueSubmit: ''}}).defaultPrevented, false);
+    assert.deepEqual(page.confirmations, []);
+    assert.equal(page.bulkForm.elements['rows[1][value]'], undefined);
+    assert.equal(page.warns(), true);
+});
+
+test('a catalogue action removes copied proposal fields after a cancelled navigation', () => {
+    const page = fixture([{selected: true}, {}], {bulk: true});
+    page.change(0, 'Selected draft');
+    page.change(1, 'Other draft');
+    page.submit(page.bulkForm);
+    assert.equal(page.warns(), true);
+    const copied = page.bulkForm.elements['rows[1][value]'];
+    page.submit(page.bulkForm, undefined, {dataset: {catalogueSubmit: ''}});
+    assert.equal(copied.removed, true);
+    assert.equal(page.warns(), true);
+    assert.deepEqual(page.confirmations, ['Send 1?']);
 });

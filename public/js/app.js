@@ -16,6 +16,8 @@
     const editors = [...document.querySelectorAll('[data-editor]')];
     const isDraft = editor => editor.value !== editor.defaultValue || editor.dataset.restored === '1';
     let submission = null;
+    const proposalEligible = checkbox => checkbox.dataset.proposalEligible !== '0';
+    const catalogueSubmission = event => event.submitter?.dataset.catalogueSubmit !== undefined;
     document.querySelectorAll('[data-auto-submit]').forEach(el => el.addEventListener('change', () => el.form.requestSubmit()));
     editors.forEach(editor => {
         const form = editor.form;
@@ -69,7 +71,9 @@
             const allItems = items();
             const count = selected().length;
             form.querySelectorAll('[data-selected-count]').forEach(el => el.textContent = count);
-            form.querySelectorAll('[data-bulk-submit]').forEach(el => el.disabled = count === 0);
+            const proposalCount = selected().filter(proposalEligible).length;
+            form.querySelectorAll('[data-bulk-submit]').forEach(el => el.disabled = proposalCount === 0);
+            form.querySelectorAll('[data-catalogue-submit]').forEach(el => el.disabled = count === 0);
             all.indeterminate = count > 0 && count < allItems.length;
             all.checked = allItems.length > 0 && count === allItems.length;
         };
@@ -78,18 +82,21 @@
         refresh();
     });
     document.querySelectorAll('form[data-confirm]').forEach(form => form.addEventListener('submit', event => {
-        const selected = [...form.elements].filter(el => el.matches('[data-select-item]:checked'));
+        const bulkProposals = form.hasAttribute('data-bulk-proposals');
+        if(bulkProposals) form.querySelectorAll('[data-copied-value]').forEach(el => el.remove());
+        if(catalogueSubmission(event)) return;
+        const selected = [...form.elements].filter(el => el.matches('[data-select-item]:checked') && (!bulkProposals || proposalEligible(el)));
+        if(bulkProposals && selected.length === 0) { event.preventDefault(); return; }
         const count = selected.length;
         const message = (event.submitter?.dataset.confirm || form.dataset.confirm || document.body.dataset.confirm).replace(':count', String(count));
         if(!window.confirm(message)) { event.preventDefault(); return; }
-        if(form.hasAttribute('data-bulk-proposals')) {
-            form.querySelectorAll('[data-copied-value]').forEach(el => el.remove());
+        if(bulkProposals) {
             for(const checkbox of selected) {
                 const sourceForm = checkbox.closest('tr').querySelector('form');
-                for(const key of ['attribute','language','lock_version','value']) {
+                for(const key of ['selected','attribute','language','lock_version','value']) {
                     const input = document.createElement('input');
                     input.type = 'hidden'; input.name = `rows[${checkbox.dataset.termId}][${key}]`;
-                    input.value = sourceForm.elements[key].value; input.dataset.copiedValue = ''; form.append(input);
+                    input.value = key === 'selected' ? '1' : sourceForm.elements[key].value; input.dataset.copiedValue = ''; form.append(input);
                 }
             }
         }
@@ -99,8 +106,8 @@
         if(event.defaultPrevented) return;
         const form = event.target;
         const values = new Map(editors.filter(editor => editor.form === form).map(editor => [editor, editor.value]));
-        if(form.hasAttribute('data-bulk-proposals')) {
-            for(const checkbox of [...form.elements].filter(el => el.matches('[data-select-item]:checked'))) {
+        if(form.hasAttribute('data-bulk-proposals') && !catalogueSubmission(event)) {
+            for(const checkbox of [...form.elements].filter(el => el.matches('[data-select-item]:checked') && proposalEligible(el))) {
                 const editor = checkbox.closest('tr').querySelector('form')?.querySelector('[data-editor]');
                 const copied = form.elements[`rows[${checkbox.dataset.termId}][value]`];
                 if(editor && copied) values.set(editor, copied.value);

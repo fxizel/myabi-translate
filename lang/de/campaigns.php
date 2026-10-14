@@ -3,6 +3,7 @@
 return [
     'groups' => 'Begriffsgruppen', 'campaigns' => 'Übersetzungskampagnen',
     'group' => 'Begriffsgruppe', 'no_group' => 'Ohne Gruppe', 'restricted_group' => 'Gruppe ausserhalb des sichtbaren Bereichs',
+    'campaign' => 'Kampagne',
     'groups_description' => 'Begriffe nach Thema ordnen, wiederfinden und Kampagnen vorbereiten.',
     'campaigns_description' => 'Übersetzungen oder Revisionen für eine Zielsprache organisieren und Arbeit sowie Bestätigungen verfolgen.',
     'new_group' => 'Gruppe erstellen', 'edit_group' => 'Gruppe bearbeiten',
@@ -46,6 +47,7 @@ return [
     'admission' => 'Letzter Aufnahmebericht', 'admitted' => 'Aufgenommen', 'returned' => 'Wieder aufgenommen', 'removed' => 'Entfernt',
     'exclusions' => ['missing_column' => 'Spalte in der Zielsprache fehlt', 'objective' => 'Entspricht nicht dem Ziel', 'blocked' => 'Aufnahme durch Bestandsprüfungen blockiert'],
     'selection' => 'Auswahl zusammenstellen und ordnen', 'assign_group' => 'Gruppe zuweisen',
+    'selection_hint' => 'Begriffe in der ersten Tabellenspalte auswählen. Diese Auswahl gilt für Vorschläge, Gruppen und Kampagnen. Vorschläge werden nur für Begriffe eingereicht, bei denen ein Vorschlag erfasst werden kann.',
     'add_existing' => 'Zur Kampagne hinzufügen', 'choose_campaign' => 'Kampagne wählen',
     'previous_proposal' => 'Nicht mehr verfolgter Vorschlag',
     'edit' => 'Bearbeiten', 'delete' => 'Löschen', 'history' => 'Kampagnenverlauf',

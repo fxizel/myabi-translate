@@ -7,11 +7,13 @@
     @if(!($validationFilter ?? false))<label class="field filter"><span class="sr-only">{{ __('ui.state') }}</span><select class="input" name="state"><option value="">{{ __('ui.all_states') }}</option>@foreach(['missing','validated','published','review','obsolete','pending'] as $state)<option value="{{ $state }}" @selected(request('state')===$state)>{{ __('ui.status_'.$state) }}</option>@endforeach</select></label>@endif
     <button class="button primary" type="submit">{{ __('ui.filter') }}</button><a class="button quiet" href="{{ url()->current() }}?language={{ $language ?? 'fr' }}">{{ __('ui.reset') }}</a>
 </div>
-<details class="filters-more" @if(request()->hasAny(['organization_id','import_id','context','sort','group_id','campaign_id'])) open @endif><summary>{{ __('ui.filters') }}</summary><div class="filters-grid">
-    @if(isset($groups))<label class="field"><span>{{ __('campaigns.group') }}</span><select class="input" name="group_id"><option value="">{{ __('ui.all') }}</option><option value="none" @selected(request('group_id')==='none')>{{ __('campaigns.no_group') }}</option>@foreach($groups as $group)<option value="{{ $group->id }}" @selected(request('group_id')==$group->id)>{{ $group->title }}@if($group->archived_at) · {{ __('campaigns.archived') }}@endif</option>@endforeach</select></label>@endif
-@if($validationFilter ?? false)
+@if(isset($groups))
+<div class="catalogue-scope-filters">
+    <label class="field"><span>{{ __('campaigns.group') }}</span><select class="input" name="group_id"><option value="">{{ __('ui.all') }}</option><option value="none" @selected(request('group_id')==='none')>{{ __('campaigns.no_group') }}</option>@foreach($groups as $group)<option value="{{ $group->id }}" @selected(request('group_id')==$group->id)>{{ $group->title }}@if($group->archived_at) · {{ __('campaigns.archived') }}@endif</option>@endforeach</select></label>
     <label class="field"><span>{{ __('campaigns.campaign') }}</span><select class="input" name="campaign_id"><option value="">{{ __('ui.all') }}</option>@foreach($filterCampaigns as $filterCampaign)<option value="{{ $filterCampaign->id }}" @selected(request('campaign_id')==$filterCampaign->id)>{{ $filterCampaign->title }} · {{ strtoupper($filterCampaign->language) }}@if($filterCampaign->archived_at) · {{ __('campaigns.archived') }}@endif</option>@endforeach</select></label>
+</div>
 @endif
+<details class="filters-more" @if(request()->hasAny(['organization_id','import_id','context','sort','search_mode','per_page'])) open @endif><summary>{{ __('ui.filters') }}</summary><div class="filters-grid">
     @if($validationFilter ?? false)<label class="field"><span>{{ __('ui.origin_organization') }}</span><select class="input" name="organization_id"><option value="">{{ __('ui.all_organizations') }}</option>@foreach($organizations ?? [] as $organization)<option value="{{ $organization->id }}" @selected(request('organization_id')==$organization->id)>{{ $organization->name }}</option>@endforeach</select></label>
     <label class="field"><span>{{ __('ui.associated_import') }}</span><input type="number" min="1" class="input" name="import_id" value="{{ request('import_id') }}"></label>@endif
     <label class="field"><span>{{ __('ui.context') }}</span><input class="input" name="context" value="{{ request('context') }}" placeholder="{{ __('ui.context_hint') }}"></label>

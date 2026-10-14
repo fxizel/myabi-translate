@@ -3,6 +3,7 @@
 return [
     'groups' => 'Groupes de termes', 'campaigns' => 'Campagnes de traduction',
     'group' => 'Groupe de termes', 'no_group' => 'Sans groupe', 'restricted_group' => 'Groupe hors du périmètre visible',
+    'campaign' => 'Campagne',
     'groups_description' => 'Classer les termes par sujet pour les retrouver et préparer des campagnes.',
     'campaigns_description' => 'Organiser la traduction ou la révision dans une langue cible, puis suivre le travail et les confirmations.',
     'new_group' => 'Créer un groupe', 'edit_group' => 'Modifier le groupe',
@@ -46,6 +47,7 @@ return [
     'admission' => 'Dernier bilan d’admission', 'admitted' => 'Admis', 'returned' => 'Réintégrés', 'removed' => 'Retirés',
     'exclusions' => ['missing_column' => 'Colonne absente dans la langue cible', 'objective' => 'Ne correspond pas à l’objectif', 'blocked' => 'Admission bloquée par les contrôles du référentiel'],
     'selection' => 'Composer et classer la sélection', 'assign_group' => 'Affecter au groupe',
+    'selection_hint' => 'Cochez les termes dans la première colonne du tableau. Cette sélection sert aux propositions, aux groupes et aux campagnes. Proposer utilise uniquement les termes pour lesquels une proposition peut être saisie.',
     'add_existing' => 'Ajouter à la campagne', 'choose_campaign' => 'Choisir une campagne',
     'previous_proposal' => 'Proposition dont le suivi a cessé',
     'edit' => 'Modifier', 'delete' => 'Supprimer', 'history' => 'Historique de la campagne',

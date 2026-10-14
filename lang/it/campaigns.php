@@ -3,6 +3,7 @@
 return [
     'groups' => 'Gruppi di termini', 'campaigns' => 'Campagne di traduzione',
     'group' => 'Gruppo di termini', 'no_group' => 'Senza gruppo', 'restricted_group' => 'Gruppo fuori dall’ambito visibile',
+    'campaign' => 'Campagna',
     'groups_description' => 'Classificare i termini per argomento per ritrovarli e preparare campagne.',
     'campaigns_description' => 'Organizzare la traduzione o la revisione in una lingua di destinazione e seguire il lavoro e le conferme.',
     'new_group' => 'Crea un gruppo', 'edit_group' => 'Modifica il gruppo',
@@ -46,6 +47,7 @@ return [
     'admission' => 'Ultimo bilancio delle ammissioni', 'admitted' => 'Ammessi', 'returned' => 'Reintegrati', 'removed' => 'Ritirati',
     'exclusions' => ['missing_column' => 'Colonna assente nella lingua di destinazione', 'objective' => 'Non corrisponde all’obiettivo', 'blocked' => 'Ammissione bloccata dai controlli del repertorio'],
     'selection' => 'Componi e classifica la selezione', 'assign_group' => 'Assegna al gruppo',
+    'selection_hint' => 'Seleziona i termini nella prima colonna della tabella. La selezione serve per proposte, gruppi e campagne. L’invio delle proposte riguarda solo i termini per i quali è possibile inserire una proposta.',
     'add_existing' => 'Aggiungi alla campagna', 'choose_campaign' => 'Scegli una campagna',
     'previous_proposal' => 'Proposta non più seguita',
     'edit' => 'Modifica', 'delete' => 'Elimina', 'history' => 'Cronologia della campagna',

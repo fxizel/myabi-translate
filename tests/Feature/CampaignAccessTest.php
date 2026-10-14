@@ -182,6 +182,50 @@ class CampaignAccessTest extends TestCase
         $filtered->assertDontSee('Grouped private');
     }
 
+    public function test_catalogue_campaign_filter_combines_with_group_and_excludes_removed_participations(): void
+    {
+        $group = $this->group('Filtered group');
+        $grouped = $this->term('Campaign grouped');
+        $direct = $this->term('Campaign direct');
+        $removed = $this->term('Campaign removed');
+        $outside = $this->term('Outside campaign');
+        $this->post('/groups/assign', ['group_id' => $group->id, 'term_ids' => [$grouped->id, $outside->id]])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $campaign = $this->campaign('Catalogue campaign', ['term_ids' => [$grouped->id, $direct->id, $removed->id]]);
+        $campaign->participations()->where('term_id', $removed->id)->update(['active' => false]);
+        $this->actingAs($this->user(['reader' => ['fr']]));
+
+        $filtered = $this->get('/terms?campaign_id='.$campaign->id.'&sort=key')->assertOk();
+        self::assertSame([$direct->id, $grouped->id], $filtered->viewData('terms')->pluck('id')->all());
+        self::assertSame(2, $filtered->viewData('terms')->total());
+        self::assertSame(['server' => 2], $filtered->viewData('typeCounts')->all());
+        $combined = $this->get('/terms?campaign_id='.$campaign->id.'&group_id='.$group->id.'&type=server&state=missing')->assertOk();
+        self::assertSame([$grouped->id], $combined->viewData('terms')->pluck('id')->all());
+        self::assertSame(1, $combined->viewData('terms')->total());
+        $ungrouped = $this->get('/terms?campaign_id='.$campaign->id.'&group_id=none')->assertOk();
+        self::assertSame([$direct->id], $ungrouped->viewData('terms')->pluck('id')->all());
+    }
+
+    public function test_catalogue_campaign_filter_preserves_pagination_and_supports_archived_campaigns(): void
+    {
+        $ids = [];
+        for ($i = 0; $i < 12; $i++) {
+            $ids[] = $this->term('Campaign page '.str_pad((string) $i, 2, '0', STR_PAD_LEFT))->id;
+        }
+        $campaign = $this->campaign('Archived catalogue campaign', ['term_ids' => $ids]);
+        $campaign->update(['status' => 'completed', 'archived_at' => now()]);
+        $this->actingAs($this->user(['reader' => ['fr']]));
+
+        $response = $this->get('/terms?campaign_id='.$campaign->id.'&per_page=10&sort=key&page=2')->assertOk();
+        $terms = $response->viewData('terms');
+        self::assertSame(12, $terms->total());
+        self::assertSame(array_slice($ids, 10), $terms->pluck('id')->all());
+        self::assertStringContainsString('campaign_id='.$campaign->id, $terms->previousPageUrl());
+        self::assertTrue($response->viewData('filterCampaigns')->contains('id', $campaign->id));
+        $this->getJson('/terms?campaign_id=invalid')->assertUnprocessable()->assertJsonValidationErrors('campaign_id');
+        $this->getJson('/terms?campaign_id=999999')->assertUnprocessable()->assertJsonValidationErrors('campaign_id');
+    }
+
     public function test_shared_memberships_show_groups_campaigns_and_instructions_to_catalogue_readers(): void
     {
         $foreign = Organisation::create(['code' => 'QB', 'name' => 'Synthetic foreign organization', 'active' => true]);
@@ -282,6 +326,62 @@ class CampaignAccessTest extends TestCase
             }
             $this->get('/campaigns/'.$campaign->id)->assertOk()->assertSee(e($instructions), false)->assertDontSee($instructions, false);
         }
+    }
+
+    public function test_catalogue_shares_the_first_column_selection_for_proposals_and_group_assignment(): void
+    {
+        $ready = $this->term('Selectable ready term');
+        $pending = $this->term('Selectable pending term');
+        $this->post('/terms/'.$pending->id.'/proposals', [
+            'attribute' => 'label', 'language' => 'fr', 'value' => 'Existing synthetic proposal',
+            'lock_version' => $pending->lock_version,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $response = $this->get('/terms?language=fr')->assertOk();
+        $document = new \DOMDocument;
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+        $xpath = new \DOMXPath($document);
+        foreach ([$ready->id => '1', $pending->id => '0'] as $id => $eligible) {
+            $inputs = $xpath->query('//table[contains(@class,"catalogue-table")]/tbody/tr/td[1]/input[@name="term_ids[]" and @value="'.$id.'"]');
+            self::assertSame(1, $inputs->length);
+            self::assertSame('bulk-terms', $inputs->item(0)->getAttribute('form'));
+            self::assertSame($eligible, $inputs->item(0)->getAttribute('data-proposal-eligible'));
+        }
+        self::assertSame(0, $xpath->query('//td[@data-column="group"]//input')->length);
+        self::assertSame(3, $xpath->query('//form[@id="bulk-terms"]//button[@data-catalogue-submit]')->length);
+        self::assertSame(0, $xpath->query('//form[@id="bulk-terms"]//form')->length);
+
+        $group = $this->group('Shared selection group');
+        $selection = ['term_ids' => [$ready->id, $pending->id]];
+        $this->post('/groups/assign', $selection + ['group_id' => $group->id])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        self::assertSame($group->id, $ready->fresh()->term_group_id);
+        self::assertSame($group->id, $pending->fresh()->term_group_id);
+        $this->post('/proposals/bulk-store', $selection + ['confirmed' => 1, 'rows' => [
+            $ready->id => ['selected' => 1, 'attribute' => 'label', 'language' => 'fr',
+                'value' => 'New synthetic proposal', 'lock_version' => $ready->fresh()->lock_version],
+        ]])->assertRedirect()->assertSessionHasNoErrors();
+        self::assertSame(1, Proposal::where('term_id', $ready->id)->count());
+        self::assertSame(1, Proposal::where('term_id', $pending->id)->count());
+    }
+
+    public function test_shared_catalogue_selection_preserves_translator_and_reader_rights(): void
+    {
+        $term = $this->term('Shared selection permissions');
+        $this->actingAs($this->user(['translator' => ['fr']]));
+        $this->get('/terms?language=fr')->assertOk()
+            ->assertSee('name="term_ids[]"', false)
+            ->assertSee('data-proposal-eligible="1"', false)
+            ->assertDontSee('data-catalogue-submit', false);
+        $this->post('/terms/'.$term->id.'/proposals', [
+            'attribute' => 'label', 'language' => 'fr', 'value' => 'Pending synthetic proposal',
+            'lock_version' => $term->lock_version,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->get('/terms?language=fr')->assertOk()->assertDontSee('name="term_ids[]"', false);
+
+        $this->actingAs($this->user(['reader' => ['fr']]));
+        $this->get('/terms?language=fr')->assertOk()
+            ->assertDontSee('name="term_ids[]"', false)->assertDontSee('data-catalogue-submit', false);
     }
 
     private function user(array $roles, ?int $organizationId = null): User

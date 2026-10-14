@@ -53,13 +53,18 @@ class TermController extends Controller
     {
         $data = $request->validate(['type' => 'nullable|in:'.implode(',', array_keys(FormatRegistry::all())), 'language' => 'nullable|in:de,fr,it,en', 'q' => 'nullable|string|max:250',
             'version_id' => 'nullable|integer|exists:myabi_versions,id', 'context' => 'nullable|string|max:255', 'per_page' => 'nullable|integer|min:10|max:100',
-            'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/']]);
+            'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
+            'campaign_id' => 'nullable|integer|exists:translation_campaigns,id']);
         $language = $data['language'] ?? 'fr';
         $query = Term::visibleTo($request->user())->with('sourceImport', 'lastPublication');
         if (($data['group_id'] ?? '') === 'none') {
             $query->whereNull('term_group_id');
         } elseif ($request->filled('group_id')) {
             $query->where('term_group_id', (int) $data['group_id']);
+        }
+        if ($request->filled('campaign_id')) {
+            $campaign = TranslationCampaign::visibleTo($request->user())->findOrFail($data['campaign_id']);
+            $query->whereIn('id', $campaign->participations()->where('active', true)->select('term_id'));
         }
         if ($request->filled('type')) {
             $query->where('type', $data['type']);
@@ -106,12 +111,12 @@ class TermController extends Controller
         $sort = match ($data['sort'] ?? 'updated') {
             'key' => 'label','created' => 'created_at',default => 'updated_at'
         };
-        // A single aggregate supplies both the per-type badges and paginator total.
+        // A single aggregate supplies the totals by type and paginator total.
         // GROUP BY type otherwise encourages MariaDB to walk the type index and
         // fetch every large catalogue row in index order for text predicates.
         $countQuery = (clone $query)->withoutEagerLoads();
         if ($state === 'pending' && in_array(DB::getDriverName(), ['mariadb', 'mysql'])
-            && ! $request->filled('context') && ! $request->filled('group_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
+            && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
             // Keep the count on a covering term index. A proposal-first
             // LooseScan otherwise fetches every large matching term by PK.
             $countQuery->forceIndex('terms_type_obsolete_id_index');
@@ -126,7 +131,7 @@ class TermController extends Controller
         // Select only this page's IDs first so the date/id index covers the
         // ordered scan; hydrate at most 100 large rows after SQL filtering.
         $pageQuery = (clone $query)->withoutEagerLoads()->select('id');
-        if (in_array(DB::getDriverName(), ['mariadb', 'mysql']) && $sort !== 'label' && ! $request->filled('context') && ! $request->filled('group_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
+        if (in_array(DB::getDriverName(), ['mariadb', 'mysql']) && $sort !== 'label' && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
             // Keep the ordered catalogue page on its covering date/id index.
             $pageQuery->forceIndex($sort === 'created_at' ? 'terms_created_page_index' : 'terms_updated_page_index');
         }
@@ -154,9 +159,10 @@ class TermController extends Controller
         }
 
         $groups = TermGroup::visibleTo($request->user())->orderBy('title')->get();
-        $compositionCampaigns = $request->user()->canManage() ? TranslationCampaign::visibleTo($request->user())->whereNull('archived_at')->whereIn('status', ['todo', 'in_progress'])->orderBy('title')->get() : collect();
+        $filterCampaigns = TranslationCampaign::visibleTo($request->user())->orderBy('title')->get();
+        $compositionCampaigns = $request->user()->canManage() ? $filterCampaigns->whereNull('archived_at')->whereIn('status', ['todo', 'in_progress']) : collect();
 
-        return view('terms.index', [...self::filters(), ...compact('terms', 'language', 'typeCounts', 'groups', 'compositionCampaigns')]);
+        return view('terms.index', [...self::filters(), ...compact('terms', 'language', 'typeCounts', 'groups', 'filterCampaigns', 'compositionCampaigns')]);
     }
 
     public function show(Request $request, string $term, SourceRecord $source)
