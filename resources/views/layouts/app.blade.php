@@ -43,7 +43,7 @@
             @endauth
         </div>
         <nav class="app-tab-strip" aria-label="{{ __('ui.workspace_navigation') }}">
-            <span class="tab-grid" aria-hidden="true">@include('partials.icon', ['name' => 'grid'])</span>
+            <a class="tab-grid" href="{{ url('/') }}" aria-label="{{ __('ui.dashboard') }}" title="{{ __('ui.dashboard') }}">@include('partials.icon', ['name' => 'grid'])</a>
             @auth
                 <a class="app-tab" href="{{ url('terms') }}" @if(!$detailBack) aria-current="page" @endif><span class="tab-star" aria-hidden="true">★</span><span class="tab-name">{{ __('ui.translation_management') }}</span></a>
                 @if($detailBack)
