@@ -316,6 +316,31 @@ def open_owned(layout, lease):
     require(not layout["down"].exists(), "maintenance_remains")
 
 
+def reload_nginx(layout, lease):
+    run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-t"), layout, lease, timeout=30)
+    # Configuration validity does not mean that the newly created master has
+    # written its PID yet. Only signal it after the PID identifies a live process.
+    probe = ("test -s /var/run/nginx.pid || exit 1; "
+             "pid=$(cat /var/run/nginx.pid) || exit 1; "
+             "case \"$pid\" in ''|*[!0-9]*) exit 1 ;; esac; "
+             "[ \"$pid\" -gt 0 ] || exit 1; kill -0 \"$pid\"")
+    deadline = time.monotonic() + 60
+    while True:
+        remaining = deadline - time.monotonic()
+        require(remaining > 0, "nginx_timeout")
+        try:
+            ready = run(compose(layout, "exec", "-T", "myabi-web", "sh", "-c", probe),
+                        layout, lease, check=False, timeout=min(10, remaining))
+            if ready.returncode == 0:
+                break
+        except subprocess.TimeoutExpired:
+            pass
+        remaining = deadline - time.monotonic()
+        require(remaining > 0, "nginx_timeout")
+        time.sleep(min(1, remaining))
+    run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-s", "reload"), layout, lease, timeout=30)
+
+
 def runtime_checks(layout, lease, opened=False):
     result = run(compose(layout, "run", "--rm", "--no-deps", "-T", "cli", "php", "scripts/operations.php", "health"), layout, lease)
     require(b"Database, schema and private runtime directories are healthy." in result.stdout, "cli_health_failed")
@@ -493,8 +518,7 @@ def switch(layout, lease):
         while run(compose(layout, "exec", "-T", "app", "php", "-r", "$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);"), layout, lease, check=False).returncode:
             require(time.monotonic() < deadline, "fpm_timeout")
             time.sleep(1)
-        run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-t"), layout, lease)
-        run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-s", "reload"), layout, lease)
+        reload_nginx(layout, lease)
         runtime_checks(layout, lease)
         verify_preservation(layout, lease)
         require(manifest(layout, lease)["commit"] == layout["release"]["revision"], "manifest_mismatch")
@@ -555,8 +579,7 @@ def recover(layout, lease):
             while run(compose(layout, "exec", "-T", "app", "php", "-r", "$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);"), layout, lease, check=False).returncode:
                 require(time.monotonic() < deadline, "fpm_timeout")
                 time.sleep(1)
-            run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-t"), layout, lease)
-            run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-s", "reload"), layout, lease)
+            reload_nginx(layout, lease)
             runtime_checks(layout, lease)
             require(manifest(layout, lease)["commit"] == layout["release"]["previous_revision"], "rollback_manifest_mismatch")
         if lease.get("owned_maintenance") and lease.get("maintenance_hash"):

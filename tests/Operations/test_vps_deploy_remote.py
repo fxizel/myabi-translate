@@ -158,6 +158,93 @@ class RemoteDeploymentTests(unittest.TestCase):
             self.error_code("audit_check_failed", lambda: remote.runtime_checks(self.layout, {}))
         self.assertEqual(2, command.call_count)
 
+    def test_nginx_reload_waits_for_live_master_after_failed_pid_probes(self):
+        lease = {"phase": "switching"}
+        probe_results = iter([
+            subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"Synthetic malformed PID"),
+            subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"Synthetic stale PID"),
+            subprocess.CompletedProcess([], 0, stdout=b"", stderr=b""),
+        ])
+        events = []
+        master_ready = False
+
+        def command(args, layout, passed_lease, **kwargs):
+            nonlocal master_ready
+            self.assertIs(self.layout, layout)
+            self.assertIs(lease, passed_lease)
+            if args[-2:] == ["nginx", "-t"]:
+                self.assertFalse(events)
+                events.append("configuration")
+            elif args[-3:] == ["nginx", "-s", "reload"]:
+                self.assertTrue(master_ready, "Reload must wait for a successful PID/liveness probe.")
+                events.append("reload")
+            else:
+                self.assertEqual(["exec", "-T", "myabi-web", "sh", "-c"], args[-6:-1])
+                self.assertIs(False, kwargs.get("check"))
+                self.assertGreater(kwargs["timeout"], 0)
+                self.assertLessEqual(kwargs["timeout"], 10)
+                self.assertNotIn("reload", events)
+                result = next(probe_results)
+                master_ready = result.returncode == 0
+                events.append("ready" if master_ready else "waiting")
+                return result
+            return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+
+        with mock.patch.object(remote, "run", side_effect=command), mock.patch.object(remote.time, "monotonic", return_value=100), mock.patch.object(remote.time, "sleep") as sleep:
+            remote.reload_nginx(self.layout, lease)
+        self.assertEqual(["configuration", "waiting", "waiting", "ready", "reload"], events)
+        self.assertEqual([mock.call(1), mock.call(1)], sleep.call_args_list)
+
+    def test_nginx_missing_master_reaches_deadline_without_reload(self):
+        clock = [100.0]
+        lease = {"phase": "switching"}
+        probes = []
+
+        def command(args, layout, passed_lease, **kwargs):
+            if args[-2:] == ["nginx", "-t"]:
+                return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+            self.assertEqual(["exec", "-T", "myabi-web", "sh", "-c"], args[-6:-1])
+            self.assertIs(False, kwargs.get("check"))
+            probes.append(kwargs["timeout"])
+            return subprocess.CompletedProcess(args, 1, stdout=b"", stderr=b"Synthetic unavailable master")
+
+        def sleep(seconds):
+            self.assertGreater(seconds, 0)
+            self.assertLessEqual(seconds, 1)
+            clock[0] += seconds
+
+        with mock.patch.object(remote, "run", side_effect=command) as calls, mock.patch.object(remote.time, "monotonic", side_effect=lambda: clock[0]), mock.patch.object(remote.time, "sleep", side_effect=sleep):
+            self.error_code("nginx_timeout", lambda: remote.reload_nginx(self.layout, lease))
+        self.assertEqual(160.0, clock[0])
+        self.assertEqual(60, len(probes))
+        self.assertTrue(all(0 < timeout <= 10 for timeout in probes))
+        self.assertFalse(any(call.args[0][-3:] == ["nginx", "-s", "reload"] for call in calls.call_args_list))
+
+    def test_nginx_hung_pid_probe_is_bounded_and_cannot_reload(self):
+        clock = [0.0]
+        probes = []
+
+        def command(args, layout, lease, **kwargs):
+            if args[-2:] == ["nginx", "-t"]:
+                return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+            self.assertEqual(["exec", "-T", "myabi-web", "sh", "-c"], args[-6:-1])
+            self.assertIs(False, kwargs.get("check"))
+            timeout = kwargs["timeout"]
+            self.assertLessEqual(timeout, 60 - clock[0])
+            probes.append(timeout)
+            clock[0] += timeout
+            raise subprocess.TimeoutExpired(args, timeout)
+
+        def sleep(seconds):
+            self.assertLessEqual(seconds, 60 - clock[0])
+            clock[0] += seconds
+
+        with mock.patch.object(remote, "run", side_effect=command) as calls, mock.patch.object(remote.time, "monotonic", side_effect=lambda: clock[0]), mock.patch.object(remote.time, "sleep", side_effect=sleep):
+            self.error_code("nginx_timeout", lambda: remote.reload_nginx(self.layout, {}))
+        self.assertEqual([10, 10, 10, 10, 10, 5], probes)
+        self.assertEqual(60.0, clock[0])
+        self.assertFalse(any(call.args[0][-3:] == ["nginx", "-s", "reload"] for call in calls.call_args_list))
+
 
 if __name__ == "__main__":
     unittest.main()
