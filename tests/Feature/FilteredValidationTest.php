@@ -16,6 +16,7 @@ use App\Models\TermGroup;
 use App\Models\TranslationCampaign;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\CampaignService;
 use App\Services\FilteredValidationService;
 use App\Services\ImportService;
 use App\Services\OperationLock;
@@ -351,4 +352,91 @@ class FilteredValidationTest extends TestCase
         $this->assertSame(2, Revision::count());
         $this->assertSame(1, DB::table('audit_events')->where('action', 'proposal.validate')->count());
     }
+
+    public function test_changed_campaign_members_reject_filtered_confirmation_even_when_total_and_id_bound_still_match(): void
+    {
+        $this->import(2);
+        $proposals = Proposal::where('status', 'pending')->where('language', 'fr')->orderBy('id')->get();
+        self::assertCount(2, $proposals);
+        [$b, $a] = $proposals->all();
+        self::assertLessThan($a->id, $b->id);
+        $campaigns = app(CampaignService::class);
+        $campaign = $campaigns->create($this->manager, ['title' => 'Synthetic filtered scope',
+            'objective' => 'translation', 'language' => 'fr', 'term_ids' => [$a->term_id]]);
+        $token = $this->token(['campaign_id' => $campaign->id]);
+        $revisions = Revision::count();
+
+        $campaigns->removeDirectTerm($this->manager, $campaign->fresh(), $a->term);
+        $campaigns->addDirectTerms($this->manager, $campaign->fresh(), [$b->term_id]);
+        $current = app(ProposalFilter::class)->query($this->manager, ['language' => 'fr', 'campaign_id' => $campaign->id]);
+        self::assertSame([$b->id], $current->orderBy('proposals.id')->pluck('proposals.id')->all());
+        self::assertSame(1, $current->count());
+        $this->post('/proposals/validate-filtered', ['snapshot_token' => $token, 'confirmed' => 1])
+            ->assertRedirect()->assertSessionHasErrors('validation');
+
+        $this->assertDatabaseCount('bulk_operations', 0);
+        self::assertSame('pending', $a->fresh()->status);
+        self::assertSame('pending', $b->fresh()->status);
+        self::assertSame($revisions, Revision::count());
+        self::assertSame(0, DB::table('audit_events')->where('action', 'proposal.validate')->count());
+    }
+
+    public function test_changed_campaign_members_stop_queued_filtered_validation_before_any_decision(): void
+    {
+        $this->import(2);
+        $proposals = Proposal::where('status', 'pending')->where('language', 'fr')->orderBy('id')->get();
+        self::assertCount(2, $proposals);
+        [$b, $a] = $proposals->all();
+        self::assertLessThan($a->id, $b->id);
+        $campaigns = app(CampaignService::class);
+        $campaign = $campaigns->create($this->manager, ['title' => 'Synthetic queued scope',
+            'objective' => 'translation', 'language' => 'fr', 'term_ids' => [$a->term_id]]);
+        $operation = $this->enqueue($this->token(['campaign_id' => $campaign->id]));
+        self::assertSame($a->id, (int) $operation->max_proposal_id);
+        $revisions = Revision::count();
+
+        $campaigns->removeDirectTerm($this->manager, $campaign->fresh(), $a->term);
+        $campaigns->addDirectTerms($this->manager, $campaign->fresh(), [$b->term_id]);
+        $current = app(ProposalFilter::class)->query($this->manager, ['language' => 'fr', 'campaign_id' => $campaign->id]);
+        self::assertSame([$b->id], $current->orderBy('proposals.id')->pluck('proposals.id')->all());
+        self::assertSame(1, $current->count());
+        self::assertFalse($this->step($operation));
+
+        self::assertSame('failed', $operation->fresh()->status);
+        self::assertSame(0, $operation->fresh()->counts['validated']);
+        self::assertSame('pending', $a->fresh()->status);
+        self::assertSame('pending', $b->fresh()->status);
+        self::assertSame($revisions, Revision::count());
+        self::assertSame(0, DB::table('audit_events')->where('action', 'proposal.validate')->count());
+    }
+
+    public function test_campaign_metadata_and_membership_noops_keep_filtered_preview_usable(): void
+    {
+        $this->import(2);
+        $proposals = Proposal::where('status', 'pending')->where('language', 'fr')->orderBy('id')->get();
+        self::assertCount(2, $proposals);
+        [$b, $a] = $proposals->all();
+        $campaigns = app(CampaignService::class);
+        $campaign = $campaigns->create($this->manager, ['title' => 'Synthetic stable scope',
+            'objective' => 'translation', 'language' => 'fr', 'term_ids' => [$a->term_id]]);
+        $token = $this->token(['campaign_id' => $campaign->id]);
+        $generation = (int) DB::table('catalogue_state')->where('id', 1)->value('generation');
+        $revisions = Revision::count();
+
+        $campaigns->addDirectTerms($this->manager, $campaign->fresh(), [$a->term_id]);
+        $campaigns->synchronize($this->manager, $campaign->fresh());
+        $campaigns->setGroups($this->manager, $campaign->fresh(), []);
+        $campaigns->update($this->manager, $campaign->fresh(), ['title' => 'Synthetic renamed scope']);
+        self::assertSame($generation, (int) DB::table('catalogue_state')->where('id', 1)->value('generation'));
+        $operation = $this->enqueue($token);
+        self::assertTrue($this->step($operation));
+
+        self::assertSame('completed', $operation->fresh()->status);
+        self::assertSame(1, $operation->fresh()->counts['validated']);
+        self::assertSame('validated', $a->fresh()->status);
+        self::assertSame('pending', $b->fresh()->status);
+        self::assertSame($revisions + 1, Revision::count());
+        self::assertSame(1, DB::table('audit_events')->where('action', 'proposal.validate')->count());
+    }
+
 }

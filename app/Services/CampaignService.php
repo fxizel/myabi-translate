@@ -240,7 +240,7 @@ class CampaignService
                 $p->update(['direct' => true]);
                 $this->event($campaign, $p, 'direct_added_for_reexamination', $user, $reason);
             }
-            $p->update($this->reset() + ['active' => true, 'removed_at' => null, 'status' => 'to_process', 'reason' => $reason]);
+            $this->updateParticipationScope($p, $this->reset() + ['active' => true, 'removed_at' => null, 'status' => 'to_process', 'reason' => $reason]);
             if ($campaign->status === 'completed') {
                 $campaign->update(['status' => 'in_progress', 'archived_at' => null, 'updated_by' => $user->id]);
                 $this->event($campaign, null, 'reopened', $user, $reason);
@@ -295,7 +295,7 @@ class CampaignService
                 $p = $campaign->participations()->where('term_id', $term->id)->lockForUpdate()->first();
                 if ($p?->active && ! $p->direct && ! $belongs) {
                     $previous = $p->tracked_proposal_id;
-                    $p->update(['active' => false, 'removed_at' => now(), 'tracked_proposal_id' => null]);
+                    $this->updateParticipationScope($p, ['active' => false, 'removed_at' => now(), 'tracked_proposal_id' => null]);
                     $this->event($campaign, $p, 'removed', $actor, null, ['previous_proposal_id' => $previous]);
                     $report['removed']++;
                 }
@@ -326,7 +326,7 @@ class CampaignService
         foreach ($campaign->participations()->where('active', true)->where('direct', false)->with('term')->lockForUpdate()->get() as $p) {
             if (! $groupIds->contains($p->term->term_group_id)) {
                 $previous = $p->tracked_proposal_id;
-                $p->update(['active' => false, 'removed_at' => now(), 'tracked_proposal_id' => null]);
+                $this->updateParticipationScope($p, ['active' => false, 'removed_at' => now(), 'tracked_proposal_id' => null]);
                 $this->event($campaign, $p, 'removed', $actor, null, ['previous_proposal_id' => $previous]);
                 $report['removed']++;
             }
@@ -393,10 +393,11 @@ class CampaignService
             return;
         }
         if ($p !== null) {
-            $p->update($this->reset() + ['active' => true, 'direct' => $direct, 'status' => 'to_process', 'reason' => null, 'removed_at' => null]);
+            $this->updateParticipationScope($p, $this->reset() + ['active' => true, 'direct' => $direct, 'status' => 'to_process', 'reason' => null, 'removed_at' => null]);
             $this->event($campaign, $p, 'returned', $actor);
             $report['returned']++;
         } else {
+            $this->invalidateParticipationScope();
             $p = $campaign->participations()->create(['term_id' => $term->id, 'attribute' => $attribute, 'active' => true, 'direct' => $direct, 'status' => 'to_process']);
             $this->event($campaign, $p, 'admitted', $actor, null, ['direct' => $direct]);
             $pending = $this->pertinentPending($term, $campaign->language);
@@ -701,6 +702,23 @@ class CampaignService
     private function invalid(string $field, string $message): never
     {
         throw ValidationException::withMessages([$field => $message]);
+    }
+
+    /** Callers hold the operation lock and transaction, including internal synchronization. */
+    private function updateParticipationScope(CampaignParticipation $participation, array $values): void
+    {
+        if ($participation->active !== (bool) $values['active']) {
+            $this->invalidateParticipationScope();
+        }
+        $participation->update($values);
+    }
+
+    private function invalidateParticipationScope(): void
+    {
+        // Membership and generation commit together. A locking read serializes
+        // this invalidation with other catalogue writers before the scope changes.
+        DB::table('catalogue_state')->where('id', 1)->lockForUpdate()->first();
+        DB::table('catalogue_state')->where('id', 1)->increment('generation');
     }
 
     private function write(callable $callback): mixed
