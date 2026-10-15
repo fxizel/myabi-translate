@@ -164,7 +164,6 @@ return [
     'export_download' => 'CSV herunterladen',
     'export_help' => 'Die Datei enthält alle bekannten Begriffe des Typs und alle Sprachen mit gemeinsamen validierten Übersetzungen oder importierten Ersatzwerten. Es wird keine Publikation erstellt.',
     'export_choose_type' => 'Übersetzungstyp auswählen',
-    'export_choose_organization' => 'Organisation auswählen',
-    'export_empty' => 'Für den Export sind eine bereits importierte aktuelle Version und eine aktive Organisation erforderlich.',
+    'export_empty' => 'Für den Export ist eine bereits importierte aktuelle Version erforderlich.',
     'export_failed' => 'Der Export ist fehlgeschlagen. Versuchen Sie es erneut oder wenden Sie sich an einen Administrator.',
 ];

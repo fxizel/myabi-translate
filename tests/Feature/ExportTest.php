@@ -77,11 +77,11 @@ class ExportTest extends TestCase
 
             $audit = AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail();
             self::assertSame($source->id, $audit->after_values['sources'][0]['import_id']);
-            self::assertSame($this->organization->id, $audit->after_values['organization_id']);
+            self::assertArrayNotHasKey('organization_id', $audit->after_values);
             self::assertSame($source->sha256, $audit->after_values['sources'][0]['sha256']);
             self::assertSame(hash_file('sha256', $path), $audit->after_values['sha256']);
             self::assertSame(1, $audit->after_values['records']);
-            self::assertEqualsCanonicalizing(['version_id', 'type', 'organization_id', 'sources', 'sha256', 'records', 'format_version', 'coverage'], array_keys($audit->after_values));
+            self::assertEqualsCanonicalizing(['version_id', 'type', 'sources', 'sha256', 'records', 'format_version', 'coverage'], array_keys($audit->after_values));
 
             ob_start();
             try {
@@ -125,14 +125,16 @@ class ExportTest extends TestCase
         self::assertDatabaseCount('publications', 0);
     }
 
-    public function test_current_term_source_is_independent_of_the_recipient_and_repeated_presences_add_no_row(): void
+    public function test_current_term_source_ignores_the_managers_organization_and_repeated_presences_add_no_row(): void
     {
         [$publisher, $term] = $this->source('mric');
         [$local] = $this->source('mric', $this->organization->id, existing: $term);
         $local->update(['is_complete' => false]);
         $this->download()->assertOk();
         self::assertSame($publisher->id, AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail()->after_values['sources'][0]['import_id']);
-        $this->download(organizationId: $this->other->id)->assertOk();
+        $this->manager->update(['organization_id' => $this->other->id]);
+        $response = $this->download()->assertOk();
+        self::assertCount(2, iterator_to_array((new CsvReader)->records($response->baseResponse->getFile()->getPathname())));
         self::assertSame($publisher->id, AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail()->after_values['sources'][0]['import_id']);
         self::assertFalse($local->fresh()->is_complete);
         self::assertDatabaseCount('import_batches', 2);
@@ -144,7 +146,9 @@ class ExportTest extends TestCase
         $this->source('mric');
         $this->manager->update(['locale' => 'fr']);
         $this->actingAs($this->manager)->get(route('exports.index'))->assertOk()
-            ->assertSee(route('exports.download'))->assertSee($this->version->number);
+            ->assertSee(route('exports.download'))->assertSee($this->version->number)
+            ->assertSee('name="type"', false)->assertSee('name="version_id"', false)
+            ->assertDontSee('name="organization_id"', false);
         $this->get(route('dashboard'))->assertOk()->assertSee(route('exports.index'));
         foreach (['reader', 'translator', 'validator', 'admin'] as $role) {
             $this->actingAs($this->user($role))->get(route('exports.index'))->assertForbidden();
@@ -157,6 +161,60 @@ class ExportTest extends TestCase
         $this->post(route('exports.download'), $this->parameters())->assertForbidden();
     }
 
+    public function test_export_page_and_download_work_without_any_active_organization(): void
+    {
+        [$source] = $this->source('mric', $this->organization->id);
+        $this->manager->update(['organization_id' => null]);
+        Organisation::query()->update(['active' => false]);
+
+        foreach (['fr', 'de', 'it'] as $locale) {
+            $this->manager->update(['locale' => $locale]);
+            $this->actingAs($this->manager)->get(route('exports.index'))->assertOk()
+                ->assertSee('name="type"', false)->assertSee('name="version_id"', false)
+                ->assertDontSee('name="organization_id"', false)
+                ->assertDontSee(__('ui.export_empty'))
+                ->assertDontSee('class="button primary" disabled', false);
+        }
+        $response = $this->download()->assertOk();
+        self::assertSame(file_get_contents($source->originalPath()), file_get_contents($response->baseResponse->getFile()->getPathname()));
+        $audit = AuditEvent::where('action', 'export.downloaded')->firstOrFail();
+        self::assertArrayNotHasKey('organization_id', $audit->after_values);
+        self::assertSame($this->manager->id, $audit->user_id);
+        self::assertSame($source->id, $audit->after_values['sources'][0]['import_id']);
+    }
+
+    public function test_an_organization_sent_by_a_legacy_form_does_not_change_the_common_export(): void
+    {
+        $this->source('mric');
+        $this->source('mric', $this->other->id);
+        $this->other->update(['active' => false]);
+        $response = $this->download()->assertOk();
+        $expected = file_get_contents($response->baseResponse->getFile()->getPathname());
+
+        foreach ([$this->other->id, 'unknown', [$this->organization->id]] as $organization) {
+            $legacy = $this->actingAs($this->manager)->post(route('exports.download'), [
+                ...$this->parameters(), 'organization_id' => $organization,
+            ])->assertOk();
+            self::assertSame($expected, file_get_contents($legacy->baseResponse->getFile()->getPathname()));
+            $audit = AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail();
+            self::assertArrayNotHasKey('organization_id', $audit->after_values);
+            self::assertSame(2, $audit->after_values['records']);
+        }
+    }
+
+    public function test_version_and_type_remain_required_and_the_page_without_imports_disables_export(): void
+    {
+        $this->manager->update(['locale' => 'fr']);
+        $this->actingAs($this->manager)->get(route('exports.index'))->assertOk()
+            ->assertSee(__('ui.export_empty'))
+            ->assertSee('class="button primary" disabled', false)
+            ->assertDontSee('name="organization_id"', false);
+        $this->postJson(route('exports.download'), [])->assertUnprocessable()
+            ->assertExactJsonStructure(['message', 'errors' => ['version_id', 'type']]);
+        $this->assertNoExportArtifacts();
+        self::assertDatabaseMissing('audit_events', ['action' => 'export.downloaded']);
+    }
+
     public function test_guests_are_redirected_to_login(): void
     {
         $this->get(route('exports.index'))->assertRedirect(route('login'));
@@ -166,27 +224,26 @@ class ExportTest extends TestCase
     public function test_malformed_form_input_is_rejected_and_does_not_break_rendering(): void
     {
         $this->actingAs($this->manager)->from(route('exports.index'))->post(route('exports.download'), [
-            'version_id' => [$this->version->id], 'type' => ['mric'], 'organization_id' => [$this->organization->id],
-        ])->assertRedirect(route('exports.index'))->assertSessionHasErrors(['version_id', 'type', 'organization_id']);
+            'version_id' => [$this->version->id], 'type' => ['mric'],
+        ])->assertRedirect(route('exports.index'))->assertSessionHasErrors(['version_id', 'type']);
         $this->get(route('exports.index'))->assertOk();
         self::assertDatabaseMissing('audit_events', ['action' => 'export.downloaded']);
     }
 
-    public function test_unknown_type_and_inactive_recipient_are_rejected(): void
+    public function test_unknown_type_is_rejected(): void
     {
-        $this->other->update(['active' => false]);
         $this->actingAs($this->manager)->postJson(route('exports.download'), [
-            'version_id' => $this->version->id, 'type' => '../originals', 'organization_id' => $this->other->id,
-        ])->assertUnprocessable()->assertJsonValidationErrors(['type', 'organization_id']);
+            'version_id' => $this->version->id, 'type' => '../originals',
+        ])->assertUnprocessable()->assertJsonValidationErrors('type');
         $this->assertNoExportArtifacts();
     }
 
-    public function test_rejected_export_keeps_the_selected_version_type_and_organization(): void
+    public function test_rejected_export_keeps_the_selected_version_and_type(): void
     {
         $this->source('mric');
         MyabiVersion::create(['number' => '2026.3', 'released_at' => '2026-10-01', 'status' => 'preparation',
             'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
-        $parameters = $this->parameters('server', $this->other->id);
+        $parameters = $this->parameters('server');
         $this->actingAs($this->manager)->from(route('exports.index'))->post(route('exports.download'), $parameters)
             ->assertRedirect(route('exports.index'))->assertSessionHasErrors('source');
         $response = $this->get(route('exports.index'))->assertOk();
@@ -297,7 +354,8 @@ class ExportTest extends TestCase
         $response = $this->download()->assertOk();
         $expected = $firstRecords[0]->raw().$firstRecords[1]->raw().$secondRecords[1]->raw();
         self::assertSame($expected, file_get_contents($response->baseResponse->getFile()->getPathname()));
-        $other = $this->download(organizationId: $this->other->id)->assertOk();
+        $this->manager->update(['organization_id' => $this->other->id]);
+        $other = $this->download()->assertOk();
         self::assertSame($expected, file_get_contents($other->baseResponse->getFile()->getPathname()));
         $audit = AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail();
         self::assertSame(2, $audit->after_values['records']);
@@ -311,7 +369,7 @@ class ExportTest extends TestCase
         self::assertSame(file_get_contents($source->originalPath()), file_get_contents($response->baseResponse->getFile()->getPathname()));
     }
 
-    public function test_1200_known_terms_are_exported_from_sources_of_1000_and_200_rows_for_every_recipient(): void
+    public function test_1200_known_terms_are_exported_from_sources_of_1000_and_200_rows_regardless_of_the_managers_organization(): void
     {
         [$first, $firstTerm] = $this->source('mric', validated: ['label' => ['fr' => 'Valeur commune {}']]);
         $firstKeys = $this->appendSyntheticRows($first, $firstTerm, 1000);
@@ -339,7 +397,8 @@ class ExportTest extends TestCase
         self::assertSame('Valeur commune {}', $records[1001]->associative(FormatRegistry::get('mric')->headers)['fr_CH']);
         self::assertSame('Import {}', $records[1200]->associative(FormatRegistry::get('mric')->headers)['fr_CH']);
 
-        $other = $this->download(organizationId: $this->other->id)->assertOk();
+        $this->manager->update(['organization_id' => $this->other->id]);
+        $other = $this->download()->assertOk();
         self::assertSame($bytes, file_get_contents($other->baseResponse->getFile()->getPathname()));
         $audit = AuditEvent::where('action', 'export.downloaded')->latest('id')->firstOrFail();
         self::assertSame(1200, $audit->after_values['records']);
@@ -388,14 +447,14 @@ class ExportTest extends TestCase
         self::assertSame([], is_dir($path) ? File::allFiles($path) : []);
     }
 
-    private function download(string $type = 'mric', ?int $organizationId = null): TestResponse
+    private function download(string $type = 'mric'): TestResponse
     {
-        return $this->actingAs($this->manager)->post(route('exports.download'), $this->parameters($type, $organizationId));
+        return $this->actingAs($this->manager)->post(route('exports.download'), $this->parameters($type));
     }
 
-    private function parameters(string $type = 'mric', ?int $organizationId = null): array
+    private function parameters(string $type = 'mric'): array
     {
-        return ['version_id' => $this->version->id, 'type' => $type, 'organization_id' => $organizationId ?? $this->organization->id];
+        return ['version_id' => $this->version->id, 'type' => $type];
     }
 
     private function user(string $role): User

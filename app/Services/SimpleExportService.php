@@ -20,18 +20,17 @@ class SimpleExportService
     ) {}
 
     /** Build a complete private CSV before sending any bytes to the client. */
-    public function prepare(User $user, int $versionId, string $type, int $organizationId): array
+    public function prepare(User $user, int $versionId, string $type): array
     {
         abort_unless($user->canManage() && $user->isLoginAllowed(), 403);
 
-        return $this->lock->run(function () use ($user, $versionId, $type, $organizationId) {
+        return $this->lock->run(function () use ($user, $versionId, $type) {
             $path = null;
             try {
-                return DB::transaction(function () use ($user, $versionId, $type, $organizationId, &$path) {
+                return DB::transaction(function () use ($user, $versionId, $type, &$path) {
                     $version = MyabiVersion::findOrFail($versionId);
                     $this->exports->assertCurrentVersion($version);
                     $format = FormatRegistry::get($type);
-                    $this->exports->assertRecipients([$organizationId]);
                     $plan = $this->exports->plan($type);
                     $permissions = new PrivateStoragePermissions;
                     $directory = storage_path('app/private/exports');
@@ -53,7 +52,7 @@ class SimpleExportService
                         throw ValidationException::withMessages(['source' => __('ui.publication_source_count')]);
                     }
                     $this->audit->record('export.downloaded', $version, [], [
-                        'version_id' => $versionId, 'type' => $type, 'organization_id' => $organizationId,
+                        'version_id' => $versionId, 'type' => $type,
                         'sources' => $this->exports->sourceManifest($plan),
                         'sha256' => $result['sha256'], 'records' => $result['records'],
                         'format_version' => $result['format_version'], 'coverage' => $coverage,

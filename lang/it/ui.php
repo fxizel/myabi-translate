@@ -164,7 +164,6 @@ return [
     'export_download' => 'Scaricare il CSV',
     'export_help' => 'Il file contiene tutti i termini noti del tipo e tutte le lingue, con le traduzioni comuni convalidate o i valori importati di ripiego. Non viene creata alcuna pubblicazione.',
     'export_choose_type' => 'Selezionare un tipo di traduzione',
-    'export_choose_organization' => 'Selezionare un’organizzazione',
-    'export_empty' => 'L’esportazione richiede una versione corrente già importata e un’organizzazione attiva.',
+    'export_empty' => 'L’esportazione richiede una versione corrente già importata.',
     'export_failed' => 'L’esportazione non è riuscita. Riprovi o contatti un amministratore.',
 ];

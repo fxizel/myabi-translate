@@ -194,9 +194,9 @@ Ce parcours historique est retiré depuis le 13.10.2026 : tous les termes sont c
 
 **Acteur :** Gestionnaire.
 
-1. Ouvrir Exports, choisir un type, une version proposée et une organisation active.
+1. Ouvrir Exports, choisir un type et une version proposée.
 2. Demander le téléchargement.
-3. Le système parcourt tous les termes courants connus du type et vérifie leur source technique respective, indépendamment du destinataire. Plusieurs imports peuvent alimenter le fichier, avec un en-tête unique et une seule ligne par terme.
+3. Le système parcourt tous les termes courants connus du type et vérifie leur source technique respective, indépendamment de l'organisation de l'utilisateur. Plusieurs imports peuvent alimenter le fichier, avec un en-tête unique et une seule ligne par terme.
 
 **Résultat :** un CSV DEVCONF avec les valeurs validées courantes et les valeurs d’origine pour les cellules non validées. Une proposition en attente n’est pas injectée ; aucune publication n’est créée.
 

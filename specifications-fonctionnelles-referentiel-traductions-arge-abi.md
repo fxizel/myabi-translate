@@ -458,11 +458,11 @@ Le menu Publications télécharge les fichiers figés pour un destinataire autor
 
 ### Export simple d'un type
 
-Le menu **Exports**, accessible au Gestionnaire, permet de choisir un type de traduction, une version admissible et une organisation destinataire active, puis de télécharger directement son fichier CSV DEVCONF. Les sept types sont proposés, avec toutes les langues du fichier. La version doit disposer d'un import appliqué, ne pas être archivée et ne pas précéder la dernière version ayant un import appliqué.
+Le menu **Exports**, accessible au Gestionnaire, permet de choisir un type de traduction et une version admissible, puis de télécharger directement son fichier CSV DEVCONF. Les sept types sont proposés, avec toutes les langues du fichier. La version doit disposer d'un import appliqué, ne pas être archivée et ne pas précéder la dernière version ayant un import appliqué.
 
 L'export contient tous les termes courants connus du type, une fois chacun, indépendamment des organisations et fichiers d'origine. Les cellules validées prennent la valeur commune ; les autres conservent la valeur importée de leur source technique vérifiée. Les propositions en attente ne remplacent aucune cellule. Plusieurs imports peuvent alimenter un fichier avec un en-tête unique et un ordre stable : 1 200 termes connus sont exportés même si un fichier source n'en contient que 1 000. Les contrôles d'intégrité, d'identité exacte, de couverture de l'ensemble attendu, de révision, de format, d'encodage et de placeholders restent bloquants.
 
-Cette action ne crée aucune publication, ne valide aucune proposition et ne modifie pas l'état publié des termes. Le nom du fichier correspond au nom DEVCONF du type. Le fichier est généré en stockage privé temporaire, puis supprimé après envoi. L'action est journalisée avec l'utilisateur, la version, le type, l'organisation, la source, la version du format, le nombre de lignes et les empreintes SHA-256. Un nouvel export reflète les validations et imports intervenus depuis le précédent ; les publications restent le moyen de conserver un catalogue figé.
+Cette action ne crée aucune publication, ne valide aucune proposition et ne modifie pas l'état publié des termes. Le nom du fichier correspond au nom DEVCONF du type. Le fichier est généré en stockage privé temporaire, puis supprimé après envoi. L'action est journalisée avec l'utilisateur, la version, le type, les sources, la version du format, le nombre de lignes et les empreintes SHA-256. Aucun destinataire n'est demandé pour cet export du référentiel commun ; l'organisation éventuelle de l'utilisateur reste une information d'audit. Un nouvel export reflète les validations et imports intervenus depuis le précédent ; les publications restent le moyen de conserver un catalogue figé.
 
 ### Téléchargement d'une publication
 
@@ -490,7 +490,7 @@ Cette action ne crée aucune publication, ne valide aucune proposition et ne mod
 ### Règles complémentaires
 
 1. Les caractères non représentables dans Windows-1252 sont refusés lors de l'envoi d'une proposition et avant sa validation pour les types exportés dans cet encodage. Un tel caractère provenant d'une valeur importée utilisée comme repli (section 8, contrôle 6) est remplacé par « ? » à l'export et listé dans le journal d'export ; l'export n'échoue jamais pour cette raison.
-2. Chaque export est journalisé : utilisateur, date et heure, version myABI, publication le cas échéant, types inclus, organisation, lots de repli, versions des formats, nombre de lignes par fichier, empreinte SHA-256 de chaque fichier.
+2. Chaque export est journalisé : utilisateur et son organisation éventuelle, date et heure, version myABI, publication et destinataire le cas échéant, types inclus, lots de repli, versions des formats, nombre de lignes par fichier, empreinte SHA-256 de chaque fichier.
 3. Un export de publication est reproductible : deux téléchargements de la même publication pour la même organisation donnent des fichiers CSV identiques, même après de nouveaux imports ou une mise à jour de l'application.
 4. Un échange de révision (XLSX) destiné aux Validateurs non techniques est fourni en lot 2 : clé, référence, valeur en vigueur, proposition, commentaire ; sa réimportation crée des propositions au statut Proposée, soumises aux mêmes contrôles. Cette fonction de révision est distincte de l'export DEVCONF vers myABI.
 
