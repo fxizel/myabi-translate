@@ -1,18 +1,5 @@
 (() => {
     'use strict';
-    const densityToggles = [...document.querySelectorAll('[data-density-toggle]')];
-    let compact = true;
-    try { compact = localStorage.getItem('myabi-density') !== 'comfortable'; } catch {}
-    const applyDensity = () => {
-        document.body.dataset.density = compact ? 'compact' : 'comfortable';
-        densityToggles.forEach(button => button.setAttribute('aria-pressed', String(compact)));
-    };
-    applyDensity();
-    densityToggles.forEach(button => button.addEventListener('click', () => {
-        compact = !compact;
-        applyDensity();
-        try { localStorage.setItem('myabi-density', compact ? 'compact' : 'comfortable'); } catch {}
-    }));
     const editors = [...document.querySelectorAll('[data-editor]')];
     const isDraft = editor => editor.value !== editor.defaultValue || editor.dataset.restored === '1';
     let submission = null;

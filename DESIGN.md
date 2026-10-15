@@ -97,12 +97,7 @@ Les libellés de section de la navigation sont en capitales, 11 px, graisse 600,
 
 ## Densité
 
-Le bouton **Compact** de la barre de contexte bascule l’espacement vertical des cellules de tableau :
-
-- compact (par défaut) : `--row-padding: 7px` ;
-- confortable : `body[data-density=comfortable]`, `--row-padding: 14px`.
-
-Le bouton porte `aria-pressed`. Le changement se fait sans rechargement et sans remplacer les champs en cours de saisie. Cette préférence est la seule donnée enregistrée dans le navigateur.
+L’affichage compact est permanent : l’espacement vertical des cellules de tableau est fixé à `--row-padding: 7px`. La barre de contexte ne propose aucun réglage de densité et les anciennes préférences enregistrées dans le navigateur sont ignorées.
 
 ## Cadre de l’application
 
@@ -111,7 +106,7 @@ Le bouton porte `aria-pressed`. Le changement se fait sans rechargement et sans 
 │ [logo]  ⌂ ?  Référentiel de traductions          [● Profil] Org. │ bandeau 50 px
 │ ▦ [★ Gestion des traductions] [Fiche terme ×]                    │ onglets 34 px
 ├────────────┬─────────────────────────────────────────────────────┤
-│ RÉFÉRENTIEL│ Référentiel › Traductions   ▤ Compact  FR ▾  Quitter│ contexte 43 px
+│ RÉFÉRENTIEL│ Référentiel › Traductions              FR ▾  Quitter│ contexte 43 px
 │ Traductions│─────────────────────────────────────────────────────│
 │ Validation │ Titre de page                     [Actions]         │
 │ Imports    │ ┌ barre de langues ────────────────────────────────┐│
@@ -127,7 +122,7 @@ Le bouton porte `aria-pressed`. Le changement se fait sans rechargement et sans 
 - **Bandeau** (`.masthead`) : logo clair sur marine (168 × 46 px, `public/images/branding/myabi-translate-header-v2.png`), boutons d’icône 30 px, titre de l’application, puis à droite la pastille rouge du profil et l’organisation.
 - **Onglets de travail** (`.app-tab-strip`) : onglet fixe « Gestion des traductions » marqué d’une étoile, puis les fiches ouvertes avec un bouton de fermeture. Un seul onglet porte `aria-current=page`. Les noms trop longs sont tronqués avec points de suspension (largeur maximale 340 px).
 - **Navigation latérale** (`.app-sidebar`) : Traductions, Validation, Imports, Exports selon les droits, Publications, Groupes de termes et Campagnes de traduction, puis les entrées d’administration autorisées. Le compteur de la validation affiche le nombre de propositions en attente. Sous la navigation : le contexte de travail (version myABI, organisation, langue de référence) et un pied discret.
-- **Barre de contexte** (`.context-bar`) : fil d’Ariane à gauche ; à droite le bouton Compact, la langue d’interface (DE/FR/IT) et la déconnexion.
+- **Barre de contexte** (`.context-bar`) : fil d’Ariane à gauche ; à droite la langue d’interface (DE/FR/IT) et la déconnexion.
 - **Pied de page** : portée et langues de référence, 10 px, filet supérieur.
 
 Les écrans d’authentification (`.guest-shell`) gardent le bandeau, masquent la navigation et centrent un panneau de 460 px au maximum.
@@ -262,7 +257,7 @@ Contrôle de référence : bureau et 390 px de large, sans débordement horizont
 1. Utiliser `layouts/app` et le partial `heading` ; ne pas recréer de cadre.
 2. Composer avec les classes existantes (`.surface`, `.block`, `.toolbar`, `.table-wrap`, `.notice`, `.badge-*`) avant d’en créer une nouvelle.
 3. Ajouter tout nouveau style dans `public/css/app.css`, avec les jetons existants ; une nouvelle couleur doit d’abord être ajoutée à ce document.
-4. Vérifier le rendu en DE/FR/IT, en mode compact et confortable, sur bureau et à 390 px.
+4. Vérifier le rendu compact permanent en DE/FR/IT, sur bureau et à 390 px.
 5. N’utiliser que des données fictives dans les captures et la documentation.
 
 ## Référentiel commun du 13.10.2026

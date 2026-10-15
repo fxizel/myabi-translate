@@ -91,7 +91,6 @@
             <div class="context-bar">
                 <div class="breadcrumb"><a href="{{ url('/') }}">{{ __('ui.registry') }}</a><span aria-hidden="true">›</span><strong>@yield('title', __('ui.translations'))</strong></div>
                 <div class="context-actions">
-                    @auth<button class="button quiet density-toggle" type="button" data-density-toggle aria-pressed="true" title="{{ __('ui.toggle_density') }}">@include('partials.icon', ['name' => 'rows'])<span>{{ __('ui.compact_view') }}</span></button>@endauth
                     <form action="{{ url('locale') }}" method="post" class="locale-form">@csrf<label class="sr-only" for="interface-locale">{{ __('ui.interface_language') }}</label><select id="interface-locale" name="locale" data-auto-submit>@foreach(['de'=>'DE', 'fr'=>'FR', 'it'=>'IT'] as $code=>$label)<option value="{{ $code }}" @selected(app()->getLocale()===$code)>{{ $label }}</option>@endforeach</select><button class="sr-only">{{ __('ui.save') }}</button></form>
                     @auth<form action="{{ url('logout') }}" method="post">@csrf<button class="text-button">{{ __('ui.logout') }}</button></form>@endauth
                 </div>
