@@ -10,6 +10,35 @@
 </section>
 @endif
 <ol class="steps"><li aria-current="step"><span>1</span>{{ __('ui.import_parameters') }}</li><li><span>2</span>{{ __('ui.dry_run') }}</li><li><span>3</span>{{ __('ui.application') }}</li></ol>
-<section class="surface block"><h2>{{ __('ui.new_import') }}</h2><form class="section" method="post" action="{{ url('imports') }}" enctype="multipart/form-data">@csrf<div class="form-grid"><label class="field"><span>{{ __('ui.version') }}</span><select class="input" name="version_id" required>@foreach($versions as $version)<option value="{{ $version->id }}" @selected(old('version_id')==$version->id)>{{ $version->number }} · {{ __('ui.status_'.$version->status) }}</option>@endforeach</select></label><label class="field"><span>{{ __('ui.type') }}</span><select class="input" name="type" required>@foreach($types as $code=>$label)<option value="{{ $code }}" @selected(old('type')===$code)>{{ $label }}</option>@endforeach</select></label><label class="field"><span>{{ __('ui.source_kind') }}</span><select class="input" name="source_kind"><option value="publisher" @selected(old('source_kind')==='publisher')>{{ __('ui.publisher') }}</option><option value="organization" @selected(old('source_kind')==='organization')>{{ __('ui.organization_source') }}</option></select></label><label class="field"><span>{{ __('ui.organization') }}</span><select class="input" name="organization_id"><option value="">{{ __('ui.publisher') }}</option>@foreach($organizations as $organization)<option value="{{ $organization->id }}" @selected(old('organization_id')==$organization->id)>{{ $organization->name }}</option>@endforeach</select></label></div><div class="upload section"><h3>{{ __('ui.choose_file') }}</h3><p class="field-hint">{{ __('ui.file_hint') }}</p><label for="devconf-file" class="sr-only">{{ __('ui.file') }}</label><input id="devconf-file" name="file" type="file" accept=".csv,.txt" required></div><div class="notice section">{{ __('ui.dry_run_help') }}</div><div class="form-actions"><button class="button primary" @disabled($versions->isEmpty())>{{ __('ui.analyze') }} →</button></div></form></section>
+@php($organizationSource = old('source_kind', 'publisher') === 'organization')
+<section class="surface block">
+    <h2>{{ __('ui.new_import') }}</h2>
+    <form class="section" method="post" action="{{ url('imports') }}" enctype="multipart/form-data">
+        @csrf
+        <div class="form-grid">
+            <label class="field"><span>{{ __('ui.version') }}</span><select class="input" name="version_id" required>@foreach($versions as $version)<option value="{{ $version->id }}" @selected(old('version_id')==$version->id)>{{ $version->number }} · {{ __('ui.status_'.$version->status) }}</option>@endforeach</select></label>
+            <label class="field"><span>{{ __('ui.type') }}</span><select class="input" name="type" required>@foreach($types as $code=>$label)<option value="{{ $code }}" @selected(old('type')===$code)>{{ $label }}</option>@endforeach</select></label>
+            <label class="field">
+                <span>{{ __('ui.source_kind') }}</span>
+                <select class="input" name="source_kind" data-import-source>
+                    <option value="publisher" @selected(!$organizationSource)>{{ __('ui.publisher') }}</option>
+                    <option value="organization" @selected($organizationSource)>{{ __('ui.organization_source') }}</option>
+                </select>
+            </label>
+            <label class="field" data-import-organization @if(!$organizationSource) hidden @endif>
+                <span>{{ __('ui.origin_organization') }}</span>
+                <select class="input" name="organization_id" @disabled(!$organizationSource) @required($organizationSource)>
+                    <option value="">—</option>
+                    @foreach($organizations as $organization)
+                        <option value="{{ $organization->id }}" @selected(old('organization_id')==$organization->id)>{{ $organization->name }}</option>
+                    @endforeach
+                </select>
+            </label>
+        </div>
+        <div class="upload section"><h3>{{ __('ui.choose_file') }}</h3><p class="field-hint">{{ __('ui.file_hint') }}</p><label for="devconf-file" class="sr-only">{{ __('ui.file') }}</label><input id="devconf-file" name="file" type="file" accept=".csv,.txt" required></div>
+        <div class="notice section">{{ __('ui.dry_run_help') }}</div>
+        <div class="form-actions"><button class="button primary" @disabled($versions->isEmpty())>{{ __('ui.analyze') }} →</button></div>
+    </form>
+</section>
 <section class="section"><div class="section-heading"><h2>{{ __('ui.import_history') }}</h2><a href="{{ url('publications') }}#versions" class="button small">{{ __('ui.new_version') }} +</a></div><div class="table-wrap"><table><thead><tr><th>{{ __('ui.file') }}</th><th>{{ __('ui.version') }}</th><th>{{ __('ui.type') }}</th><th>{{ __('ui.rows') }}</th><th>{{ __('ui.state') }}</th><th>{{ __('ui.author') }}</th><th>{{ __('ui.date') }}</th></tr></thead><tbody>@forelse($imports as $import)<tr><td><a href="{{ url('imports/'.$import->id) }}">{{ $import->filename }} →</a><span class="cell-caption">{{ $import->source_kind==='publisher'?__('ui.publisher'):$import->organization?->name }}</span></td><td>{{ $import->version?->number }}</td><td>{{ $types[$import->type] ?? $import->type }}</td><td>{{ number_format($import->row_count ?? 0, 0, '.', '’') }}</td><td>@include('partials.status',['status'=>$import->status])</td><td>{{ $import->author?->name }}</td><td>{{ $import->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</td></tr>@empty<tr><td colspan="7"><div class="empty-state"><h2>{{ __('ui.empty_title') }}</h2><p>{{ __('ui.file_hint') }}</p></div></td></tr>@endforelse</tbody></table></div>@include('partials.pagination',['items'=>$imports])</section>
 @endsection

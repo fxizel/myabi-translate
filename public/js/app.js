@@ -6,6 +6,20 @@
     const proposalEligible = checkbox => checkbox.dataset.proposalEligible !== '0';
     const catalogueSubmission = event => event.submitter?.dataset.catalogueSubmit !== undefined;
     document.querySelectorAll('[data-auto-submit]').forEach(el => el.addEventListener('change', () => el.form.requestSubmit()));
+    document.querySelectorAll('[data-import-source]').forEach(select => {
+        const field = select.form.querySelector('[data-import-organization]');
+        const organization = field?.querySelector('select');
+        if(!organization) return;
+        const refresh = () => {
+            const fromOrganization = select.value === 'organization';
+            field.hidden = !fromOrganization;
+            organization.disabled = !fromOrganization;
+            organization.required = fromOrganization;
+        };
+        refresh();
+        select.addEventListener('change', refresh);
+        window.addEventListener('pageshow', refresh);
+    });
     editors.forEach(editor => {
         const form = editor.form;
         const counter = form.querySelector('[data-character-count]');
