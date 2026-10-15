@@ -122,8 +122,14 @@
         if(input) input.required = select.value === 'reject';
     }));
     document.querySelectorAll('[data-column-toggle]').forEach(input => {
+        const table = document.getElementById(input.getAttribute('aria-controls'));
+        if(!table) return;
         const key = `argeabi-column-${input.dataset.columnToggle}`;
-        const apply = () => document.querySelectorAll(`[data-column="${input.dataset.columnToggle}"]`).forEach(el => el.hidden = !input.checked);
+        const apply = () => {
+            table.querySelectorAll(`[data-column="${input.dataset.columnToggle}"]`).forEach(el => el.hidden = !input.checked);
+            const visibleColumns = [...table.tHead.rows[0].cells].filter(cell => !cell.hidden).length;
+            table.querySelectorAll('[data-column-span]').forEach(cell => cell.colSpan = visibleColumns);
+        };
         try { if(localStorage.getItem(key) !== null) input.checked = localStorage.getItem(key) === '1'; } catch {}
         apply();
         input.addEventListener('change', () => { apply(); try { localStorage.setItem(key, input.checked ? '1' : '0'); } catch {} });

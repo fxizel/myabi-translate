@@ -33,9 +33,9 @@
 </section>
 @endif
 <p class="field-hint">{{ __('tables.sort_help') }}</p>
-<div class="bulk-bar"><span>{{ number_format($terms->total(), 0, '.', '’') }} {{ __('ui.results') }} · <strong data-selected-count>0</strong> {{ __('ui.selected') }}</span><div class="row"><details><summary>{{ __('ui.columns') }}</summary><div class="check-group section">@foreach(['key','state'] as $column)<label class="check-label"><input type="checkbox" checked data-column-toggle="{{ $column }}">{{ __('ui.'.$column) }}</label>@endforeach</div></details><button class="button" type="submit" data-bulk-submit disabled>{{ __('ui.propose') }} →</button></div></div>
+<div class="bulk-bar"><span>{{ number_format($terms->total(), 0, '.', '’') }} {{ __('ui.results') }} · <strong data-selected-count>0</strong> {{ __('ui.selected') }}</span><div class="row"><details><summary>{{ __('ui.columns') }}</summary><div class="check-group section">@foreach(['key','state'] as $column)<label class="check-label"><input type="checkbox" checked data-column-toggle="{{ $column }}" aria-controls="catalogue-table">{{ __('ui.'.$column) }}</label>@endforeach</div></details><button class="button" type="submit" data-bulk-submit disabled>{{ __('ui.propose') }} →</button></div></div>
 </form>
-<div class="table-wrap" role="region" aria-label="{{ __('ui.translations') }}" tabindex="0"><table class="catalogue-table" data-sortable-table data-sort-asc="{{ __('tables.sort_asc') }}" data-sort-desc="{{ __('tables.sort_desc') }}"><thead><tr><th class="checkbox-cell"><input type="checkbox" form="bulk-terms" data-select-all aria-label="{{ __('ui.select_all') }}"></th>
+<div class="table-wrap" role="region" aria-label="{{ __('ui.translations') }}" tabindex="0"><table id="catalogue-table" class="catalogue-table" data-sortable-table data-sort-asc="{{ __('tables.sort_asc') }}" data-sort-desc="{{ __('tables.sort_desc') }}"><thead><tr><th class="checkbox-cell"><input type="checkbox" form="bulk-terms" data-select-all aria-label="{{ __('ui.select_all') }}"></th>
 @include('partials.sortable-heading', ['columnIndex'=>1, 'columnName'=>'key', 'label'=>__('ui.key')])
 @include('partials.sortable-heading', ['columnIndex'=>2, 'cellClass'=>'source-cell', 'label'=>__('ui.reference'), 'suffix'=>'de_CH'])
 @include('partials.sortable-heading', ['columnIndex'=>3, 'cellClass'=>'translation-cell', 'label'=>__('ui.current_value'), 'suffix'=>$language])
@@ -66,7 +66,7 @@
     <td data-column="state" data-sort-value="{{ __('ui.status_'.($term->current_state ?? 'missing')) }}">@include('partials.status',['status'=>$term->current_state ?? 'missing'])</td>
     <td data-column="group">@if(!$term->group || $groups->contains('id',$term->term_group_id))@include('groups.badge',['group'=>$term->group])@else<span class="empty-value">{{ __('campaigns.restricted_group') }}</span>@endif </td>
 </tr>
-@empty<tr><td colspan="7"><div class="empty-state"><h2>{{ __('ui.empty_title') }}</h2><p>{{ __('ui.empty_description') }}</p>@if($canManage ?? false)<a href="{{ url('imports') }}" class="button primary">{{ __('ui.new_import') }} →</a>@endif</div></td></tr>@endforelse
+@empty<tr><td colspan="7" data-column-span><div class="empty-state"><h2>{{ __('ui.empty_title') }}</h2><p>{{ __('ui.empty_description') }}</p>@if($canManage ?? false)<a href="{{ url('imports') }}" class="button primary">{{ __('ui.new_import') }} →</a>@endif</div></td></tr>@endforelse
 </tbody></table></div>
 @include('partials.pagination', ['items'=>$terms])
 <script src="{{ asset('js/table-sort.js') }}" defer></script>

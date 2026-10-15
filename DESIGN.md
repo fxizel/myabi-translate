@@ -160,7 +160,8 @@ Au-dessus du catalogue et de la validation, `.language-bar` liste les langues de
 
 - Toujours dans `.table-wrap`, qui porte la bordure et le défilement horizontal propre au tableau ; la page elle-même ne défile jamais horizontalement.
 - En-tête gris `#dce3e9`, 12 px gras ; cellules 12 px alignées en haut, filets verticaux très clairs ; lignes paires `#fbfcfd` ; survol et focus interne en `--tint`.
-- Largeurs minimales : 920 px pour le catalogue et la validation, 650 px pour les autres tableaux sur mobile.
+- Largeurs minimales : 920 px pour la validation, 650 px pour les autres tableaux sur mobile. Le catalogue adapte son minimum aux colonnes visibles : de 804 px à 1064 px.
+- Dans le catalogue, la sélection (34 px), la clé (140 px), l’état (120 px) et le groupe (170 px) gardent une largeur stable. La référence, la valeur en vigueur et la proposition se partagent également l’espace restant, avec 200 px au minimum par colonne. « Colonnes affichées » masque la clé et l’état sans désaligner les cellules ni étirer les métadonnées ; le message de résultat vide couvre les seules colonnes visibles.
 - Cellule de terme : texte source en lien bleu gras, clé technique dessous en 10 px gris (`.key`), type ou légende en `.cell-caption`.
 - Valeur absente : `.empty-value`, 11 px gris, jamais une cellule vide.
 - Édition dans le tableau : zone de texte de 50 px, actions alignées à droite, erreurs client masquées tant qu’elles sont vides.
