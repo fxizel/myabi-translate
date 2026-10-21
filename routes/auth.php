@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthInvitationController;
 use App\Http\Controllers\BrowserExtensionTokenController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Middleware\EnsureSecureSession;
 use App\Http\Middleware\EnsureValidTwoFactorChallenge;
@@ -25,7 +26,7 @@ Route::middleware('guest')->group(function () {
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->middleware('throttle:password-reset')->name('password.email');
     Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
-    Route::post('/reset-password', [NewPasswordController::class, 'store'])->middleware('throttle:password-reset')->name('password.update');
+    Route::post('/reset-password', [PasswordResetController::class, 'store'])->middleware('throttle:password-reset')->name('password.update');
     Route::get('/invitations/{token}', [AuthInvitationController::class, 'show'])->name('invitation.show');
     Route::post('/invitations/{token}', [AuthInvitationController::class, 'accept'])->middleware('throttle:password-reset')->name('invitation.accept');
     Route::middleware(EnsureValidTwoFactorChallenge::class)->group(function () {

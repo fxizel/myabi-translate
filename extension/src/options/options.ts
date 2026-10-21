@@ -57,7 +57,7 @@ function showErrors(errors: readonly string[]): void {
 }
 
 async function showTokenState(): Promise<void> {
-    const state = await tokenState(api);
+    const state = await tokenState((await loadSettings(api)).apiUrl, api);
     $('tokenState').textContent = t(lang, state === 'none' ? 'optTokenNone' : 'optTokenSaved');
 }
 
@@ -144,13 +144,13 @@ async function persistToken(input: FormInput, settings: Settings): Promise<void>
     if ($<HTMLInputElement>('clearToken').checked) {
         await clearToken(api);
     } else if (typed) {
-        await saveToken(typed, settings.tokenPersistence, api);
+        await saveToken(typed, settings.tokenPersistence, settings.apiUrl, api);
     } else {
-        const state = await tokenState(api);
+        const state = await tokenState(settings.apiUrl, api);
         if (state !== 'none' && state !== settings.tokenPersistence) {
-            const current = await loadToken(api);
+            const current = await loadToken(settings.apiUrl, api);
             if (current) {
-                await saveToken(current, settings.tokenPersistence, api);
+                await saveToken(current, settings.tokenPersistence, settings.apiUrl, api);
             }
         }
     }

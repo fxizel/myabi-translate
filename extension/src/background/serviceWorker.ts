@@ -114,7 +114,7 @@ async function handleSearch(message: Record<string, unknown>, sender: MessageSen
     }
 
     const apiCheck = validateHttpUrl(settings.apiUrl);
-    const token = await loadToken(api);
+    const token = await loadToken(apiCheck.ok ? apiCheck.url : '', api);
     if (!apiCheck.ok || !token) {
         return fail({ kind: 'notConfigured' });
     }
@@ -194,7 +194,7 @@ async function handleFeedback(message: Record<string, unknown>, sender: MessageS
     const resultId = typeof message.resultId === 'number' || typeof message.resultId === 'string' ? message.resultId : key;
     const settings = await loadSettings(api);
     const apiCheck = validateHttpUrl(settings.apiUrl);
-    const token = await loadToken(api);
+    const token = await loadToken(apiCheck.ok ? apiCheck.url : '', api);
     if (!settings.feedbackEnabled || !request || !key || !apiCheck.ok || !token) {
         return { ok: false };
     }
@@ -219,7 +219,7 @@ async function handleTestConnection(message: Record<string, unknown>): Promise<R
     const settings = await loadSettings(api);
     const apiCheck = validateHttpUrl(typeof message.apiUrl === 'string' ? message.apiUrl : settings.apiUrl);
     const typed = typeof message.token === 'string' ? message.token.trim() : '';
-    const token = typed || (await loadToken(api));
+    const token = typed || (await loadToken(apiCheck.ok ? apiCheck.url : '', api));
     if (!apiCheck.ok || !token) {
         return { ok: false, error: { kind: 'notConfigured' } satisfies PanelError };
     }

@@ -57,6 +57,8 @@ Valeurs proposées : cinq jetons actifs au maximum par utilisateur, nom de 1 à 
 
 La création ne peut accorder aucun droit supplémentaire à ceux de l’utilisateur. L’utilisateur révoque ses propres jetons ; un administrateur conserve la révocation globale du compte. Changer le mot de passe, réinitialiser les accès ou utiliser une action existante qui incrémente `session_version` doit invalider les jetons précédents.
 
+L’extension stocke le secret et l’origine de l’API dans une même valeur, séparée des paramètres exportables. Chaque appel (recherche, feedback, test de connexion) exige que cette origine corresponde à sa destination. Une configuration vers une nouvelle origine efface les jetons local et session avant publication des nouveaux paramètres ; un test avant enregistrement exige un jeton saisi pour cette destination. Les anciens jetons sans origine doivent être ressaisis après la mise à jour 0.2.2 ; aucune migration ne leur attribue implicitement l’URL courante. Les contrôles d’origine empêchent aussi de mélanger un ancien instantané des paramètres avec un nouveau jeton pendant des écritures concurrentes.
+
 ### Contrôles à chaque requête
 
 Le middleware bearer exige un token personnel réel, sans accepter une session web à sa place. `auth:sanctum` doit donc être complété par un contrôle explicite du bearer et du type de token ; sa seule présence ne suffit pas à exclure les cookies.

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\BrowserExtensionCors;
 use App\Http\Middleware\BrowserExtensionTransport;
+use App\Http\Middleware\EnsureCanonicalHost;
 use App\Http\Middleware\EnsureSecureSession;
 use App\Http\Middleware\RequireRole;
 use App\Http\Middleware\RequireTwoFactor;
@@ -37,7 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
             '2fa.required' => RequireTwoFactor::class,
             'role' => RequireRole::class,
         ]);
-        $middleware->web(append: [SetLocale::class, SecurityHeaders::class]);
+        // The health endpoint remains usable by the internal loopback probe.
+        $middleware->web(prepend: [EnsureCanonicalHost::class], append: [SetLocale::class, SecurityHeaders::class]);
         $middleware->redirectGuestsTo('/login');
     })
     ->withExceptions(function (Exceptions $exceptions): void {

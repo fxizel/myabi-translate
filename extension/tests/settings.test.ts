@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
     DEFAULT_SETTINGS,
+    SETTINGS_KEY,
+    TOKEN_KEY,
     clearToken,
     isPlausibleToken,
     loadSettings,
@@ -61,6 +63,7 @@ describe('normalizeSettings', () => {
 });
 
 describe('stockage des réglages et du token', () => {
+    const apiUrl = 'https://t.example.test/api';
     it('relit ce qui a été enregistré', async () => {
         const { api } = fakeApi();
         const settings = normalizeSettings({ apiUrl: 'https://t.example.test/api', allowedDomains: ['myab.example.test'] });
@@ -70,26 +73,76 @@ describe('stockage des réglages et du token', () => {
 
     it('conserve le token à un seul endroit à la fois', async () => {
         const { api, localArea, sessionArea } = fakeApi();
-        expect(await tokenState(api)).toBe('none');
+        expect(await tokenState(apiUrl, api)).toBe('none');
 
-        await saveToken('abc123', 'local', api);
-        expect(await tokenState(api)).toBe('local');
-        expect(await loadToken(api)).toBe('abc123');
+        await saveToken('abc123', 'local', apiUrl, api);
+        expect(await tokenState(apiUrl, api)).toBe('local');
+        expect(await loadToken(apiUrl, api)).toBe('abc123');
         expect(sessionArea.data).toEqual({});
 
-        await saveToken('abc123', 'session', api);
-        expect(await tokenState(api)).toBe('session');
+        await saveToken('abc123', 'session', apiUrl, api);
+        expect(await tokenState(apiUrl, api)).toBe('session');
         expect(Object.keys(localArea.data)).toEqual([]);
 
         await clearToken(api);
-        expect(await tokenState(api)).toBe('none');
-        expect(await loadToken(api)).toBe('');
+        expect(await tokenState(apiUrl, api)).toBe('none');
+        expect(await loadToken(apiUrl, api)).toBe('');
+    });
+
+    it.each(['local', 'session'] as const)('lie un jeton %s à son origine et refuse les autres destinations', async (persistence) => {
+        const { api } = fakeApi();
+        await saveToken('synthetic-token', persistence, apiUrl, api);
+        expect(await loadToken('https://t.example.test/other-path', api)).toBe('synthetic-token');
+        for (const url of ['https://untrusted.example.test/api', 'https://t.example.test:8443/api', 'http://t.example.test/api', '']) {
+            expect(await loadToken(url, api)).toBe('');
+            expect(await tokenState(url, api)).toBe('none');
+        }
+        await saveToken('local-token', persistence, 'http://localhost:8000/api', api);
+        expect(await loadToken('https://localhost:8000/api', api)).toBe('');
+        expect(await loadToken('http://localhost:8001/api', api)).toBe('');
+    });
+
+    it.each(['local', 'session'] as const)('refuse un ancien jeton %s sans liaison après une mise à jour', async (persistence) => {
+        const { api, localArea, sessionArea } = fakeApi({ [SETTINGS_KEY]: normalizeSettings({ apiUrl }) });
+        (persistence === 'local' ? localArea : sessionArea).data[TOKEN_KEY] = 'legacy-unbound-token';
+        expect(await loadToken(apiUrl, api)).toBe('');
+        expect(await tokenState(apiUrl, api)).toBe('none');
+        await saveToken('entered-again-token', persistence, apiUrl, api);
+        expect(await loadToken(apiUrl, api)).toBe('entered-again-token');
+    });
+
+    it('efface les deux stockages avant de publier une configuration vers une nouvelle origine', async () => {
+        const { api, localArea, sessionArea } = fakeApi({ [SETTINGS_KEY]: normalizeSettings({ apiUrl }) });
+        await saveToken('synthetic-token', 'local', apiUrl, api);
+        sessionArea.data[TOKEN_KEY] = { value: 'session-token', origin: 'https://t.example.test' };
+        const set = api.storage.local.set.bind(api.storage.local);
+        api.storage.local.set = vi.fn(async (items) => {
+            if (SETTINGS_KEY in items) {
+                expect(localArea.data).not.toHaveProperty(TOKEN_KEY);
+                expect(sessionArea.data).not.toHaveProperty(TOKEN_KEY);
+            }
+            await set(items);
+        });
+        await saveSettings(normalizeSettings({ apiUrl: 'https://new.example.test/api' }), api);
+        expect(await loadToken('https://new.example.test/api', api)).toBe('');
+        await saveToken('new-token', 'session', 'https://new.example.test/api', api);
+        expect(await loadToken(apiUrl, api)).toBe('');
+        expect(await loadToken('https://new.example.test/api', api)).toBe('new-token');
+    });
+
+    it('conserve le jeton pour les réglages de même origine et refuse une liaison invalide', async () => {
+        const { api } = fakeApi({ [SETTINGS_KEY]: normalizeSettings({ apiUrl }) });
+        await saveToken('synthetic-token', 'local', apiUrl, api);
+        await saveSettings(normalizeSettings({ apiUrl: 'https://t.example.test:443/new-path', collectContext: true }), api);
+        expect(await loadToken(apiUrl, api)).toBe('synthetic-token');
+        await expect(saveToken('synthetic-token', 'local', 'http://remote.example.test', api)).rejects.toThrow();
+        expect(await loadToken(apiUrl, api)).toBe('synthetic-token');
     });
 
     it('ne range jamais le token dans les réglages', async () => {
         const { api, localArea } = fakeApi();
         await saveSettings(normalizeSettings({ apiUrl: 'https://t.example.test/api' }), api);
-        await saveToken('super-secret-token', 'local', api);
+        await saveToken('super-secret-token', 'local', apiUrl, api);
         expect(JSON.stringify(localArea.data.settings)).not.toContain('super-secret-token');
     });
 });

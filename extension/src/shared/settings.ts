@@ -108,6 +108,10 @@ export async function loadSettings(api: ExtensionApi = getApi()): Promise<Settin
 }
 
 export async function saveSettings(settings: Settings, api: ExtensionApi = getApi()): Promise<void> {
+    const previous = await loadSettings(api);
+    if (tokenOrigin(previous.apiUrl) !== tokenOrigin(settings.apiUrl)) {
+        await clearToken(api);
+    }
     await api.storage.local.set({ [SETTINGS_KEY]: settings });
 }
 
@@ -139,30 +143,38 @@ function tokenArea(api: ExtensionApi, persistence: TokenPersistence): StorageAre
 
 export type TokenState = 'none' | TokenPersistence;
 
-async function readToken(area: StorageArea | undefined): Promise<string> {
-    if (!area) {
-        return '';
-    }
+function tokenOrigin(apiUrl: string): string {
+    const check = validateHttpUrl(apiUrl);
+    return check.ok ? check.origin : '';
+}
+
+async function readToken(area: StorageArea | undefined, origin: string): Promise<string> {
+    if (!area || !origin) return '';
     const stored = await area.get(TOKEN_KEY);
     const value = stored[TOKEN_KEY];
-    return typeof value === 'string' ? value : '';
+    // Unbound tokens from earlier releases must be entered again, never rebound implicitly.
+    return isRecord(value) && value.origin === origin && typeof value.value === 'string' && isPlausibleToken(value.value)
+        ? value.value : '';
 }
 
-export async function loadToken(api: ExtensionApi = getApi()): Promise<string> {
-    return (await readToken(api.storage.session)) || (await readToken(api.storage.local));
+export async function loadToken(apiUrl: string, api: ExtensionApi = getApi()): Promise<string> {
+    const origin = tokenOrigin(apiUrl);
+    return (await readToken(api.storage.session, origin)) || (await readToken(api.storage.local, origin));
 }
 
-export async function tokenState(api: ExtensionApi = getApi()): Promise<TokenState> {
-    if (await readToken(api.storage.session)) {
-        return 'session';
-    }
-    return (await readToken(api.storage.local)) ? 'local' : 'none';
+export async function tokenState(apiUrl: string, api: ExtensionApi = getApi()): Promise<TokenState> {
+    const origin = tokenOrigin(apiUrl);
+    if (await readToken(api.storage.session, origin)) return 'session';
+    return (await readToken(api.storage.local, origin)) ? 'local' : 'none';
 }
 
-export async function saveToken(token: string, persistence: TokenPersistence, api: ExtensionApi = getApi()): Promise<void> {
+export async function saveToken(token: string, persistence: TokenPersistence, apiUrl: string, api: ExtensionApi = getApi()): Promise<void> {
+    const origin = tokenOrigin(apiUrl);
+    if (!origin || !isPlausibleToken(token)) throw new Error('Invalid token configuration');
     const target = tokenArea(api, persistence);
     const other = tokenArea(api, persistence === 'local' ? 'session' : 'local');
-    await target.set({ [TOKEN_KEY]: token });
+    // The credential and its destination are a single storage value, even across settings writes.
+    await target.set({ [TOKEN_KEY]: { value: token, origin } });
     await other.remove(TOKEN_KEY);
 }
 

@@ -4,29 +4,39 @@ namespace App\Providers;
 
 use App\Actions\Fortify\RedirectIfMfaEnabled;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Responses\PasswordResetLinkResponse;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
+use Laravel\Fortify\Contracts\FailedPasswordResetResponse;
 use Laravel\Fortify\Contracts\RedirectsIfTwoFactorAuthenticatable;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 use Laravel\Fortify\Events\TwoFactorAuthenticationFailed;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Responses\FailedPasswordResetResponse as InvalidPasswordResetResponse;
 
 class FortifyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         Fortify::ignoreRoutes();
+        $this->app->bind(FailedPasswordResetLinkRequestResponse::class, PasswordResetLinkResponse::class);
+        $this->app->bind(SuccessfulPasswordResetLinkRequestResponse::class, PasswordResetLinkResponse::class);
+        $this->app->bind(FailedPasswordResetResponse::class, fn () => new InvalidPasswordResetResponse(Password::INVALID_TOKEN));
     }
 
     public function boot(): void
@@ -38,6 +48,9 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::twoFactorChallengeView(fn () => view('auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('auth.confirm-password'));
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+        ResetPassword::createUrlUsing(fn ($user, string $token) => rtrim(config('app.url'), '/').route('password.reset', [
+            'token' => $token, 'email' => $user->getEmailForPasswordReset(),
+        ], false));
         Fortify::authenticateUsing(function (Request $request) {
             // Persistent sign-in would bypass the mandatory twelve-hour session limit.
             $request->merge(['remember' => false]);

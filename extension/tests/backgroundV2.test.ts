@@ -18,7 +18,7 @@ function dispatch(message: unknown, from = sender): Promise<unknown> {
 
 beforeEach(async () => {
     vi.resetModules();
-    const stub = fakeApi({ [SETTINGS_KEY]: normalizeSettings({ apiUrl: 'http://localhost:8000/api/browser-extension', allowedDomains: ['localhost'], collectContext: true, searchLanguage: 'it', uiLanguage: 'de', feedbackEnabled: true }), [TOKEN_KEY]: 'synthetic-secret', [ENABLED_KEY]: true });
+    const stub = fakeApi({ [SETTINGS_KEY]: normalizeSettings({ apiUrl: 'http://localhost:8000/api/browser-extension', allowedDomains: ['localhost'], collectContext: true, searchLanguage: 'it', uiLanguage: 'de', feedbackEnabled: true }), [TOKEN_KEY]: { value: 'synthetic-secret', origin: 'http://localhost:8000' }, [ENABLED_KEY]: true });
     api = stub.api;
     const noopEvent = () => ({ addListener: vi.fn(), removeListener: vi.fn() });
     Object.assign(api.runtime, { getURL: (path: string) => 'chrome-extension://test-extension/' + path, onInstalled: noopEvent(), onStartup: noopEvent() });
@@ -118,4 +118,45 @@ describe('message content → sanitizer background → HTTP réel', () => {
         expect(fetchImpl).toHaveBeenCalledOnce();
         expect(api.tabs.sendMessage).toHaveBeenLastCalledWith(1, expect.objectContaining({ type: 'panel:error', error: { kind: 'network' } }), { frameId: 0 });
     });
+    it('ne transmet pas le jeton enregistré à une autre origine depuis Tester', async () => {
+        const fetchImpl = vi.fn(); vi.stubGlobal('fetch', fetchImpl);
+        const from = { ...sender, url: 'chrome-extension://test-extension/options.html' };
+        expect(await dispatch({ type: 'testConnection', apiUrl: 'https://untrusted.example.test/api', token: '' }, from))
+            .toMatchObject({ ok: false, error: { kind: 'notConfigured' } });
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+    it('permet de tester une nouvelle origine avec un nouveau jeton saisi explicitement', async () => {
+        const fetchImpl = vi.fn(async () => new Response(JSON.stringify(empty), { status: 200 }));
+        vi.stubGlobal('fetch', fetchImpl);
+        const from = { ...sender, url: 'chrome-extension://test-extension/options.html' };
+        expect(await dispatch({ type: 'testConnection', apiUrl: 'https://new.example.test/api', token: 'new-synthetic-token' }, from)).toEqual({ ok: true, count: 0 });
+        expect(fetchImpl).toHaveBeenCalledWith('https://new.example.test/api/search', expect.objectContaining({
+            headers: expect.objectContaining({ Authorization: 'Bearer new-synthetic-token' }), redirect: 'error',
+        }));
+    });
+    it('refuse search et feedback si les réglages changent avant le remplacement du jeton', async () => {
+        const stored = await api.storage.local.get(SETTINGS_KEY);
+        await api.storage.local.set({ [SETTINGS_KEY]: { ...(stored[SETTINGS_KEY] as object), apiUrl: 'https://new.example.test/api' } });
+        const fetchImpl = vi.fn(); vi.stubGlobal('fetch', fetchImpl);
+        const request = { contractVersion: 2, textTruncated: false, text: 'Test', lang: 'fr' };
+        expect(await dispatch({ type: 'search', requestId: 'r', request })).toEqual({ ok: false });
+        expect(await dispatch({ type: 'feedback', request, key: 'K', resultId: 'cell2.synthetic', feedbackProof: 'synthetic-proof' })).toEqual({ ok: false });
+        const from = { ...sender, url: 'chrome-extension://test-extension/options.html' };
+        expect(await dispatch({ type: 'testConnection' }, from)).toMatchObject({ ok: false, error: { kind: 'notConfigured' } });
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+    it('refuse le jeton suivant si une recherche possède encore les réglages précédents', async () => {
+        const get = api.storage.local.get.bind(api.storage.local);
+        api.storage.local.get = vi.fn(async (keys) => {
+            const value = await get(keys);
+            if (keys === SETTINGS_KEY) {
+                await api.storage.local.set({ [TOKEN_KEY]: { value: 'next-token', origin: 'https://new.example.test' } });
+            }
+            return value;
+        });
+        const fetchImpl = vi.fn(); vi.stubGlobal('fetch', fetchImpl);
+        expect(await dispatch({ type: 'search', requestId: 'r', request: { contractVersion: 2, textTruncated: false, text: 'Test', lang: 'fr' } })).toEqual({ ok: false });
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
 });

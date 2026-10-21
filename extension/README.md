@@ -121,13 +121,15 @@ Les iframes sont gérées : chaque frame détecte son clic et surligne son élé
 
 Rien n'est codé en dur sur MyAB : domaines, structure du DOM et URL sont des réglages. `config.example.json` montre le format ; la page Paramètres sait **importer** et **exporter** ce fichier (jamais le token). Après import, vérifier puis enregistrer.
 
+Le jeton est lié à l’origine de son API (protocole, hôte et port). Tester une autre origine exige de saisir explicitement son jeton ; le jeton enregistré n’y est jamais réutilisé. Enregistrer une configuration d’une autre origine efface le jeton précédent dans les deux modes de stockage. Après la mise à jour de sécurité **0.2.2**, ressaisir une fois le jeton : les anciens enregistrements sans liaison d’origine ne sont plus acceptés. Un import JSON ne transporte et ne réassocie aucun jeton.
+
 ## Contrat de l'API
 
 Le backend Laravel expose `POST /api/browser-extension/search` et `POST /api/browser-extension/feedback`, avec un jeton personnel Sanctum. Le [contrat version 2](../docs/technique/api-extension-navigateur.md) définit les champs, limites, scores, statuts et erreurs ; la [mise en œuvre](../docs/technique/api-extension-implementation.md) décrit la projection, l’entretien et la recette.
 
 Les recherches réelles envoient `contractVersion: 2` et `textTruncated`, avec la langue du texte inspecté, distincte de celle du panneau. Chaque résultat identifie une cellule par terme, type DEVCONF, tuple exact, attribut et langue. La valeur importée, la référence et la traduction validée sont affichées séparément. Les propositions pending sont comptées, sans sélection arbitraire d’une traduction en vigueur.
 
-La version reconstruite pour cette API est **0.2.1**. Vérifier cette version dans la fiche de l’extension après chargement. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation. Le serveur accepte automatiquement les origines Chrome et Firefox : aucun identifiant d’installation ni utilisateur n’est à déclarer côté API.
+La version reconstruite pour cette API est **0.2.2**. Vérifier cette version dans la fiche de l’extension après chargement. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation. Le serveur accepte automatiquement les origines Chrome et Firefox : aucun identifiant d’installation ni utilisateur n’est à déclarer côté API.
 
 Le serveur calcule `matchState`, `exactCandidateCount`, `hasMore` et `candidateSetComplete` avant la limite d’affichage. Plusieurs exacts restent ambigus avec `maxResults: 1`. Le client respecte `exact: false` et annonce les aperçus tronqués. Le feedback est facultatif, signé et sans effet sur la validation ou les campagnes.
 

@@ -46,7 +46,7 @@ async function init(): Promise<void> {
     });
 
     const configured =
-        validateHttpUrl(settings.apiUrl).ok && settings.allowedDomains.length > 0 && (await loadToken(api)) !== '';
+        validateHttpUrl(settings.apiUrl).ok && settings.allowedDomains.length > 0 && (await loadToken(settings.apiUrl, api)) !== '';
     if (!configured) {
         setStatus(t(lang, 'popupNotConfigured'), 'warn');
         return;
