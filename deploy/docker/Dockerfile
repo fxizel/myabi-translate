@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM php:8.4-fpm-bookworm AS php-base
+FROM php:8.4.27-fpm-bookworm AS php-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libicu-dev libonig-dev libzip-dev python3 mariadb-client ca-certificates unzip \
     && docker-php-ext-install -j2 intl mbstring pdo_mysql zip opcache \
@@ -25,6 +25,7 @@ COPY resources/views ./resources/views
 COPY routes ./routes
 COPY scripts ./scripts
 COPY artisan ./artisan
+RUN php scripts/check-php-runtime.php
 ARG APP_REVISION
 ARG APP_VERSION=local-preparation
 RUN composer dump-autoload --no-dev --no-scripts --classmap-authoritative \

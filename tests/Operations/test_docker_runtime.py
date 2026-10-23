@@ -1,6 +1,6 @@
 """Opt-in disposable PHP/Nginx transport test; no application or business database is used.
 
-MYABI_RUNTIME_APP_IMAGE must name a locally built myABI PHP 8.4 image. The current
+MYABI_RUNTIME_APP_IMAGE must name a locally built patched myABI PHP image. The current
 PHP, FPM, entrypoint and Nginx configuration files are mounted read-only over it.
 """
 from concurrent.futures import ThreadPoolExecutor
@@ -21,7 +21,10 @@ APP_IMAGE = os.environ.get('MYABI_RUNTIME_APP_IMAGE')
 
 PHP_PROBE = r'''<?php
 header('Content-Type: application/json');
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo '{"healthy":true}'; exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['healthy' => true, 'php_version' => PHP_VERSION,
+        'upload_progress' => (bool) ini_get('session.upload_progress.enabled')]); exit;
+}
 $file = $_FILES['upload'] ?? null;
 if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
     http_response_code(413); echo json_encode(['error' => $file['error'] ?? 'post_limit']); exit;
@@ -120,6 +123,21 @@ class DockerRuntimeTest(unittest.TestCase):
             while sample.tell() + len(line) <= size:
                 sample.write(line)
         return path
+
+    def test_served_fpm_uses_patched_php_and_disables_native_upload_progress(self):
+        connection = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+        try:
+            connection.request('GET', '/up')
+            response = connection.getresponse()
+            self.assertEqual(200, response.status)
+            data = json.loads(response.read())
+            version = tuple(map(int, data['php_version'].split('.')))
+            self.assertIn(version[:2], [(8, 4), (8, 5)])
+            minimum = (8, 4, 27) if version[:2] == (8, 4) else (8, 5, 12)
+            self.assertGreaterEqual(version, minimum)
+            self.assertFalse(data['upload_progress'])
+        finally:
+            connection.close()
 
     def upload(self, path):
         boundary = 'myabiSyntheticBoundary'

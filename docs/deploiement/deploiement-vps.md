@@ -105,7 +105,7 @@ Dans `compose.env`, fixer `APP_REVISION` au SHA Git complet et `RELEASE_TAG` à 
 
 ```sh
 docker compose --env-file compose.env config --quiet
-docker compose --env-file compose.env build app myabi-web
+docker compose --env-file compose.env build --pull app myabi-web
 docker compose --env-file compose.env up -d --wait db
 docker compose --env-file compose.env run --rm provision
 docker compose --env-file compose.env run --rm migrate

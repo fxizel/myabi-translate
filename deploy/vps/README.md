@@ -2,6 +2,8 @@
 
 Cette variante utilise Nginx, PHP 8.4 FPM et MariaDB 11.4 installés sur le système. Sur un VPS qui héberge déjà d'autres services, la variante isolée décrite dans le guide principal est prioritaire. Ces modèles natifs restent une option après choix d'un système pris en charge et inspection des services existants. Ils ne modifient rien à distance.
 
+PHP **8.4.27 minimum** est obligatoire pour CLI et FPM afin de corriger CVE-2026-109618 et CVE-2026-109619. Mettre à jour les paquets puis redémarrer l’instance FPM dédiée ; le nom `php8.4` ne prouve pas le niveau de correctif. Le pool désactive aussi `session.upload_progress.enabled`. Voir la [procédure de sécurité PHP](../../docs/deploiement/security-deployment.md).
+
 Le nom de site est `myabi.example.org`, le répertoire `/srv/myabi`. Les chemins des exécutables sont ceux de paquets Debian/Ubuntu ; les vérifier sur le système retenu. Ne pas remplacer la configuration globale Nginx, MariaDB ou PHP et ne pas arrêter les services d'autres sites. Aucun processus Laravel permanent ni Node n'est nécessaire : FPM sert les requêtes, les commandes métier sont ponctuelles.
 
 | Modèle | Emplacement proposé |

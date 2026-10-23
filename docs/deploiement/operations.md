@@ -4,6 +4,8 @@ La cible VPS demandée le 22 septembre 2026 est décrite dans [le guide VPS](dep
 
 ## Préparer le pilote
 
+PHP **8.4.27 minimum** est requis pour CLI et FPM. Appliquer les [correctifs des CVE PHP du 21 octobre 2026](security-deployment.md) et renouveler les processus avant ouverture du service ; le seul choix « PHP 8.4 » ne prouve pas la présence des correctifs.
+
 Le site sert uniquement `current/public`, avec PHP 8.4 et HTTPS. Choisir la même version de PHP pour le site et les tâches SSH. alwaysdata permet de choisir les versions de langage au niveau du site et de l’environnement ; vérifier les binaires réellement fournis au compte. [Documentation PHP](https://help.alwaysdata.com/en/docs/web-hosting/languages/php/).
 
 Créer une base MariaDB et deux comptes distincts : un compte applicatif limité et un compte de migration. Appliquer la [procédure de sécurité SQL](security-deployment.md). La version MariaDB testée par la CI est 11.4 ; confirmer la version réellement attribuée au pilote avant la recette.

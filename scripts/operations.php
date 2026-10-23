@@ -4,6 +4,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
 // Operational read-only metadata and health checks. Never print configuration secrets.
+require __DIR__.'/check-php-runtime.php';
 require dirname(__DIR__).'/vendor/autoload.php';
 $app = require dirname(__DIR__).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();

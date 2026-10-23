@@ -45,6 +45,8 @@ class NativeDeploymentTest(unittest.TestCase):
         self.executable(self.tools / 'php', '''#!/usr/bin/env python3
 import json, os, pathlib, sys
 args = sys.argv[1:]
+if args[0].endswith('/check-php-runtime.php'):
+    sys.exit(1 if os.environ.get('FAIL_PHP_RUNTIME') == '1' else 0)
 if args[0] == '-r':
     print('b' * 48 if 'random_bytes' in args[1] else json.loads(args[2])['url'])
     sys.exit(0)
@@ -61,7 +63,7 @@ if [[ "$*" != *--fail* && "${FAIL_TLS:-0}" == 1 ]]; then exit 60; fi
         stage = self.root / 'fixture'
         for directory in ['vendor', 'public', 'scripts', 'bootstrap/cache', 'database/migrations']:
             (stage / directory).mkdir(parents=True, exist_ok=True)
-        for name in ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php', 'scripts/operations.php']:
+        for name in ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php', 'scripts/operations.php', 'scripts/check-php-runtime.php']:
             (stage / name).write_text('synthetic fixture')
         shutil.copyfile(SCRIPTS / 'inspect-release.py', stage / 'scripts/inspect-release.py')
         (stage / 'RELEASE.json').write_text(json.dumps({'commit': self.commit}))
@@ -82,6 +84,13 @@ if [[ "$*" != *--fail* && "${FAIL_TLS:-0}" == 1 ]]; then exit 60; fi
 
     def mode(self, path):
         return stat.S_IMODE(path.stat().st_mode)
+
+    def test_unpatched_php_is_rejected_before_maintenance_or_backup(self):
+        result = self.deploy(FAIL_PHP_RUNTIME='1')
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse((self.shared / 'storage/framework/down').exists())
+        self.assertFalse((self.root / 'current').exists())
+        self.assertFalse(self.trace.exists())
 
     def test_shared_runtime_keeps_code_and_operational_secrets_protected(self):
         lock = self.shared / 'storage/app/private/operations.lock'

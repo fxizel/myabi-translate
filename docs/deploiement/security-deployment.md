@@ -1,14 +1,42 @@
 # Comptes, sessions et journal d’audit
 
-## Alerte du 21 octobre 2026 : CVE-2026-109618 et CVE-2026-109619
+## Correctifs du 23 octobre 2026 : CVE-2026-109618 et CVE-2026-109619
 
-Point de situation à **15 h 02 CEST (13 h 02 UTC)** : [PHP annonce deux vulnérabilités critiques, CVSS v4.0 9.2 chacune](https://www.php.net/archive/2026.php#2026-10-20-1), avec publication prévue à 16 h CEST. Les versions affectées, les versions corrigées et les préconditions techniques ne sont pas encore précisées dans cette annonce. [CERT-EU associe ces deux identifiants au risque d’exécution de code à distance](https://cert.europa.eu/publications/security-advisories/2026-018/).
+Les avis définitifs décrivent deux risques critiques d’exécution de code à distance dans PHP : [corruption lors d’un épuisement mémoire](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w) et [état global conservé entre requêtes](https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp). PHP-FPM est également concerné selon les chemins exécutés. Seule la mise à jour du moteur corrige complètement ces failles ; un middleware Laravel intervient trop tard pour certains déclenchements.
 
-Le runtime local relevé est PHP 8.4.26 ; il reste **potentiellement concerné**, sans exploitation démontrée sur myABI. Le contrôle Composer ne couvre pas le moteur PHP. Le tag Docker php:8.4-fpm-bookworm et les exécutables natifs php8.4 ne prouvent pas quel correctif est réellement installé. Le pilote de session Laravel en base ne suffit pas à écarter une faille du runtime.
+| Branche | Première version corrigée pour les deux CVE | Utilisation myABI |
+| --- | --- | --- |
+| PHP 8.2 | 8.2.35 | Non prise en charge |
+| PHP 8.3 | 8.3.36 | Non prise en charge |
+| PHP 8.4 | **8.4.27** | Référence : image `php:8.4.27-fpm-bookworm` |
+| PHP 8.5 | **8.5.12** | Autorisée par Composer, à qualifier avant changement de branche |
 
-Avant toute mise en service, identifier la version et le paquet réellement utilisés par FPM et les commandes CLI, puis appliquer la version ou le paquet confirmé comme corrigé par PHP ou son distributeur. Pour Docker, reconstruire en récupérant la base corrigée puis recréer les services concernés ; pour le natif, mettre à jour le paquet et renouveler les processus. Relever ensuite les versions exécutées et rejouer la recette isolée. Les trois corrections applicatives ne corrigent pas ces CVE. Aucun contournement spécifique non confirmé n’est présenté comme efficace. Si un service exposé ne peut pas être corrigé rapidement, CERT-EU recommande d’envisager son isolement temporaire ; cette décision relève de l’exploitant.
+Composer et son verrou refusent les versions précédentes, y compris PHP 8.5.0 à 8.5.11. `scripts/check-php-runtime.php`, indépendant de Laravel et des secrets, contrôle le binaire CLI lors de la construction et du démarrage Docker, du déploiement natif et des contrôles d’exploitation. Il ne certifie pas le binaire FPM d’un autre service. `composer audit` vérifie les bibliothèques ; il ne met pas PHP à jour.
 
-Cette alerte est datée et doit être réévaluée à partir de l’avis final ; aucune version corrigée n’est inventée et aucune mise à jour distante n’est effectuée par le dépôt.
+### Configuration complémentaire
+
+Le suivi natif `session.upload_progress.enabled` est désactivé dans le `php.ini` Docker et imposé administrativement dans les pools Docker/natif. L’application suit ses imports elle-même et utilise les sessions Laravel en base. Ce réglage réduit un chemin décrit dans CVE-2026-109619 ; il ne remplace pas le correctif PHP. Le `.user.ini` fourni reprend la valeur, mais est appliqué trop tard pour protéger le démarrage : sur hébergement géré, demander aussi son application dans `php.ini` ou le pool FPM.
+
+Conserver les limites de mémoire, de taille des requêtes et de durée. Les modèles Nginx bornent le corps HTTP à 110 Mio avant PHP. `memory_limit=-1`, le masquage des erreurs et le recyclage périodique des workers ne sont pas des corrections complètes. Éviter les paramètres FastCGI `PHP_VALUE`/`PHP_ADMIN_VALUE` par requête ; utiliser la configuration de démarrage et les valeurs administratives du pool. Examiner les avertissements de configuration et erreurs fatales dans les journaux privés, sans publier de données métier.
+
+### Mise à jour des installations existantes
+
+1. Inventorier les services et le frontal selon le [guide VPS](deploiement-vps.md). Identifier séparément les binaires CLI, FPM et les processus actifs. Ne pas utiliser de page publique `phpinfo()`.
+2. Docker : suivre la procédure de livraison et de sauvegarde existante, construire avec `docker compose --env-file compose.env build --pull app myabi-web`, puis recréer `app` et `myabi-web` avec les nouvelles images. Le client Python utilise aussi `docker build --pull`. Un redémarrage d’une ancienne image ne met pas PHP à jour. Les commandes ponctuelles doivent utiliser la même nouvelle image.
+3. Natif/hébergement géré : installer PHP 8.4.27 ou ultérieur dans la branche 8.4 pour **CLI et FPM**, appliquer `session.upload_progress.enabled=Off` dans la configuration de démarrage/pool, tester puis redémarrer uniquement l’instance FPM myABI. Renouveler tous ses workers et relancer les serveurs de développement éventuels. Un paquet rétroporté exige une preuve du distributeur et une adaptation explicite du contrôle de version ; aucun contournement silencieux n’est prévu.
+4. Relever les versions et la configuration effectives, puis rejouer la recette de connexion, téléversement synthétique, traitement et téléchargement. Ne déclarer l’installation corrigée qu’après remplacement des processus vulnérables.
+
+Contrôles Docker après recréation, depuis le répertoire Compose :
+
+```sh
+docker compose --env-file compose.env exec -T app php scripts/check-php-runtime.php
+docker compose --env-file compose.env exec -T app php-fpm -v
+docker compose --env-file compose.env exec -T app php-fpm -tt
+docker compose --env-file compose.env exec -T app php-fpm -i | grep session.upload_progress.enabled
+docker compose --env-file compose.env run --rm cli php scripts/operations.php health
+```
+
+En natif, utiliser les chemins réellement installés : `php8.4 scripts/check-php-runtime.php`, `php-fpm8.4 -v` et `php-fpm8.4 --test --fpm-config /etc/myabi/php-fpm.conf`. Vérifier aussi les valeurs administratives du pool avec `--fpm-config /etc/myabi/php-fpm.conf -tt`. Ces contrôles des exécutables et fichiers doivent accompagner le redémarrage et les sondes HTTP pour vérifier le service actif. Aucun déploiement distant n’est effectué par ces changements du dépôt.
 
 ## Authentification et sessions
 

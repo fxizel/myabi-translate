@@ -99,6 +99,7 @@ if used+expanded+int(q['database_bytes'])+int(q['external_bytes'])+margin > int(
 PY
 mkdir "$candidate"
 tar -xzf "$archive" -C "$candidate" --no-same-owner --no-same-permissions
+"$php_bin" "$candidate/scripts/check-php-runtime.php"
 ln -s "$shared/.env" "$candidate/.env"
 ln -s "$shared/storage" "$candidate/storage"
 mkdir -p "$candidate/bootstrap/cache"

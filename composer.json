@@ -9,7 +9,7 @@
   ],
   "license": "AGPL-3.0-only",
   "require": {
-    "php": "^8.4",
+    "php": "~8.4.27 || ~8.5.12",
     "ext-iconv": "*",
     "ext-intl": "*",
     "ext-pdo": "*",

@@ -96,7 +96,7 @@ Les fichiers figés d’une publication et leur manifeste permettent de retrouve
 
 Prérequis :
 
-- PHP 8.4 avec `mbstring`, `intl`, `iconv`, `pdo_mysql`, `zip`, `xml` et `ctype` ;
+- PHP **8.4.27 minimum dans la branche 8.4** avec `mbstring`, `intl`, `iconv`, `pdo_mysql`, `zip`, `xml` et `ctype` (PHP 8.5 : 8.5.12 minimum ; voir les [correctifs de sécurité PHP](docs/deploiement/security-deployment.md)) ;
 - Composer 2 et MariaDB 11.4 ;
 - pour les tests rapides, SQLite avec `pdo_sqlite` ;
 - pour les tests JavaScript de développement et de CI seulement, Node 24, sans dépendance npm.

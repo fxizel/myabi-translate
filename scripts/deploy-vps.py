@@ -303,7 +303,7 @@ class Deployment:
         images = []
         for target, name, service in [('app', 'myabi-translate-app', 'app'), ('web', 'myabi-translate-web', 'myabi-web')]:
             reference = name + ':' + tag
-            self.runner.run(['docker', 'build', '--file', 'deploy/docker/Dockerfile', '--target', target,
+            self.runner.run(['docker', 'build', '--pull', '--file', 'deploy/docker/Dockerfile', '--target', target,
                              '--build-arg', 'APP_REVISION=' + revision, '--build-arg', 'APP_VERSION=' + tag,
                              '--tag', reference, '.'], cwd=source, log_path=folder / ('build-' + target + '.log'))
             metadata = json.loads(self.runner.capture(['docker', 'image', 'inspect', reference]))[0]
