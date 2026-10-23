@@ -139,6 +139,14 @@ class DockerRuntimeTest(unittest.TestCase):
         finally:
             connection.close()
 
+    def test_cli_startup_guard_preserves_machine_readable_stdout(self):
+        output = self.docker('run', '--rm', '--network', 'none', '--user', '10001:10001', '--read-only',
+                            '--mount', f'type=volume,source={self.volume},target=/var/www/html/storage',
+                            '--mount', f'type=bind,source={ROOT / "deploy/docker/entrypoint.sh"},target=/probe-entrypoint.sh,readonly',
+                            '--entrypoint', 'sh', APP_IMAGE, '/probe-entrypoint.sh', 'php', '-r',
+                            'echo json_encode(["healthy" => true]);')
+        self.assertEqual({'healthy': True}, json.loads(output))
+
     def upload(self, path):
         boundary = 'myabiSyntheticBoundary'
         preamble = (f'--{boundary}\r\nContent-Disposition: form-data; name="upload"; filename="synthetic.csv"\r\n'
