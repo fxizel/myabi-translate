@@ -73,6 +73,75 @@ Transférer l'archive par SSH avec une clé dédiée à privilèges limités et 
 
 Le script `deploy.sh` attend au maximum 35 minutes le verrou exclusif `shared/storage/app/private/operations.lock`, commun aux imports, publications et opérations. Il contrôle l’espace, installe le code, suspend les requêtes web, appelle le hook de sauvegarde, exécute les migrations avec le compte distinct, puis contrôle le schéma, les répertoires, les droits d’audit et les pages `/up` et `/login` en HTTPS. Le lien `current` est remplacé atomiquement. L’application ne rouvre qu’après ces contrôles.
 
+## Consulter les logs techniques et le journal d’audit
+
+### Emplacement et configuration des logs Laravel
+
+Les logs techniques Laravel servent au diagnostic des avertissements et des erreurs de l’application. Leur configuration est définie dans [config/logging.php](../../config/logging.php). Ils restent hors de `public`, de Git et des paquets de livraison.
+
+| Installation | Répertoire des logs Laravel |
+| --- | --- |
+| Développement local | `storage/logs/`, à la racine du projet |
+| Native ou hébergement géré avec `deploy.sh` | `shared/storage/logs/`, accessible aussi par `current/storage/logs/` |
+| Docker | `data/storage/logs/` depuis le répertoire Compose, monté dans `/var/www/html/storage/logs/` dans les conteneurs `app` et `cli` |
+
+Le [.env.example](../../.env.example) et les exemples natif/Docker prévoient les réglages suivants dans le fichier d’environnement applicatif privé :
+
+```dotenv
+LOG_CHANNEL=daily
+LOG_LEVEL=warning
+LOG_DAILY_DAYS=14
+```
+
+Avec ces réglages, les fichiers se nomment `laravel-AAAA-MM-JJ.log`. Le seuil `warning` conserve les avertissements et les niveaux supérieurs (`error`, `critical`, `alert`, `emergency`) ; les messages `debug`, `info` et `notice` sont filtrés. Vérifier les réglages de l’installation : en l’absence des variables, la configuration du dépôt utilise `stack` avec `single`, donc `laravel.log`, au niveau `debug`. Après modification, appliquer la [procédure de rechargement de configuration](security-deployment.md#authentification-et-sessions). Conserver `APP_DEBUG=false` en exploitation.
+
+### Contenu et confidentialité
+
+Les entrées portent une date, un niveau, un message et éventuellement un contexte. Les exceptions signalées à Laravel peuvent inclure leur message et une trace d’appels.
+
+Pour les échecs pris en charge par [OperationFailure](../../app/Services/OperationFailure.php), l’événement `operation.failed` contient uniquement `code`, `reference` (UUID de diagnostic), `entity`, `id`, `exception_class` et `sqlstate` lorsqu’il est disponible. Ce mécanisme n’enregistre ni le message brut de l’exception, ni les requêtes SQL, ni les valeurs métier. La référence permet de retrouver l’entrée correspondant à l’échec d’une opération. Les exceptions de l’API de l’extension navigateur sont volontairement exclues du signalement Laravel dans [bootstrap/app.php](../../bootstrap/app.php), afin de ne pas y recopier de textes inspectés ou d’identifiants sensibles.
+
+Réserver la lecture aux personnes autorisées. Les autres erreurs peuvent contenir des informations sensibles : vérifier et expurger tout extrait avant partage. Ne pas publier de logs bruts, de secrets ou de valeurs métier dans une issue, un dépôt ou une livraison.
+
+### Rotation
+
+Avec `daily` et `LOG_DAILY_DAYS=14`, Monolog conserve au maximum 14 fichiers quotidiens correspondants et supprime les plus anciens lors de la rotation déclenchée par une écriture. Il s’agit d’un nombre de fichiers, sans garantie de suppression après 14 jours calendaires en l’absence d’activité. Aucun plafond de taille par fichier Laravel n’est configuré ; surveiller l’espace occupé. Un ancien fichier `laravel.log` issu du canal `single` n’est pas pris en charge par cette rotation quotidienne.
+
+Les journaux Docker de sortie standard et d’erreur ont leur propre rotation (trois fichiers de 10 Mio par service dans le modèle fourni). Cette limite ne s’applique pas aux fichiers Laravel du stockage persistant.
+
+### Consultation
+
+Depuis la racine du projet local ou le répertoire `current` en installation native, sous Linux :
+
+```sh
+ls -lh storage/logs/laravel*.log
+tail -n 100 -f storage/logs/laravel-AAAA-MM-JJ.log
+```
+
+Sous PowerShell, depuis la racine du projet local :
+
+```powershell
+Get-ChildItem .\storage\logs\laravel*.log
+Get-Content -LiteralPath .\storage\logs\laravel-AAAA-MM-JJ.log -Tail 100 -Wait
+```
+
+Remplacer `AAAA-MM-JJ` par la date du fichier à examiner ; `Ctrl+C` arrête le suivi. À la rotation quotidienne, relancer le suivi sur le nouveau fichier. Pour retrouver une référence d’échec sous Linux, utiliser `grep -F 'REFERENCE_UUID' storage/logs/laravel-*.log` en remplaçant `REFERENCE_UUID` par la référence recherchée.
+
+Avec Docker, depuis le répertoire Compose, consulter les fichiers Laravel dans le conteneur actif :
+
+```sh
+docker compose --env-file compose.env exec -T app sh -c 'ls -lh storage/logs/laravel*.log'
+docker compose --env-file compose.env exec -T app tail -n 100 -f storage/logs/laravel-AAAA-MM-JJ.log
+```
+
+Pour les sorties des services PHP-FPM et Nginx, utiliser séparément `docker compose --env-file compose.env logs --tail=100 app myabi-web`. Avec le canal `daily`, cette commande n’affiche pas les fichiers de logs Laravel. Les commandes ci-dessus lisent les journaux sans les modifier.
+
+### Journal d’audit métier
+
+Le journal d’audit est enregistré en base dans la table `audit_events`. Il conserve les actions métier et de sécurité (imports, propositions, décisions, publications, comptes), leur auteur, l’organisation, la date, l’entité concernée, les valeurs avant/après selon l’action, l’adresse IP et l’identifiant de requête lorsqu’ils sont disponibles. [AuditService](../../app/Services/AuditService.php) masque les champs de secrets prévus par le service.
+
+Les rôles autorisés le consultent sur `/audit` et peuvent l’exporter en CSV via `/audit/export`. Ce journal est protégé en ajout seul ; la rotation des fichiers techniques ne le purge pas. Ses données et ses exports restent privés. Voir les [protections SQL du journal d’audit](security-deployment.md#accès-mariadb-séparés).
+
 ## Sauvegarder hors hébergement
 
 Avant chaque migration, le script exige `shared/backup-hook.sh`. Ce hook s’exécute **sous le verrou déjà acquis**, pendant la maintenance, et doit terminer avec un code non nul si la copie ou sa vérification échoue. Il reçoit les chemins de la nouvelle version, du répertoire partagé et de la version précédente. Il ne doit pas rappeler `backup.sh`, qui chercherait à reprendre le même verrou.
