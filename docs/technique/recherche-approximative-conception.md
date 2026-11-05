@@ -2,7 +2,7 @@
 
 Date : 5 novembre 2026.
 
-Statut : conception en cours, sans développement du moteur. Les décisions ci-dessous complètent le [périmètre fonctionnel validé](../fonctionnel/recherche-approximative.md). Les durées indiquées sont des objectifs à vérifier, et non des performances mesurées.
+Statut : conception technique validée le 5 novembre 2026, désormais réalisée dans le dépôt. Les décisions ci-dessous complètent le [périmètre fonctionnel validé](../fonctionnel/recherche-approximative.md). La grille de seuils reste une hypothèse calibrable ; les mesures synthétiques locales ne valent pas qualification de l'hébergement cible. La section de réalisation décrit le comportement livré et les limites de recette.
 
 ## Décisions de calibrage
 
@@ -23,10 +23,11 @@ Statut : conception en cours, sans développement du moteur. Les décisions ci-d
 
 | Sujet | Décision validée |
 | --- | --- |
-| Cible | Afficher la première page de résultats approximatifs, filtres et compteurs compris, en au plus 5 secondes dans 95 % des essais. |
+| Cible | Afficher la première page de résultats approximatifs complets, filtres et compteurs compris, en au plus 5 secondes dans 65 % des essais. |
 | Charge de référence | 5 recherches simultanées sur un catalogue complet représentatif. |
-| Cas exceptionnel | Arrêter le calcul approximatif lorsqu’il atteint le plafond de 15 secondes. |
+| Cas exceptionnel | Plafond de 20 secondes, retour compris ; interrompre le calcul avant pour préserver le retour. |
 | Dépassement | Afficher uniquement les correspondances habituelles dans le périmètre et avec les filtres demandés, avec un message expliquant le dépassement du délai. |
+| Échec d’indexation | Conserver l’enregistrement métier et suspendre la recherche approximative jusqu’à réparation, avec une indisponibilité explicite et sans servir de résultats périmés. |
 
 Le repli conserve la référence allemande et les valeurs en vigueur et propositions en attente de la langue cible. Il ne revient pas implicitement à une recherche dans toutes les langues ou dans d’autres champs. Les résultats approximatifs partiels ne sont pas affichés comme une liste complète.
 
@@ -70,7 +71,7 @@ Les mesures porteront sur un corpus synthétique reproduisant la volumétrie com
 
 Pour mesurer le délai visible, le chronométrage proposé va de l’application des critères jusqu’à l’affichage de la première page et de ses compteurs, sur un environnement de référence documenté. Le temps serveur et le temps SQL sont aussi relevés pour expliquer le résultat. Les conditions matérielles, versions et conditions réseau devront accompagner les mesures.
 
-Les recherches approximatives complètes affichées en cinq secondes au plus doivent représenter au moins 95 % des essais de référence. Les replis et erreurs sont comptés séparément et ne constituent pas des succès approximatifs complets. Une recherche terminée sans correspondance est un résultat complet lorsqu’elle a correctement évalué les critères.
+Les recherches approximatives complètes affichées en cinq secondes au plus doivent représenter au moins 65 % des essais de référence. Cette proportion a été abaissée de 95 % à 65 % par décision de l'utilisateur le 5 novembre 2026 ; la précision minimale reste de 95 %. Les replis et erreurs restent dans le dénominateur, sont comptés séparément et ne constituent pas des succès approximatifs complets. Une recherche terminée sans correspondance est un résultat complet lorsqu’elle a correctement évalué les critères.
 
 Le scénario nominal comporte cinq recherches simultanées, avec des requêtes variées. Les résultats sont aussi examinés par langue, longueur de saisie, type de recherche et sélectivité des filtres. Les essais à froid, à chaud et pendant un import complètent le scénario nominal, conformément aux exigences existantes de consultation pendant les traitements.
 
@@ -82,7 +83,7 @@ La recherche doit préparer les correspondances habituelles dans le périmètre 
 
 Les limites de candidats, l’annulation des traitements SQL et la marge nécessaire au retour de la page doivent être définies ensemble. Si un traitement ne peut pas produire un résultat complet dans le budget, il utilise le repli décidé ; il ne présente pas un total approximatif tronqué comme exhaustif.
 
-MariaDB permet de limiter une requête avec `max_statement_time`, mais son arrêt dépend de points de contrôle pendant l’exécution et peut être retardé. Cette limite SQL doit donc être combinée avec le budget applicatif restant, des traitements bornés et une marge pour le retour. Le plafond de quinze secondes reste un critère à vérifier ; fixer une variable SQL à quinze secondes ne suffit pas à le démontrer. Voir la [documentation MariaDB sur l’arrêt des requêtes](https://mariadb.com/docs/server/ha-and-performance/optimization-and-tuning/query-optimizations/aborting-statements).
+MariaDB permet de limiter une requête avec `max_statement_time`, mais son arrêt dépend de points de contrôle pendant l’exécution et peut être retardé. Cette limite SQL doit donc être combinée avec le budget applicatif restant, des traitements bornés et une marge pour le retour. Le plafond de vingt secondes reste un critère à vérifier ; fixer une variable SQL à vingt secondes ne suffit pas à le démontrer. Voir la [documentation MariaDB sur l’arrêt des requêtes](https://mariadb.com/docs/server/ha-and-performance/optimization-and-tuning/query-optimizations/aborting-statements).
 
 ## Indexation retenue et modèle proposé
 
@@ -114,7 +115,11 @@ Les points de synchronisation existants de [SearchText](../../app/Services/Searc
 
 La reconstruction complète est un traitement explicite par lots bornés, distinct des requêtes de recherche. Une génération ne devient utilisable qu’après contrôle de sa complétude et de sa cohérence avec les écritures intervenues pendant sa préparation. Elle ne permet pas d’accepter des résultats périmés après une modification confirmée. Le coût d’une mise à jour ciblée et celui d’une reconstruction complète seront mesurés séparément.
 
-Le comportement en cas d’échec d’indexation reste à arbitrer. La proposition est de conserver l’action métier et de rendre l’approximatif indisponible jusqu’à réparation, sans servir de résultats périmés. La [projection de l’extension](../../app/Services/BrowserExtension/SearchProjection.php) suit déjà ce principe pour son propre index. L’alternative est de faire échouer l’enregistrement lorsque la cohérence de l’index ne peut pas être garantie.
+En cas d’échec d’indexation, la décision validée est de conserver l’action métier et de rendre l’approximatif indisponible jusqu’à réparation, sans servir de résultats périmés. La [projection de l’extension](../../app/Services/BrowserExtension/SearchProjection.php) suit déjà ce principe pour son propre index. La confirmation de l’action reste conditionnée à la persistance effective du changement métier et de l’état d’indisponibilité ; une erreur qui empêche ces écritures ne peut pas être présentée comme un enregistrement réussi.
+
+Une nouvelle recherche après confirmation de l’enregistrement voit la modification dans l’index disponible, ou l’indisponibilité de l’approximatif. Une génération connue comme incomplète ou incompatible ne peut pas continuer à fournir des résultats. La réparation passe par une reprise ou une reconstruction contrôlée ; la remise en service exige un contrôle de complétude et de cohérence avec les dernières écritures.
+
+Le message proposé après une erreur d’indexation est : « Modification enregistrée. La recherche approximative est temporairement indisponible. » Lors d’une tentative de recherche, l’indisponibilité est distinguée d’un résultat vide. Les modes de recherche existants restent accessibles ; l’application ne prétend pas avoir terminé un élargissement approximatif ni ne change silencieusement son périmètre.
 
 ## Comparaison et classement proposés
 
@@ -167,11 +172,69 @@ La recette doit aussi couvrir les corrections et décisions pendant la consultat
 
 ## Points techniques restant à préciser
 
+Ce tableau conserve les travaux prévus lors de la conception. La section suivante précise leur réalisation et les contrôles restant à effectuer sur l'environnement cible.
+
 | Sujet | Travail de conception restant |
 | --- | --- |
 | Qualité | Arrêter les annotations du corpus de référence pour appliquer le seuil validé de 95 % et les cas positifs obligatoires. |
 | Algorithme | Revoir la chaîne proposée, puis valider les seuils adaptatifs et les familles de libellés sur le corpus. |
 | Indexation | Finaliser le schéma physique et les limites de sélection après évaluation du stockage et des mises à jour ciblées. |
-| Échec d’indexation | Choisir entre conserver l’action métier en suspendant l’approximatif et faire échouer l’enregistrement. |
+| Échec d’indexation | Vérifier la conservation effective de l’action métier, la suspension de l’approximatif et sa remise en service après réparation. |
 | Délai | Définir les budgets SQL et applicatifs nécessaires pour appliquer le plafond et retourner le repli. |
 | Recette | Fixer l’environnement de mesure et les dimensions du corpus synthétique complet avant toute conclusion de performance. |
+
+## Réalisation du profil 1
+
+Le moteur est dans `App\Services\CatalogueSearch`. `SearchText::syncMany` synchronise la projection après l'enregistrement des propositions ; le rejet et la transition vers les termes communs sont également couverts. Les attributs déjà décodés par un import ne sont réutilisés que s'ils appartiennent à la source effectivement retenue du terme. L'extension conserve son normaliseur, ses tables, son moteur et son contrat API.
+
+Les six tables `catalogue_search_*` séparent état, mutations à traiter, valeurs, vocabulaire mutualisé, occurrences positionnées et bigrammes. `terms.catalogue_reference_de` conserve uniquement les références dont la langue est identifiée DE, avec une signature de la source. Cette projection compacte est enregistrée avec le changement métier. Le repli interroge ces références, le JSON des validations et les propositions actuellement en attente, indépendamment des tables de l'approximatif. `term_search` fournit un surensemble de candidats habituels ; les termes marqués à traiter y sont ajoutés pour couvrir les écritures SQL directes. Chaque valeur est ensuite vérifiée dans le périmètre exact demandé.
+
+Les mots sont normalisés avec le composant compatible de l'extension et un profil propre au catalogue. Les accents, ligatures et casse sont rapprochés ; les positions de l'original sont conservées. Les petits mots significatifs, les négations, nombres, variables et références structurées ne reçoivent pas de correction arbitraire. Les familles morphologiques contrôlées sont dans `resources/search/lexical-families.php`. Toute évolution du profil ou de cette ressource impose une nouvelle version et une reconstruction.
+
+La comparaison est la distance de Damerau-Levenshtein restreinte, dite OSA, sur les caractères Unicode. Elle ne correspond pas à la distance non restreinte ; le cas `CA → ABC` est testé. Les candidats par fragments sont un surensemble : une inversion peut détruire trois bigrammes. Les comparaisons finales appliquent la grille de départ selon le plus court des deux mots. Tous les mots importants doivent correspondre à des occurrences distinctes d'une même valeur. Une affectation minimise le coût lexical et préfère un alignement dans l'ordre lorsque le coût est identique.
+
+Deux tables SQL temporaires propres à la connexion portent les variantes et les meilleurs résultats par terme. Les candidats groupés sont lus une seule fois, sans verrou d'écriture, dans un fichier temporaire privé et automatiquement supprimé, limité à 16 Mio de métadonnées. Seuls 200 identifiants ou scores sont repris en mémoire à la fois. Cette lecture évite les verrous partagés que pourrait prendre un `INSERT SELECT` sur la source. Le cas d'un unique mot candidat utilise un classement SQL par terme ; les autres cas conservent l'affectation des occurrences. Le classement final précède la pagination : habituels d'abord, puis coût lexical, ordre, écart de longueur et identifiant du terme. Les garde-fous de candidats, occurrences, mémoire, fichier temporaire et temps provoquent un repli complet ; ils ne produisent pas un total tronqué. Les compteurs par type, habituel et approximatif portent sur les mêmes termes distincts.
+
+Les déclencheurs transactionnels enregistrent les mutations des termes et propositions. Une écriture optionnelle échouée est annulée jusqu'au point de sauvegarde, puis l'indisponibilité est persistée dans la transaction métier. Si cette transaction ne peut pas être validée, l'action ne peut pas être confirmée. Une synchronisation ultérieure ne réactive pas un index suspendu. Les lectures utilisent une vue cohérente ; elles ne gardent pas de verrou partagé global pendant tout le calcul.
+
+Le plafond initial de quinze secondes a été porté à vingt secondes par décision de l'utilisateur le 5 novembre 2026. La proportion exigée sous cinq secondes est désormais de 65 %, tandis que le seuil de pertinence reste de 95 %. Le budget est de 17 secondes de travail avec une réserve de retour de 3 secondes. Les requêtes candidates sont soumises à une limite SQL de 2 secondes au maximum, réduite au budget restant et restaurée même après annulation. La préparation des résultats habituels dispose d'une limite par instruction de 3 secondes lorsque l'index est disponible, 6 secondes lorsqu'il est indisponible. Le budget est recalculé séparément avant les compteurs et avant la sélection de la page ; une relation déjà prouvée vide dans le même instantané n'est pas recalculée. Ces valeurs ont été révisées après les premières mesures synthétiques ; aucun seuil de pertinence n'a été assoupli. Ces mécanismes sont vérifiés par des essais d'annulation et ne prouvent pas, seuls, un plafond visible sur toute infrastructure. Les paramètres techniques sont dans `config/catalogue-search.php`.
+
+Les configurations Nginx fournies transmettent l'horodatage interne `MYABI_REQUEST_STARTED_AT` au contrôleur FastCGI, avant l'attente du processus PHP. Cette attente réduit le budget restant ; aucun en-tête HTTP du client n'est utilisé comme horloge. La conversion initiale utilise les horloges des services du même hôte, puis le calcul repose sur l'horloge monotone PHP. Pour une autre configuration native, installer le même paramètre et vérifier la synchronisation des horloges ; sans lui, la mesure applicative commence à l'entrée dans PHP. Nginx documente [la variable temporelle `$msec`](https://nginx.org/en/docs/http/ngx_http_core_module.html#var_msec) et [les paramètres FastCGI](https://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_param).
+
+Si le serveur ne peut pas préparer une liste habituelle complète, la réponse est une erreur 503 avec les critères conservés et sans tableau ni total fictif. Ce cas est compté comme une erreur de recette, distincte du repli habituel complet, d'un index indisponible et d'une liste vide.
+
+### Reconstruction et déploiement
+
+Après sauvegarde cohérente et migration, exécuter `php artisan referentiel:catalogue-search-rebuild`. La commande prend le verrou exclusif des opérations lourdes, vérifie les originaux privés, prépare une génération par lots de 200 termes, actualise les statistiques MariaDB hors transaction, contrôle ses compteurs et sa cohérence avec les mutations, puis l'active atomiquement. Elle reprend un curseur compatible et recommence une génération si le catalogue ou le profil a changé. La recherche habituelle reste disponible pendant la préparation ; les écritures métier sont suspendues. Les générations précédentes sont nettoyées par lots après activation.
+
+Le compte applicatif a besoin de `CREATE TEMPORARY TABLES` sur la seule base applicative. Le provisionnement Docker l'accorde sans élargir les droits `SELECT, INSERT` du journal d'audit. Après création des nouvelles tables, rejouer le provisionnement table par table. Ne pas attribuer les droits de migration au compte web.
+
+### Corpus et outils de mesure
+
+`tests/Fixtures/catalogue-search-corpus.php` fixe 400 recherches annotées, dont 200 de calibration et 200 réservées à la vérification, avec des noms différents dans les deux moitiés. Chaque contexte est un ensemble de candidats entièrement annoté. Les quatre langues, origines, champs secondaires, guillemets, saisies courtes, variables, nombres et différences de sens sont couverts. La précision ne compte que les dix premiers termes approximatifs au maximum ; les positifs obligatoires sont contrôlés séparément. Cette évaluation ne mesure pas la pertinence de toutes les requêtes possibles.
+
+Chaque contexte annoté comporte trois candidats. La précision obtenue dans ces ensembles fermés ne démontre pas la précision de toutes les recherches sans filtre sur le grand catalogue.
+
+Les premiers essais MariaDB avec la grille initiale ont évalué 161 résultats approximatifs en calibration, dont 160 pertinents, et 160 résultats réservés, tous pertinents ; aucun positif obligatoire n'a été manqué. Les annotations n'ont pas été modifiées pour obtenir ces résultats. Les rapports détaillés et leurs empreintes restent privés sous `.runtime/recherche-approximative/`.
+
+Un complément figé de 96 recherches (`catalogue-search-corrections.php`) couvre explicitement insertions, substitutions et deux corrections, sur d'autres mots et avec 48 cas dans chaque moitié. Il complète les suppressions et inversions des 400 annotations initiales sans modifier celles-ci ni régler les tolérances sur la moitié réservée. Les tests de répétitions, Unicode et différences de sens complètent cette mesure.
+
+Le générateur `scripts/lib/SyntheticSearchCatalogue.php` reproduit les proportions des sept types sur au moins 581 142 termes, leurs attributs multiples, des textes répétés, cellules vides, valeurs multilignes et propositions. Il crée de nouveaux CSV synthétiques privés et ne lit pas `data/imports`. Ses taux de remplissage et son vocabulaire sont synthétiques ; les nombres de termes, valeurs, propositions, mots et index doivent accompagner les résultats.
+
+Pour les mesures PHP/SQL, exporter des paramètres synthétiques de test et utiliser le bootstrap gardé `scripts/lib/isolated_search_bootstrap.php`, avec `APP_ENV=testing`, `MYABI_ISOLATED_TESTS=1`, un schéma neuf `myabi_test_*`, un hôte loopback, une clé applicative jetable et `MYABI_BENCHMARK_DATADIR` correspondant exactement à l'instance. Migrer ce seul schéma avant la génération. Ne jamais charger le `.env` de l'application ni diriger ces outils vers sa base de travail.
+
+```sh
+php scripts/benchmark_approximate_search.php --bootstrap=scripts/lib/isolated_search_bootstrap.php --seed=581142 --report=.runtime/recherche-approximative/seed.json --fixtures=.runtime/recherche-approximative/fixtures.json
+php scripts/benchmark_approximate_search.php --bootstrap=scripts/lib/isolated_search_bootstrap.php --rebuild --report=.runtime/recherche-approximative/rebuild.json --fixtures=.runtime/recherche-approximative/fixtures.json
+php scripts/benchmark_approximate_search.php --bootstrap=scripts/lib/isolated_search_bootstrap.php --samples=200 --report=.runtime/recherche-approximative/service.json --fixtures=.runtime/recherche-approximative/fixtures.json
+php scripts/benchmark_approximate_search.php --bootstrap=scripts/lib/isolated_search_bootstrap.php --describe --report=.runtime/recherche-approximative/catalogue-description.json --fixtures=.runtime/recherche-approximative/fixtures.json
+php scripts/benchmark_approximate_search.php --bootstrap=scripts/lib/isolated_search_bootstrap.php --update-samples=20 --report=.runtime/recherche-approximative/updates.json --fixtures=.runtime/recherche-approximative/fixtures.json
+php scripts/benchmark_approximate_search.php --bootstrap=scripts/lib/isolated_search_bootstrap.php --import-type=server --changed --import-control --report=.runtime/recherche-approximative/import-control.json --fixtures=.runtime/recherche-approximative/fixtures.json
+php scripts/benchmark_approximate_search.php --bootstrap=scripts/lib/isolated_search_bootstrap.php --import-type=mric --import-rows=5000 --changed --report=.runtime/recherche-approximative/import-concurrent.json --fixtures=.runtime/recherche-approximative/fixtures.json
+```
+
+Le script navigateur `scripts/benchmark_approximate_search.cjs` mesure cinq clients, le rendu et l'attente comprise. Son serveur de test doit utiliser trois processus PHP avec base et stockage isolés. Il sépare résultats complets, replis et erreurs. Un essai Windows avec trois serveurs PHP et un proxy local ne qualifie pas PHP-FPM/Nginx sous Linux : la cible à cinq secondes et les essais à froid, à chaud et pendant import restent à vérifier sur une réplique de la configuration VPS.
+
+La réévaluation des trois campagnes locales de 200 recherches avec le seuil accepté de 65 % donne 67,5 % après redémarrage du buffer MariaDB, 69,5 % à chaud et 65,5 % pendant import. Le maximum visible observé est de 17,70 secondes, sans dépassement de vingt secondes. Le critère de rapidité est donc atteint localement dans les trois conditions, avec une seule recherche de marge sur 200 pendant import. Les 90 replis et 34 erreurs sur 600 essais restent des échecs approximatifs complets. Ces mesures précèdent le changement du critère : leurs rapports bruts sont conservés et leur nouvelle évaluation est séparée sous `.runtime/recherche-approximative/acceptance-evaluation.json`. Elles ne remplacent pas la qualification Linux ni la validation de représentativité du catalogue synthétique.
+
+Les fichiers de résultats et les paramètres synthétiques restent sous `.runtime`. Le contrôle comparatif annule les deux transactions métier, mais peut laisser des originaux synthétiques privés et des fichiers de progression ; il ne doit jamais viser une base de travail. L'import de charge, lui, est réellement validé dans la base jetable. Le générateur préremplit les références DE : une reconstruction ainsi mesurée ne représente pas le coût d'une première initialisation avec caches vides. Prévoir la place pour la génération active, celle en construction et les fichiers temporaires avant une reconstruction réelle.

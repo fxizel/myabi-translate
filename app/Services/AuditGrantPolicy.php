@@ -27,7 +27,7 @@ class AuditGrantPolicy
         if ($table === '*') {
             // Reject write/destructive rights on EVERY schema wildcard, including
             // escaped or pattern grants that may cover the configured database.
-            return $schema === $database && array_diff($privileges, ['SELECT', 'INSERT']) === [];
+            return $schema === $database && array_diff($privileges, ['SELECT', 'INSERT', 'CREATE TEMPORARY TABLES']) === [];
         }
         if ($schema !== $database || $table === '' || strpbrk($table, '%*\\') !== false) {
             return false;

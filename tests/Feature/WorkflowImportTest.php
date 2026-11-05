@@ -18,6 +18,8 @@ use App\Services\AuditService;
 use App\Services\BrowserExtension\ApiProblem;
 use App\Services\BrowserExtension\SearchProjection;
 use App\Services\BrowserExtension\SearchService;
+use App\Services\CatalogueSearch\Projection;
+use App\Services\CatalogueSearch\Search;
 use App\Services\DevconfExportService;
 use App\Services\ImportService;
 use App\Services\LocalizedMessage;
@@ -611,5 +613,47 @@ class WorkflowImportTest extends TestCase
         $this->assertSame('de', $proposal->language);
         $this->assertSame('pending', $proposal->status);
         $this->assertSame([], Term::first()->validated);
+    }
+
+    public function test_catalogue_fuzzy_projection_tracks_import_edit_validation_supersession_and_source_change(): void
+    {
+        $this->import([['Name' => 'Synthetic', 'de_CH' => 'Dossier öffnen', 'fr_CH' => 'Dossier ouvrir']]);
+        app(Projection::class)->rebuild();
+        $workflow = app(WorkflowService::class);
+        $term = Term::firstOrFail();
+        $original = Proposal::firstOrFail();
+        $proposal = $workflow->propose($this->translator, $term, 'label', 'fr', 'Ouverture dossier');
+        $proposal = $workflow->edit($this->translator, $proposal, 'Ouverture du dossier', 1);
+        $workflow->decide($this->validator, $proposal, 'validate', 2);
+        self::assertSame('rejected', $original->fresh()->status);
+        self::assertFalse(DB::table('catalogue_search_values')->where('origin', 'proposal')->exists());
+        self::assertSame(2, $term->fresh()->revision_no);
+        $search = app(Search::class);
+        $result = $search->search(Term::visibleTo($this->manager), ['q' => 'ouvrir dossier', 'language' => 'fr'], 1, hrtime(true) / 1e9);
+        self::assertSame([$term->id], $result['ids']->all());
+        self::assertSame('current', $result['matches'][$term->id]['origin']);
+        $this->import([['Name' => 'Synthetic', 'de_CH' => 'Archiv öffnen', 'fr_CH' => 'Ouvrir une archive']]);
+        self::assertTrue((bool) DB::table('catalogue_search_state')->value('ready'));
+        self::assertFalse(DB::table('catalogue_search_dirty')->exists());
+        $result = $search->search(Term::visibleTo($this->manager), ['q' => 'archiv offnen', 'language' => 'fr'], 1, hrtime(true) / 1e9);
+        self::assertSame([$term->id], $result['ids']->all());
+        self::assertSame('reference', $result['matches'][$term->id]['origin']);
+        self::assertSame(3, $term->fresh()->revision_no, 'Projection writes must not create business revisions.');
+    }
+
+    public function test_catalogue_projection_updates_roll_back_with_the_outer_business_transaction(): void
+    {
+        $this->import([['Name' => 'Synthetic', 'de_CH' => 'Bezeichnung']]);
+        app(Projection::class)->rebuild();
+        $before = DB::table('catalogue_search_state')->value('mutation_no');
+        $words = DB::table('catalogue_search_words')->count();
+        DB::beginTransaction();
+        app(WorkflowService::class)->propose($this->translator, Term::firstOrFail(), 'label', 'fr', 'Nouvelle proposition');
+        self::assertTrue(DB::table('catalogue_search_values')->where('origin', 'proposal')->exists());
+        DB::rollBack();
+        self::assertSame($before, DB::table('catalogue_search_state')->value('mutation_no'));
+        self::assertFalse(DB::table('catalogue_search_dirty')->exists());
+        self::assertFalse(DB::table('catalogue_search_values')->where('origin', 'proposal')->exists());
+        self::assertSame($words, DB::table('catalogue_search_words')->count());
     }
 }

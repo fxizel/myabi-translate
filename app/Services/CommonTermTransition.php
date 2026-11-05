@@ -7,6 +7,7 @@ use App\Domain\Devconf\FormatRegistry;
 use App\Domain\Devconf\TranslationValidator;
 use App\Models\ImportBatch;
 use App\Models\Term;
+use App\Services\CatalogueSearch\Projection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -226,6 +227,7 @@ class CommonTermTransition
         // Archived lineages are excluded from live projections, but their business rows remain intact.
         DB::table('term_search')->where('term_id', $legacy->id)->delete();
         DB::table('term_states')->where('id', $legacy->id)->delete();
+        app(Projection::class)->syncMany(Term::withoutGlobalScope('current')->whereIn('id', [$base->id, $legacy->id])->get());
     }
 
     /** Only an exactly matching old context can shed ownership; stale fingerprints stay stale. */

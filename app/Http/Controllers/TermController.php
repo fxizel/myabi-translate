@@ -12,6 +12,8 @@ use App\Models\Term;
 use App\Models\TermGroup;
 use App\Models\TermState;
 use App\Models\TranslationCampaign;
+use App\Services\CatalogueSearch\ListUnavailable;
+use App\Services\CatalogueSearch\Search;
 use App\Services\SourceRecord;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -51,11 +53,25 @@ class TermController extends Controller
 
     public function index(Request $request)
     {
+        $now = microtime(true);
+        $requestStarted = app()->runningInConsole() ? $now : (float) $request->server('REQUEST_TIME_FLOAT', $now);
+        $frontStarted = $request->server('MYABI_REQUEST_STARTED_AT');
+        if (is_numeric($frontStarted) && is_finite((float) $frontStarted) && (float) $frontStarted > 0) {
+            // An internal FastCGI parameter includes upstream waiting; never trust an HTTP header.
+            $requestStarted = min($requestStarted, (float) $frontStarted);
+        }
+        $started = hrtime(true) / 1e9 - max(0, $now - $requestStarted);
+        if ($request->boolean('approximate') && $request->query('search_mode', 'text') === 'text' && DB::transactionLevel() === 0) {
+            return app(Search::class)->snapshot(fn () => $this->index($request));
+        }
         $data = $request->validate(['type' => 'nullable|in:'.implode(',', array_keys(FormatRegistry::all())), 'language' => 'nullable|in:de,fr,it,en', 'q' => 'nullable|string|max:250',
             'version_id' => 'nullable|integer|exists:myabi_versions,id', 'context' => 'nullable|string|max:255', 'per_page' => 'nullable|integer|min:10|max:100',
             'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
-            'campaign_id' => 'nullable|integer|exists:translation_campaigns,id']);
+            'campaign_id' => 'nullable|integer|exists:translation_campaigns,id', 'approximate' => 'nullable|boolean']);
         $language = $data['language'] ?? 'fr';
+        $approximate = ($data['approximate'] ?? false) && ($data['search_mode'] ?? 'text') === 'text';
+        $searchInfo = null;
+        $searchError = false;
         $query = Term::visibleTo($request->user())->with('sourceImport', 'lastPublication');
         if (($data['group_id'] ?? '') === 'none') {
             $query->whereNull('term_group_id');
@@ -75,7 +91,7 @@ class TermController extends Controller
         if ($request->filled('context')) {
             $query->where('context', $data['context']);
         }
-        if ($request->filled('q')) {
+        if ($request->filled('q') && ! $approximate) {
             $text = $data['q'];
             $mode = $data['search_mode'] ?? 'text';
             if ($mode === 'regex') {
@@ -111,33 +127,44 @@ class TermController extends Controller
         $sort = match ($data['sort'] ?? 'updated') {
             'key' => 'label','created' => 'created_at',default => 'updated_at'
         };
-        // A single aggregate supplies the totals by type and paginator total.
-        // GROUP BY type otherwise encourages MariaDB to walk the type index and
-        // fetch every large catalogue row in index order for text predicates.
-        $countQuery = (clone $query)->withoutEagerLoads();
-        if ($state === 'pending' && in_array(DB::getDriverName(), ['mariadb', 'mysql'])
-            && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
-            // Keep the count on a covering term index. A proposal-first
-            // LooseScan otherwise fetches every large matching term by PK.
-            $countQuery->forceIndex('terms_type_obsolete_id_index');
-        }
-        foreach (array_keys(FormatRegistry::all()) as $type) {
-            $countQuery->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) AS '.$type, [$type]);
-        }
-        $counts = $countQuery->toBase()->first();
-        $typeCounts = collect((array) $counts)->map(fn ($count) => (int) $count)->filter(fn ($count) => $count > 0);
         $perPage = (int) ($data['per_page'] ?? 25);
         $page = LengthAwarePaginator::resolveCurrentPage();
-        // Select only this page's IDs first so the date/id index covers the
-        // ordered scan; hydrate at most 100 large rows after SQL filtering.
-        $pageQuery = (clone $query)->withoutEagerLoads()->select('id');
-        if (in_array(DB::getDriverName(), ['mariadb', 'mysql']) && $sort !== 'label' && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
-            // Keep the ordered catalogue page on its covering date/id index.
-            $pageQuery->forceIndex($sort === 'created_at' ? 'terms_created_page_index' : 'terms_updated_page_index');
+        if ($approximate && $request->filled('q')) {
+            try {
+                $searchInfo = app(Search::class)->search($query, $data, $page, $started);
+                $ids = $searchInfo['ids'];
+                $typeCounts = $searchInfo['typeCounts'];
+            } catch (ListUnavailable) {
+                $searchError = true;
+                $ids = $typeCounts = collect();
+            }
+        } else {
+            // A single aggregate supplies the totals by type and paginator total.
+            // GROUP BY type otherwise encourages MariaDB to walk the type index and
+            // fetch every large catalogue row in index order for text predicates.
+            $countQuery = (clone $query)->withoutEagerLoads();
+            if ($state === 'pending' && in_array(DB::getDriverName(), ['mariadb', 'mysql'])
+                && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
+                // Keep the count on a covering term index. A proposal-first
+                // LooseScan otherwise fetches every large matching term by PK.
+                $countQuery->forceIndex('terms_type_obsolete_id_index');
+            }
+            foreach (array_keys(FormatRegistry::all()) as $type) {
+                $countQuery->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) AS '.$type, [$type]);
+            }
+            $counts = $countQuery->toBase()->first();
+            $typeCounts = collect((array) $counts)->map(fn ($count) => (int) $count)->filter(fn ($count) => $count > 0);
+            // Select only this page's IDs first so the date/id index covers the
+            // ordered scan; hydrate at most 100 large rows after SQL filtering.
+            $pageQuery = (clone $query)->withoutEagerLoads()->select('id');
+            if (in_array(DB::getDriverName(), ['mariadb', 'mysql']) && $sort !== 'label' && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
+                // Keep the ordered catalogue page on its covering date/id index.
+                $pageQuery->forceIndex($sort === 'created_at' ? 'terms_created_page_index' : 'terms_updated_page_index');
+            }
+            $ids = $typeCounts->sum() > ($page - 1) * $perPage
+                ? $pageQuery->orderBy($sort, $sort === 'label' ? 'asc' : 'desc')->orderBy('id')->forPage($page, $perPage)->pluck('id')
+                : collect();
         }
-        $ids = $typeCounts->sum() > ($page - 1) * $perPage
-            ? $pageQuery->orderBy($sort, $sort === 'label' ? 'asc' : 'desc')->orderBy('id')->forPage($page, $perPage)->pluck('id')
-            : collect();
         $rows = Term::visibleTo($request->user())->with('sourceImport', 'lastPublication', 'group')->whereIn('id', $ids)->get()->keyBy('id');
         $items = $ids->map(fn ($id) => $rows->get($id))->filter()->values();
         $terms = (new LengthAwarePaginator($items, $typeCounts->sum(), $perPage, $page, ['path' => $request->url()]))->withQueryString();
@@ -150,6 +177,7 @@ class TermController extends Controller
             $term->current_value = data_get($term->validated, "$attribute.$language");
             $term->current_state = $term->state($attribute, $language);
             $term->pending_value = $pending->first()?->value;
+            $term->pending_id = $pending->first()?->id;
             $term->pending_count = $pending->count();
             $term->other_pending_attributes = $proposals->get($term->id, collect())->except($attribute)
                 ->map(fn ($languages) => $languages->get($language, collect())->count());
@@ -162,11 +190,16 @@ class TermController extends Controller
         $filterCampaigns = TranslationCampaign::visibleTo($request->user())->orderBy('title')->get();
         $compositionCampaigns = $request->user()->canManage() ? $filterCampaigns->whereNull('archived_at')->whereIn('status', ['todo', 'in_progress']) : collect();
 
-        return view('terms.index', [...self::filters(), ...compact('terms', 'language', 'typeCounts', 'groups', 'filterCampaigns', 'compositionCampaigns')]);
+        $view = view('terms.index', [...self::filters(), ...compact('terms', 'language', 'typeCounts', 'groups', 'filterCampaigns', 'compositionCampaigns', 'approximate', 'searchInfo', 'searchError')]);
+
+        return $searchError ? response($view, 503) : $view;
     }
 
     public function show(Request $request, string $term, SourceRecord $source)
     {
+        if ($request->filled('match_proposal') && DB::transactionLevel() === 0) {
+            return app(Search::class)->snapshot(fn () => $this->show($request, $term, $source));
+        }
         abort_unless($request->user()->canSeeCatalogue(), 403);
         $term = Term::withoutGlobalScope('current')->findOrFail($term);
         if ($term->consolidated_into_id !== null) {
@@ -181,7 +214,17 @@ class TermController extends Controller
         $term->load('group');
         $language = in_array($request->query('language'), ['de', 'fr', 'it', 'en']) ? $request->query('language') : 'fr';
         $attributes = $term->attributesForDisplay();
-        $proposals = $term->proposals()->with('author', 'organization', 'import.organization', 'imports.organization')->latest()->orderByDesc('id')->paginate(50)->withQueryString();
+        $proposalPage = null;
+        if ($request->filled('match_proposal')) {
+            $request->validate(['match_proposal' => 'integer|min:1']);
+            $matched = $term->proposals()->findOrFail($request->integer('match_proposal'));
+            $before = $term->proposals()->where(fn ($q) => $q->where('created_at', '>', $matched->created_at)
+                ->orWhere(fn ($q) => $q->where('created_at', $matched->created_at)->where('id', '>', $matched->id)))->count();
+            if (! $request->filled('page')) {
+                $proposalPage = intdiv($before, 50) + 1;
+            }
+        }
+        $proposals = $term->proposals()->with('author', 'organization', 'import.organization', 'imports.organization')->latest()->orderByDesc('id')->paginate(50, ['*'], 'page', $proposalPage)->withQueryString();
         $revisions = $revisionTerm->revisions()->with('author')->orderByDesc('number')->paginate(30, ['*'], 'revisions_page');
         $presences = DB::table('import_rows')->join('import_batches', 'import_batches.id', '=', 'import_rows.import_id')->join('myabi_versions', 'myabi_versions.id', '=', 'import_batches.version_id')
             ->where('term_id', $term->id)->where('import_batches.status', 'applied')->select('import_rows.*', 'myabi_versions.number as version_number', 'import_batches.filename', 'import_batches.created_at')->orderByDesc('import_id')->paginate(25, ['*'], 'presence_page');

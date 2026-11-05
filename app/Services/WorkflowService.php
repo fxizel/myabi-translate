@@ -119,6 +119,7 @@ class WorkflowService
                 throw ValidationException::withMessages(['reason' => __('ui.reason_required')]);
             }
             $p->update(['status' => 'rejected', 'rejection_reason' => $reason, 'decided_by' => $user->id, 'decided_at' => now(), 'lock_version' => $p->lock_version + 1]);
+            app(SearchText::class)->sync($term);
         } else {
             if ($p->author_id === $user->id) {
                 if (! $user->canManage() || ! $override) {

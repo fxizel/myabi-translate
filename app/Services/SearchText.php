@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Term;
 use App\Services\BrowserExtension\SearchProjection;
+use App\Services\CatalogueSearch\Projection;
 use Illuminate\Support\Facades\DB;
 
 /** Transactional search projection; never changes a term's business revision. */
@@ -51,5 +52,7 @@ class SearchText
             $term->search_text = $text;
         }
         app(SearchProjection::class)->syncMany($terms, $projectionAttributes ?? $attributes);
+        // Only attributes from the actual source pointer are admissible for the DE cache.
+        app(Projection::class)->syncMany($terms, $projectionAttributes ?? $attributes);
     }
 }

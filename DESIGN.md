@@ -154,6 +154,8 @@ Une icône de 16 px peut précéder le libellé ; un bouton d’icône seule por
 
 ### Barre de langues
 
+La recherche approximative utilise une case à cocher près du champ et une aide visible sous la barre. Ses extraits conservent les valeurs habituelles du tableau : filet gauche `--line`, nom du champ, origine et langue, lien vers la fiche. Le badge de correspondance et `mark` utilisent `--tint` et `--blue`, sans reprendre les états métier. Le classement par pertinence désactive le tri local des colonnes. Les aides et annonces de résultat restent accessibles en DE/FR/IT et à 390 px.
+
 Au-dessus du catalogue et de la validation, `.language-bar` liste les langues de traduction (nom + code régional en 10 px). La langue courante prend le fond `--tint` et une bordure `#a9ccef`. Quand elle précède les filtres, elle se soude au bloc (pas de marge ni de bordure inférieure).
 
 ### Tableaux

@@ -2,7 +2,7 @@
 
 Date : 5 novembre 2026.
 
-Statut : périmètre fonctionnel et disposition de la maquette validés. La réalisation et le calibrage du moteur restent à définir.
+Statut : périmètre fonctionnel, disposition de la maquette et conception technique validés ; réalisation disponible dans le dépôt. La recette synthétique et les mesures locales sont décrites dans la fiche technique. Elles ne constituent pas une qualification de performance du VPS.
 
 La recherche approximative aide à retrouver un terme malgré une faute de frappe ou un libellé légèrement différent. Elle complète la recherche de la page **Traductions**, dans le cadre visuel de [DESIGN.md](../../DESIGN.md).
 
@@ -53,6 +53,8 @@ Les filtres de type, version, état, groupe, campagne et contexte restent cumula
 
 La recherche respecte les droits de consultation et le caractère commun du référentiel. Un rapprochement lexical ne modifie aucune valeur, proposition, validation, révision ou identité de terme. Les [règles DEVCONF](../technique/formats-devconf.md), notamment les blocages d’identité ambiguë, continuent de s’appliquer.
 
+Si la mise à jour de l’index échoue lors d’une modification, l’enregistrement métier est conservé et la recherche approximative est suspendue jusqu’à réparation. Un message indique son indisponibilité ; des résultats périmés ne sont pas présentés comme une recherche à jour. La [fiche technique](../technique/recherche-approximative-conception.md) précise la cohérence et la remise en service attendues.
+
 ## Critères d’acceptation
 
 Les exemples ci-dessous sont fictifs et constituent le début du corpus de calibration. Leur comportement devra être vérifié sur le moteur réalisé.
@@ -81,6 +83,10 @@ Les exemples ci-dessous sont fictifs et constituent le début du corpus de calib
 
 ## Cadrage technique
 
+**Précision validée pendant la réalisation :** seules les références dont le mappage DEVCONF identifie effectivement la langue DE sont recherchées comme référence. Un repli Default/Caption sans langue connue, ou une référence explicitement non allemande, ne fournit pas de correspondance dans ce mode. Les valeurs validées et propositions en attente restent recherchées dans la seule langue cible. La recherche habituelle garde son périmètre existant.
+
+L'option est transmise dans l'URL par `approximate=1`. Les liens de langue et de pagination la conservent ; Réinitialiser la retire. Un dépassement du budget abandonne tous les résultats élargis et conserve uniquement les correspondances habituelles admissibles. Une recherche dont la liste complète ne peut pas être établie n'affiche pas un total partiel.
+
 Le catalogue actuel reçoit la recherche, les filtres et la pagination dans [TermController](../../app/Http/Controllers/TermController.php), puis affiche le tableau [terms/index.blade.php](../../resources/views/terms/index.blade.php) et le formulaire [term-filters.blade.php](../../resources/views/partials/term-filters.blade.php).
 
 La projection générale composée par [SearchText](../../app/Services/SearchText.php) concatène des contenus de plusieurs langues et des propositions, sans conserver dans le texte l’origine de chaque correspondance. Elle ne suffit donc pas, à elle seule, à garantir le périmètre par langue et par état de proposition retenu ici. La conception du moteur doit identifier les valeurs par terme, attribut, langue et nature, et évaluer les projections existantes avant d’ajouter un stockage.
@@ -93,7 +99,7 @@ La sélection des candidats doit permettre de retrouver un mot isolé mal orthog
 
 Le traitement devra appliquer les droits et les filtres, rechercher et classer les correspondances, regrouper les résultats par terme, puis paginer de manière stable. La pagination ne doit pas limiter la recherche aux lignes déjà visibles. Si une limite technique réduit les candidats, elle ne peut pas être présentée comme un total exhaustif sans règle produit explicite.
 
-La réalisation reste dans la pile Laravel, PHP et MariaDB du projet, sans besoin de Node ni de Redis en production. Pour la recherche approximative, la cible validée est désormais de cinq secondes au plus dans 95 % des essais, avec cinq recherches simultanées, un plafond de calcul de quinze secondes et un repli sur les correspondances habituelles en cas de dépassement. La [conception technique](../technique/recherche-approximative-conception.md) précise ces décisions et le protocole de mesure. L’objectif habituel inférieur à deux secondes des [spécifications techniques](../../specifications-techniques-referentiel-traductions-arge-abi.md) reste applicable à la recherche habituelle.
+La réalisation reste dans la pile Laravel, PHP et MariaDB du projet, sans besoin de Node ni de Redis en production. Pour la recherche approximative, la cible validée est de cinq secondes au plus dans **65 % des essais**, avec cinq recherches simultanées, un plafond de **vingt secondes**, retour compris, et un repli sur les correspondances habituelles en cas de dépassement. Par décisions de l'utilisateur le 5 novembre 2026, le plafond initial de quinze secondes a été porté à vingt secondes et la proportion exigée sous cinq secondes est passée de 95 % à 65 %. Le seuil de pertinence reste de 95 %. Les replis et erreurs restent dans le dénominateur des essais et ne comptent jamais comme des recherches approximatives complètes. La [conception technique](../technique/recherche-approximative-conception.md) précise ces décisions et le protocole de mesure. L’objectif habituel inférieur à deux secondes des [spécifications techniques](../../specifications-techniques-referentiel-traductions-arge-abi.md) reste applicable à la recherche habituelle.
 
 ## Conception du moteur
 

@@ -25,6 +25,7 @@ foreach (['myabi_app' => $appPassword, 'myabi_migrate' => $secret('db_migration_
 $pdo->exec("GRANT ALL PRIVILEGES ON `myabi`.* TO 'myabi_migrate'@'%'");
 $pdo->exec("GRANT SELECT, SHOW VIEW, TRIGGER ON `myabi`.* TO 'myabi_backup'@'%'");
 $pdo->exec("GRANT SELECT ON `mysql`.`proc` TO 'myabi_backup'@'%'");
+$pdo->exec("GRANT CREATE TEMPORARY TABLES ON `myabi`.* TO 'myabi_app'@'%'");
 $tables = $pdo->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'myabi' AND TABLE_TYPE = 'BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN);
 foreach ($tables as $table) {
     if (! preg_match('/^[a-z0-9_]+$/D', $table)) {

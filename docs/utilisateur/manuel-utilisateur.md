@@ -51,6 +51,20 @@ Figure 2 — Recherche dans le catalogue commun.
 
 La langue cible est indépendante de la langue de l’interface. Vous pouvez travailler en italien avec des menus français.
 
+### Retrouver un libellé proche
+
+1. Saisissez votre texte, par exemple « dosier » ou « ouvrir dossier ».
+2. Cochez **Recherche approximative**, près du champ.
+3. Cliquez sur **Filtrer**.
+
+La recherche porte sur les références identifiées comme allemandes, les valeurs en vigueur et les propositions en attente dans la langue cible. Les autres langues et les propositions rejetées ne fournissent pas de correspondance. Tous les filtres restent applicables.
+
+Les correspondances habituelles apparaissent d'abord, puis les résultats proches par pertinence. Chaque terme compte une seule fois. Le badge **Approximative**, l'origine et le surlignage expliquent le résultat ; ils ne changent aucun état de validation. Si le texte se trouve dans un autre champ ou une autre proposition, la ligne conserve ses valeurs habituelles et ajoute un extrait nommé. **Voir la correspondance** ouvre le champ ou la proposition concernée.
+
+L'élargissement commence à trois caractères hors espaces. Les guillemets imposent l'expression exacte : `"dosier"` ne corrige pas la faute. Cocher l'option sélectionne le mode Texte ; choisir Début de clé ou Expression régulière la désactive. Revenir à Texte ne la réactive pas. L'option est désactivée à la première ouverture et par **Réinitialiser**, qui conserve la langue cible.
+
+Si le délai est dépassé ou si l'index est indisponible, un message indique que seuls les résultats habituels du périmètre demandé sont affichés. Une modification confirmée reste enregistrée même si elle suspend l'approximatif ; le Gestionnaire doit alors faire réparer l'index. Si la recherche ne peut établir une liste complète, elle demande de préciser les filtres plutôt que d'afficher un total incomplet.
+
 ## 3. Consulter une fiche et son historique
 
 ### Lire les valeurs et leur provenance
