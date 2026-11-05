@@ -47,5 +47,9 @@
         <p class="section">{{ __('ui.four_eyes') }}</p>
         <p class="section">{{ __('ui.immutable_help') }}</p>
     </aside>
+    <section class="surface block" aria-labelledby="help-credits">
+        <h2 id="help-credits">{{ __('help.credits_title') }}</h2>
+        <p class="section">{{ __('help.credits') }}</p>
+    </section>
 </div>
 @endsection

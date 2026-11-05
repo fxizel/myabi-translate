@@ -8,6 +8,8 @@ return [
     'permissions' => 'Die verfügbaren Aktionen hängen von Ihren Rollen und freigegebenen Sprachen ab: Lesende konsultieren das Register, Übersetzende machen Vorschläge, Validierende entscheiden und die Verwaltung organisiert Gruppen, Kampagnen, Importe und Publikationen. Die Administration verwaltet Konten und Organisationen; diese Rolle allein berechtigt weder zum Übersetzen noch zum Validieren.',
     'contents' => 'Inhaltsverzeichnis der Hilfe',
     'rules' => 'Wichtige Regeln',
+    'credits_title' => 'Mitwirkende',
+    'credits' => 'Anwendung entwickelt von Loïc Brait im Namen der Police neuchâteloise.',
     'sections' => [
         'catalogue' => [
             'title' => 'Suchen und nachschlagen',

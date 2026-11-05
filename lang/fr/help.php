@@ -8,6 +8,8 @@ return [
     'permissions' => 'Les actions dépendent de vos rôles et des langues autorisées : le Lecteur consulte, le Traducteur propose, le Validateur décide et le Gestionnaire organise les groupes, les campagnes, les imports et les publications. L’Administrateur gère les comptes et les organisations ; ce rôle seul ne donne pas de droits de traduction ou de validation.',
     'contents' => 'Sommaire de l’aide',
     'rules' => 'Règles à retenir',
+    'credits_title' => 'Crédits',
+    'credits' => 'Application développée par Loïc Brait au nom de la Police neuchâteloise.',
     'sections' => [
         'catalogue' => [
             'title' => 'Rechercher et consulter',
