@@ -145,7 +145,7 @@ Le tableau de bord compte les propositions âgées d’au moins 30 jours depuis 
 
 ## Limite du composant navigateur
 
-Le dépôt contient aussi [MyAB Translation Inspector](../../extension/README.md), un composant navigateur séparé. Son API Laravel version 2 retrouve les cellules du catalogue commun avec un jeton personnel, distingue valeur importée et validée et préserve les ambiguïtés. Le retour de correspondance facultatif ne modifie pas le workflow. Sa [mise en œuvre](../technique/api-extension-implementation.md) décrit la projection, la connexion et la recette ; une API factice reste disponible uniquement en mode de test explicite.
+Le dépôt contient aussi [myABI Translation Inspector](../../extension/README.md), un composant navigateur séparé. Son API Laravel version 2 retrouve les cellules du catalogue commun avec un jeton personnel, distingue valeur importée et validée et préserve les ambiguïtés. Le retour de correspondance facultatif ne modifie pas le workflow. Sa [mise en œuvre](../technique/api-extension-implementation.md) décrit la projection, la connexion et la recette ; une API factice reste disponible uniquement en mode de test explicite.
 
 ## Sources de référence de cet état
 

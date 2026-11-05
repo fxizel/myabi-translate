@@ -1,4 +1,4 @@
-# MyAB Translation Inspector
+# myABI Translation Inspector
 
 Extension navigateur (Chrome et Firefox, **un seul code source**) qui retrouve la clé technique d'un texte affiché dans l'ERP MyAB, pour corriger sa traduction dans l'application de gestion des traductions.
 
@@ -129,7 +129,7 @@ Le backend Laravel expose `POST /api/browser-extension/search` et `POST /api/bro
 
 Les recherches réelles envoient `contractVersion: 2` et `textTruncated`, avec la langue du texte inspecté, distincte de celle du panneau. Chaque résultat identifie une cellule par terme, type DEVCONF, tuple exact, attribut et langue. La valeur importée, la référence et la traduction validée sont affichées séparément. Les propositions pending sont comptées, sans sélection arbitraire d’une traduction en vigueur.
 
-La version reconstruite pour cette API est **0.2.2**. Vérifier cette version dans la fiche de l’extension après chargement. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation. Le serveur accepte automatiquement les origines Chrome et Firefox : aucun identifiant d’installation ni utilisateur n’est à déclarer côté API.
+La version reconstruite pour cette API est **0.2.3**. Vérifier cette version dans la fiche de l’extension après chargement. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation. Le serveur accepte automatiquement les origines Chrome et Firefox : aucun identifiant d’installation ni utilisateur n’est à déclarer côté API.
 
 Le serveur calcule `matchState`, `exactCandidateCount`, `hasMore` et `candidateSetComplete` avant la limite d’affichage. Plusieurs exacts restent ambigus avec `maxResults: 1`. Le client respecte `exact: false` et annonce les aperçus tronqués. Le feedback est facultatif, signé et sans effet sur la validation ou les campagnes.
 

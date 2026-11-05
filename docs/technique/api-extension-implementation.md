@@ -2,7 +2,7 @@
 
 Date : 14 octobre 2026. État : implémentation et recette locale terminées.
 
-Laravel expose la recherche réelle de MyAB Translation Inspector et un retour de correspondance facultatif, selon le [contrat version 2](api-extension-navigateur.md). L’extension est construite et distribuée séparément ; aucun runtime Node n’est ajouté à la production Laravel.
+Laravel expose la recherche réelle de myABI Translation Inspector et un retour de correspondance facultatif, selon le [contrat version 2](api-extension-navigateur.md). L’extension est construite et distribuée séparément ; aucun runtime Node n’est ajouté à la production Laravel.
 
 ## Découpage et livrables
 

@@ -20,7 +20,7 @@ L’[index de la documentation](docs/README.md) présente l’arborescence des d
 - [Configuration](#configuration)
 - [Traitements en arrière-plan](#traitements-en-arrière-plan)
 - [Vérification](#vérification)
-- [Extension navigateur MyAB Translation Inspector](#extension-navigateur-myab-translation-inspector)
+- [Extension navigateur myABI Translation Inspector](#extension-navigateur-myabi-translation-inspector)
 - [Version de l’application](#version-de-lapplication)
 - [Livraison et exploitation](#livraison-et-exploitation)
 - [Données, licence et contribution](#données-licence-et-contribution)
@@ -183,7 +183,7 @@ php scripts/test_devconf_roundtrip.php --validate-semantics
 
 Les mesures sur les fichiers complets, l’espace réellement consommé chez l’hébergeur et la réimportation dans une instance myABI figurent dans le [procès-verbal de recette](docs/technique/recette.md). Un test local ne certifie ni le quota ni les performances du pilote.
 
-## Extension navigateur MyAB Translation Inspector
+## Extension navigateur myABI Translation Inspector
 
 Le dossier [`extension/`](extension/README.md) contient une extension Chrome et Firefox (WebExtensions MV3, TypeScript). Alt+clic sur un texte de MyAB interroge la recherche réelle Laravel et affiche les cellules correspondantes : type, clé, attribut, langue, référence, valeur importée et traduction validée. Le verdict conserve les ambiguïtés même si un seul résultat est affiché. Les corrections passent par la fiche web ; un retour de correspondance ne valide aucune traduction.
 

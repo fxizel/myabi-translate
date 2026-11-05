@@ -286,12 +286,12 @@ export class Overlay {
         close.setAttribute('aria-label', t(this.lang, 'close'));
         close.addEventListener('click', () => this.handlers.onClose());
 
-        const header = create(this.doc, 'div', 'header', create(this.doc, 'span', 'title', 'MyAB Translation Inspector'), close);
+        const header = create(this.doc, 'div', 'header', create(this.doc, 'span', 'title', 'myABI Translation Inspector'), close);
         const body = create(this.doc, 'div', 'body');
         body.setAttribute('aria-live', 'polite');
         const panel = create(this.doc, 'section', 'panel', header, body);
         panel.setAttribute('role', 'dialog');
-        panel.setAttribute('aria-label', 'MyAB Translation Inspector');
+        panel.setAttribute('aria-label', 'myABI Translation Inspector');
         root.appendChild(panel);
         this.panel = panel;
         this.body = body;

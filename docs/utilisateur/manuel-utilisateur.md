@@ -288,7 +288,7 @@ Figure 12 — Préférences du compte traducteur.
 
 ## 11. Utiliser l’extension dans Chrome et Firefox
 
-**MyAB Translation Inspector** retrouve dans le référentiel un texte affiché dans MyAB. Elle ne modifie pas MyAB. L’ouverture d’une fiche conserve les droits et les langues autorisées de votre compte.
+**myABI Translation Inspector** retrouve dans le référentiel un texte affiché dans MyAB. Elle ne modifie pas MyAB. L’ouverture d’une fiche conserve les droits et les langues autorisées de votre compte.
 
 Demandez au responsable le paquet correspondant à votre navigateur et les adresses de connexion. La configuration et l’utilisation sont identiques dans Chrome et Firefox.
 
@@ -300,7 +300,7 @@ Objectif : rendre l’inspecteur disponible dans Chrome.
 2. Ouvrez `chrome://extensions` et activez **Mode développeur**.
 3. Cliquez sur **Charger l’extension non empaquetée**.
 4. Sélectionnez le dossier contenant `manifest.json`.
-5. Épinglez **MyAB Translation Inspector** dans la barre d’outils.
+5. Épinglez **myABI Translation Inspector** dans la barre d’outils.
 
 Résultat : l’extension apparaît parmi les extensions installées.
 

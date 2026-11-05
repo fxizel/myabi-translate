@@ -2,7 +2,7 @@
 
 Statut : contrat implémenté et recette locale terminée. Date : 14 octobre 2026. Voir la [mise en œuvre](api-extension-implementation.md) pour le découpage, les résultats de validation et la mise en service.
 
-L’API doit permettre à MyAB Translation Inspector de retrouver une cellule du référentiel à partir d’un texte affiché dans MyAB, puis d’ouvrir sa fiche pour correction. Elle consulte le catalogue commun sans modifier MyAB, les traductions, les propositions, les campagnes ou les publications. Une correspondance textuelle ne constitue jamais une décision de validation ni une preuve que la version du référentiel est installée dans MyAB.
+L’API doit permettre à myABI Translation Inspector de retrouver une cellule du référentiel à partir d’un texte affiché dans MyAB, puis d’ouvrir sa fiche pour correction. Elle consulte le catalogue commun sans modifier MyAB, les traductions, les propositions, les campagnes ou les publications. Une correspondance textuelle ne constitue jamais une décision de validation ni une preuve que la version du référentiel est installée dans MyAB.
 
 L’implémentation comprend la recherche réelle, les jetons personnels, les adaptations du client nécessaires à un affichage fidèle et le retour « cette correspondance est correcte ». Ce dernier exige une permission dédiée et une activation locale. Les paramètres ci-dessous, notamment expiration et quotas, définissent les valeurs par défaut de la réalisation.
 
