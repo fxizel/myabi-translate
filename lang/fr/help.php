@@ -9,7 +9,7 @@ return [
     'contents' => 'Sommaire de l’aide',
     'rules' => 'Règles à retenir',
     'credits_title' => 'Crédits',
-    'credits' => 'Application développée par Loïc Brait au nom de la Police neuchâteloise.',
+    'credits' => 'Application développée par Loïc Brait (GhostKunst Studio) au nom de la Police neuchâteloise.',
     'sections' => [
         'catalogue' => [
             'title' => 'Rechercher et consulter',
@@ -80,7 +80,7 @@ return [
             'paragraphs' => [
                 'Dans Mon profil, consultez vos informations et réglez la langue de l’interface, les notifications quotidiennes et votre mot de passe. Configurez le second facteur lorsque votre rôle l’exige et conservez vos codes de récupération en lieu sûr.',
                 'Le bouton Compact du bandeau adapte l’espacement des tableaux. Colonnes affichées permet de masquer certaines colonnes du catalogue. Ces réglages d’affichage ne modifient pas les données.',
-                'Si MyAB Translation Inspector est activé et installé dans votre navigateur, créez un jeton personnel dans Mon profil et copiez-le immédiatement dans les paramètres de l’extension : il n’est affiché qu’une fois. Configurez l’adresse API et les domaines MyAB autorisés, activez le mode inspecteur puis utilisez Alt + clic sur un texte pour retrouver sa clé et ouvrir sa traduction. Vous pouvez révoquer le jeton dans votre profil.',
+                'Si myABI Translation Inspector est activé et installé dans votre navigateur, créez un jeton personnel dans Mon profil et copiez-le immédiatement dans les paramètres de l’extension : il n’est affiché qu’une fois. Configurez l’adresse API et les domaines MyAB autorisés, activez le mode inspecteur puis utilisez Alt + clic sur un texte pour retrouver sa clé et ouvrir sa traduction. Vous pouvez révoquer le jeton dans votre profil.',
             ],
         ],
     ],

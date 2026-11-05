@@ -9,7 +9,7 @@ return [
     'contents' => 'Inhaltsverzeichnis der Hilfe',
     'rules' => 'Wichtige Regeln',
     'credits_title' => 'Mitwirkende',
-    'credits' => 'Anwendung entwickelt von Loïc Brait im Namen der Police neuchâteloise.',
+    'credits' => 'Anwendung entwickelt von Loïc Brait (GhostKunst Studio) im Namen der Police neuchâteloise.',
     'sections' => [
         'catalogue' => [
             'title' => 'Suchen und nachschlagen',
@@ -80,7 +80,7 @@ return [
             'paragraphs' => [
                 'Sehen Sie unter Mein Profil Ihre Angaben ein und ändern Sie die Sprache der Oberfläche, tägliche Benachrichtigungen und Ihr Passwort. Richten Sie den zweiten Faktor ein, wenn Ihre Rolle ihn verlangt, und bewahren Sie die Wiederherstellungscodes sicher auf.',
                 'Die Schaltfläche Kompakt in der Kopfleiste passt die Abstände in Tabellen an. Sichtbare Spalten erlaubt das Ausblenden bestimmter Katalogspalten. Diese Anzeigeeinstellungen ändern keine Daten.',
-                'Wenn MyAB Translation Inspector aktiviert und in Ihrem Browser installiert ist, erstellen Sie unter Mein Profil einen persönlichen Token und kopieren Sie ihn sofort in die Einstellungen der Erweiterung: er wird nur einmal angezeigt. Konfigurieren Sie die API-Adresse und die erlaubten MyAB-Domains, aktivieren Sie den Inspektormodus und verwenden Sie Alt + Klick auf einen Text, um seinen Schlüssel zu finden und seine Übersetzung zu öffnen. Sie können den Token in Ihrem Profil widerrufen.',
+                'Wenn myABI Translation Inspector aktiviert und in Ihrem Browser installiert ist, erstellen Sie unter Mein Profil einen persönlichen Token und kopieren Sie ihn sofort in die Einstellungen der Erweiterung: er wird nur einmal angezeigt. Konfigurieren Sie die API-Adresse und die erlaubten MyAB-Domains, aktivieren Sie den Inspektormodus und verwenden Sie Alt + Klick auf einen Text, um seinen Schlüssel zu finden und seine Übersetzung zu öffnen. Sie können den Token in Ihrem Profil widerrufen.',
             ],
         ],
     ],

@@ -9,7 +9,7 @@ return [
     'contents' => 'Sommario dell’aiuto',
     'rules' => 'Regole da ricordare',
     'credits_title' => 'Crediti',
-    'credits' => 'Applicazione sviluppata da Loïc Brait a nome della Police neuchâteloise.',
+    'credits' => 'Applicazione sviluppata da Loïc Brait (GhostKunst Studio) a nome della Police neuchâteloise.',
     'sections' => [
         'catalogue' => [
             'title' => 'Cercare e consultare',
@@ -80,7 +80,7 @@ return [
             'paragraphs' => [
                 'In Il mio profilo, consulti i dati personali e imposti la lingua dell’interfaccia, le notifiche quotidiane e la password. Configuri il secondo fattore quando il ruolo lo richiede e conservi i codici di recupero in un luogo sicuro.',
                 'Il pulsante Compatto nella barra superiore adatta la spaziatura delle tabelle. Colonne visualizzate consente di nascondere alcune colonne del catalogo. Queste impostazioni di visualizzazione non modificano i dati.',
-                'Se MyAB Translation Inspector è attivato e installato nel browser, crei un token personale in Il mio profilo e lo copi subito nelle impostazioni dell’estensione: viene visualizzato una sola volta. Configuri l’indirizzo API e i domini MyAB autorizzati, attivi la modalità ispettore e utilizzi Alt + clic su un testo per trovarne la chiave e aprire la traduzione. Può revocare il token nel profilo.',
+                'Se myABI Translation Inspector è attivato e installato nel browser, crei un token personale in Il mio profilo e lo copi subito nelle impostazioni dell’estensione: viene visualizzato una sola volta. Configuri l’indirizzo API e i domini MyAB autorizzati, attivi la modalità ispettore e utilizzi Alt + clic su un testo per trovarne la chiave e aprire la traduzione. Può revocare il token nel profilo.',
             ],
         ],
     ],
