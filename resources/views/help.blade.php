@@ -15,6 +15,7 @@
     ];
 @endphp
 <div class="content-narrow stack-gap">
+    <section class="surface block"><h2>{{ __('screenshots.title') }}</h2><p>{{ __('screenshots.help') }}</p></section>
     <section class="surface block" aria-labelledby="help-start">
         <h2 id="help-start">{{ __('help.start') }}</h2>
         <p class="section">{{ __('help.common') }}</p>

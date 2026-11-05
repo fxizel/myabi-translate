@@ -320,3 +320,9 @@ La commande de mise à jour rapide ci-dessus automatise les livraisons sans chan
 - Capacité mesurée avec historique, réimport, publication, sauvegarde et images conservées ; restauration complète éprouvée.
 
 Le [PV local](../technique/recette.md) reste la preuve des essais déjà effectués. Le changement d'hébergement lève la contrainte de l'offre Free mais ne transforme pas ces résultats en recette distante.
+
+## Prérequis des captures de propositions
+
+PHP CLI et le FPM dédié doivent disposer de GD avec PNG/JPEG, EXIF et Fileinfo. L’image Docker les construit ; pour la variante native, installer les extensions de la branche PHP retenue et vérifier les codecs avec des images synthétiques. Conserver la limite mémoire de 256 Mio pour la recette. Les limites HTTP prévues pour les imports restent suffisantes ; l’application limite chaque capture à 5 Mio.
+
+Cette évolution ajoute une migration : suivre la procédure complète avec sauvegarde cohérente avant migration. Ne pas utiliser la voie rapide réservée aux schémas inchangés, ni lancer un rollback automatique supprimant les références d’images. Le stockage privé persistant et la sauvegarde existante incluent captures et miniatures. Voir le [contrat des captures](../technique/captures-propositions.md).

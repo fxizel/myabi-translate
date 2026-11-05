@@ -5,6 +5,7 @@ use App\Http\Controllers\ExportController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ProposalController;
+use App\Http\Controllers\ProposalScreenshotController;
 use App\Http\Controllers\PublicationController;
 use App\Http\Controllers\TermController;
 use App\Http\Controllers\VersionController;
@@ -33,6 +34,8 @@ Route::middleware(['auth', 'session.secure', '2fa.required'])->group(function ()
     Route::post('/terms/{term}/confirm', [ProposalController::class, 'confirm'])->name('terms.confirm');
     Route::get('/validation', [ProposalController::class, 'index'])->name('validation.index');
     Route::patch('/proposals/{proposal}', [ProposalController::class, 'update'])->name('proposals.update');
+    Route::get('/proposals/{proposal}/screenshot', [ProposalScreenshotController::class, 'show'])->name('proposals.screenshot');
+    Route::get('/proposals/{proposal}/screenshot/thumbnail', [ProposalScreenshotController::class, 'thumbnail'])->name('proposals.screenshot.thumbnail');
     Route::post('/proposals/bulk-store', [ProposalController::class, 'bulkStore'])->name('proposals.bulk-store');
     Route::post('/proposals/bulk', [ProposalController::class, 'bulk'])->name('proposals.bulk');
     Route::post('/proposals/validate-filtered', [ProposalController::class, 'validateFiltered'])->name('proposals.validate-filtered');

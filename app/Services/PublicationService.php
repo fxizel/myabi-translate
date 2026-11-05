@@ -99,7 +99,8 @@ class PublicationService
                 $manifest = [
                     'publication_id' => $publication->id, 'publication' => $publication->number,
                     'version' => $publication->version->number, 'version_id' => $publication->version_id,
-                    'application_version' => config('referentiel.version'), 'captured_at' => now()->toIso8601String(),
+                    'application_version' => config('version.number'), 'application_release' => config('referentiel.version'),
+                    'captured_at' => now()->toIso8601String(),
                     'catalogue_generation' => (int) DB::table('catalogue_state')->where('id', 1)->value('generation'),
                     'types' => $publication->types, 'recipients' => [],
                 ];
@@ -139,7 +140,7 @@ class PublicationService
                     $recipient['row_manifest'] = ['name' => 'revisions.jsonl', 'path' => $relative.'/revisions.jsonl', 'records' => $rowCount,
                         'bytes' => filesize($rowManifestPath), 'sha256' => hash_file('sha256', $rowManifestPath)];
                     $catalogue = ['publication' => $manifest['publication'], 'version' => $manifest['version'], 'captured_at' => $manifest['captured_at'],
-                        'application_version' => $manifest['application_version'], 'recipient' => $recipient];
+                        'application_version' => $manifest['application_version'], 'application_release' => $manifest['application_release'], 'recipient' => $recipient];
                     $this->writeJson($directory.'/catalogue.json', $catalogue);
                     $archiveName = $this->safeName($publication->number).'_'.$this->safeName($organization->code).'.zip';
                     $archivePath = $directory.'/'.$archiveName;

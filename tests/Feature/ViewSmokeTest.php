@@ -76,7 +76,8 @@ class ViewSmokeTest extends TestCase
         $this->actingAs($this->manager);
         $term = Term::firstOrFail();
         foreach (['/', '/terms', '/terms?language=it&sort=key', '/terms?sort=updated', '/terms/'.$term->id, '/terms/'.$term->id.'?from=1&to=1', '/validation', '/imports', '/imports/'.$this->import->id, '/publications', '/profile', '/admin', '/audit', '/help'] as $url) {
-            $this->get($url)->assertOk()->assertSee('ARGE-ABI')->assertSee('main-content', false);
+            $this->get($url)->assertOk()->assertSee('ARGE-ABI')->assertSee('main-content', false)
+                ->assertSee('myABI Translate · v'.config('version.number'));
         }
     }
 

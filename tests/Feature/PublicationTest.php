@@ -122,6 +122,7 @@ class PublicationTest extends TestCase
 
     public function test_legacy_source_can_be_published_and_downloaded_without_reimport_or_flag_change(): void
     {
+        config(['version.number' => '2026.11.7', 'referentiel.version' => 'sha-'.str_repeat('a', 12)]);
         [$source] = $this->source('mric');
         $source->update(['is_complete' => false]);
         $this->actingAs($this->manager)->post(route('publications.store'), [
@@ -138,6 +139,11 @@ class PublicationTest extends TestCase
 
         $publication->refresh();
         self::assertSame('published', $publication->status);
+        self::assertSame('2026.11.7', $publication->manifest['application_version']);
+        self::assertSame('sha-'.str_repeat('a', 12), $publication->manifest['application_release']);
+        $catalogue = json_decode(File::get($this->privateStorage.'/app/private/publications/'.$publication->id.'/'.$this->organization->id.'/catalogue.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('2026.11.7', $catalogue['application_version']);
+        self::assertSame('sha-'.str_repeat('a', 12), $catalogue['application_release']);
         $recipient = $publication->manifest['recipients'][$this->organization->id];
         self::assertCount(1, $recipient['files']);
         self::assertSame('mric', $recipient['files'][0]['type']);

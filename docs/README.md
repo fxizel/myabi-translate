@@ -11,13 +11,15 @@ docs/
 │   ├── cas-utilisation.md
 │   ├── exigences-fonctionnelles.md
 │   ├── parcours-ui-ux.md
-│   └── groupes-et-campagnes-traduction.md
+│   ├── groupes-et-campagnes-traduction.md
+│   └── recherche-approximative.md
 ├── technique/
 │   ├── formats-devconf.md
 │   ├── exigences-techniques.md
 │   ├── recette.md
 │   ├── recette-design-myabi.md
 │   ├── groupes-campagnes-implementation.md
+│   ├── recherche-approximative-conception.md
 │   ├── api-extension-navigateur.md
 │   └── api-extension-implementation.md
 ├── deploiement/
@@ -36,6 +38,8 @@ Le [PRD fonctionnel](fonctionnel/PRD.md) présente le produit existant et donne 
 
 La [spécification des groupes de termes et campagnes de traduction](fonctionnel/groupes-et-campagnes-traduction.md) définit le contrat de cette fonctionnalité. Son découpage, les choix retenus et les vérifications sont décrits dans la [mise en œuvre technique](technique/groupes-campagnes-implementation.md).
 
+La [conception de la recherche approximative](fonctionnel/recherche-approximative.md) rassemble le périmètre fonctionnel validé pour la page Traductions, les critères d’acceptation et les points de conception restant à préciser avant réalisation.
+
 ## Technique
 
 | Document | Contenu |
@@ -48,6 +52,7 @@ La [spécification des groupes de termes et campagnes de traduction](fonctionnel
 | [Référentiel commun](technique/transition-termes-communs.md) | Lots réalisés, diagnostic privé, reprise des historiques et procédure de bascule. |
 | [API de l’extension navigateur](technique/api-extension-navigateur.md) | Contrat version 2, audit du client initial, recherche par cellule, jetons et ambiguïtés. |
 | [Mise en œuvre de l’API](technique/api-extension-implementation.md) | Découpage, connexion de l’extension, reconstruction de la projection et validation. |
+| [Conception de la recherche approximative](technique/recherche-approximative-conception.md) | Calibrage, délais, charge simultanée et protocole de recette avant réalisation. |
 
 ## Déploiement et exploitation
 

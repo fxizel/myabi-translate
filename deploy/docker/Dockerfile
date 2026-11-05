@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM php:8.4.27-fpm-bookworm AS php-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libicu-dev libonig-dev libzip-dev python3 mariadb-client ca-certificates unzip \
-    && docker-php-ext-install -j2 intl mbstring pdo_mysql zip opcache \
+        libicu-dev libonig-dev libzip-dev libpng-dev libjpeg62-turbo-dev python3 mariadb-client ca-certificates unzip \
+    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install -j2 intl mbstring pdo_mysql zip opcache gd exif \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 myabi-web \
     && useradd --uid 10001 --gid 10001 --no-create-home myabi-web \

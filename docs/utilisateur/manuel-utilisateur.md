@@ -352,3 +352,19 @@ Résultat : l’ancien jeton ne permet plus d’interroger le référentiel.
 Un jeton expire au plus tard après 30 jours. **Session du navigateur uniquement (à ressaisir)** impose de le saisir de nouveau après fermeture du navigateur. Ne partagez pas votre jeton.
 
 En cas de refus d’authentification, vérifiez le jeton. En cas d’accès refusé, vérifiez les droits indiqués par le message. Pour un domaine non autorisé, utilisez **Ouvrir les paramètres**, vérifiez le domaine, enregistrez et rechargez MyAB.
+
+## Joindre une capture à une proposition
+
+Une capture permet de montrer le contexte du terme dans myABI. Elle est facultative, sans légende, et accompagne uniquement cette proposition, pour son attribut et sa langue.
+
+1. Dans la fiche du terme ou le formulaire individuel d’une campagne, choisissez une image ou placez le focus sur **Coller une capture ici**, puis faites **Ctrl+V**. Le collage de texte dans la traduction reste inchangé.
+2. Vérifiez l’aperçu et l’absence d’informations sensibles. Préparez le recadrage ou le masquage avec vos outils habituels avant l’ajout.
+3. Envoyez explicitement la proposition. Une seule image PNG/JPEG est acceptée : **5 Mio (5 242 880 octets)**, 8 192 pixels par côté et 12 millions de pixels au total.
+
+Tant que votre proposition est en attente, **Corriger** permet d’ajouter, remplacer ou retirer la capture, même sans changer le texte. Une proposition créée par saisie groupée peut être complétée dans sa fiche. Les propositions importées conservent leurs règles de reprise. Après validation ou rejet, l’image est conservée et ne peut plus être modifiée.
+
+**Corriger le rejet** reprend automatiquement la capture avec aperçu. Vous pouvez la retirer ou la remplacer avant l’envoi ; la proposition rejetée et son image restent conservées indépendamment.
+
+Cliquez sur une miniature dans la fiche, la validation ou la campagne pour agrandir l’image. Fermez-la avec la **croix en haut à droite**, un **clic autour de l’image** ou **Échap**. Le clavier permet aussi d’activer la croix ; le focus revient au lien d’origine après fermeture. Un clic sur l’image la laisse ouverte. Les personnes autorisées à consulter la proposition peuvent consulter sa capture.
+
+En cas d’erreur, gardez le formulaire ouvert : le texte et l’aperçu sont conservés avec JavaScript. Après rechargement, sélectionnez à nouveau le fichier. Sans JavaScript, choisissez aussi l’action **Ajouter ou remplacer la capture**. En cas de conflit, relisez la fiche courante avant de recommencer. Après une erreur réseau, vérifiez si la proposition a été enregistrée avant de renvoyer. Une capture n’est jamais envoyée automatiquement par l’extension.

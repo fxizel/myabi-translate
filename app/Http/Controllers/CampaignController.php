@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\DB;
 
 class CampaignController extends Controller
 {
+    use Concerns\SavesProposals;
+
     public function prepare(Request $request)
     {
         abort_unless($request->user()->canManage(), 403);
@@ -177,10 +179,9 @@ class CampaignController extends Controller
 
     public function propose(Request $request, TranslationCampaign $campaign, Term $term, CampaignService $service)
     {
-        $data = $request->validate(['value' => 'required|string|max:1000000', 'lock_version' => 'required|integer']);
-        $service->propose($request->user(), $campaign, $term, $data['value'], (int) $data['lock_version']);
+        $data = $request->validate([...$this->screenshotRules(), 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer']);
 
-        return back()->with('status', __('ui.proposal_saved'));
+        return $this->saveProposal($request, fn () => $service->propose($request->user(), $campaign, $term, $data['value'], (int) $data['lock_version'], $request->file('screenshot'), $data['screenshot_action'] ?? 'keep'), true);
     }
 
     public function reexamine(Request $request, TranslationCampaign $campaign, Term $term, CampaignService $service)

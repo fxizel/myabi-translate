@@ -10,6 +10,8 @@ class Proposal extends Model
 {
     protected $guarded = [];
 
+    protected $hidden = ['screenshot_path'];
+
     protected static function booted(): void
     {
         static::creating(function (Proposal $proposal) {
@@ -28,7 +30,8 @@ class Proposal extends Model
 
     protected function casts(): array
     {
-        return ['anomalies' => 'array', 'edit_history' => 'array', 'divergence' => 'boolean', 'claimed' => 'boolean', 'decided_at' => 'datetime'];
+        return ['anomalies' => 'array', 'edit_history' => 'array', 'divergence' => 'boolean', 'claimed' => 'boolean', 'decided_at' => 'datetime',
+            'screenshot_bytes' => 'integer', 'screenshot_width' => 'integer', 'screenshot_height' => 'integer'];
     }
 
     public function term()

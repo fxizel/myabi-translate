@@ -227,3 +227,7 @@ Le code peut être développé progressivement ; le pilote utilisable reste cond
 | Responsabilités | Titulaire du compte, responsables, emplacement de la copie de sauvegarde et classification des données à renseigner |
 
 Cette version décrit le pilote ; elle ne constate ni déploiement, ni réussite de test de charge, ni validation de mise en production institutionnelle.
+
+## Captures des propositions
+
+Le [contrat des captures](docs/technique/captures-propositions.md) décrit les colonnes facultatives, la validation Fileinfo/GD, l’orientation EXIF, les miniatures, les routes authentifiées, le verrou exclusif et les callbacks de transaction. Les fichiers restent dans le stockage privé, sans BLOB ni partage physique entre propositions. La sauvegarde SQL et fichiers existante les inclut ; aucun service supplémentaire n’est nécessaire. GD avec PNG/JPEG, EXIF et Fileinfo sont requis pour PHP CLI et FPM.

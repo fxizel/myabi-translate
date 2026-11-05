@@ -696,3 +696,11 @@ Ce journal conserve les questions de cadrage et leurs décisions actées. Les qu
 Les réponses seront reportées dans les sections concernées et ce tableau conservé comme journal des décisions de cadrage.
 
 **Décision du 20.09.2026 (ancienne question 15)** : les colonnes techniques myABI, notamment Update User et Update Dt, restent telles qu'importées. La traçabilité du Référentiel est conservée séparément ; l'export ne propose pas de réécriture de ces colonnes.
+
+## Capture de contexte d’une proposition
+
+Une capture d’écran facultative, sans légende, peut accompagner une proposition pour son attribut et sa langue. Elle est choisie comme fichier PNG/JPEG ou collée avec Ctrl+V dans la zone prévue, avec aperçu avant envoi et rappel de vérifier l’absence d’informations sensibles. L’auteur peut l’ajouter, la remplacer ou la retirer tant que la proposition est en attente. Une proposition importée suit les règles existantes de reprise par un rédacteur. Après validation ou rejet, l’image est conservée et figée. La correction d’un rejet reprend par défaut une copie indépendante, retirable ou remplaçable avant envoi.
+
+Toute personne autorisée à consulter la proposition peut consulter son image, sans cloisonnement supplémentaire par organisation. Une miniature ouvre une fenêtre accessible au clavier, refermable avec Échap, dans la fiche et la validation. Le formulaire individuel des campagnes propose le même ajout ; après saisie groupée du catalogue, la fiche permet de compléter une proposition en attente. Aucun éditeur d’image ni capture automatique via l’extension n’est prévu. La saisie et l’aperçu sont conservés en cas d’erreur avec JavaScript ; après rechargement, le texte est restauré et le fichier doit être choisi à nouveau.
+
+La limite est de 5 Mio (5 242 880 octets), 8 192 pixels par côté et 12 millions de pixels au total. Une modification d’image invalide les anciennes décisions et confirmations de validation. Les captures sont privées, incluses dans les sauvegardes et exclues des exports et publications. Voir le [contrat technique](docs/technique/captures-propositions.md).

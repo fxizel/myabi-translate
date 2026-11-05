@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 class ProposalController extends Controller
 {
+    use Concerns\SavesProposals;
+
     public function index(Request $request, ProposalFilter $filter, FilteredValidationService $filteredValidation)
     {
         abort_unless($request->user()->canValidateAny(), 403);
@@ -23,7 +25,7 @@ class ProposalController extends Controller
         $language = $filters['language'];
         $generation = (int) DB::table('catalogue_state')->where('id', 1)->value('generation');
         $q = $filter->query($request->user(), $filters)
-            ->select(['id', 'term_id', 'attribute', 'language', 'value', 'lock_version', 'author_id', 'organization_id', 'import_id', 'edit_history', 'anomalies', 'created_at'])
+            ->select(['id', 'term_id', 'attribute', 'language', 'value', 'lock_version', 'author_id', 'organization_id', 'import_id', 'edit_history', 'anomalies', 'created_at', 'screenshot_path'])
             ->with(['term:id,type,label,source_text,validated,source_import_id,source_offset,source_length', 'term.sourceImport:id,path', 'author:id,name', 'organization:id,name,code', 'import:id,organization_id', 'import.organization:id,name,code', 'imports:id,organization_id', 'imports.organization:id,name,code']);
         $showAll = $request->query('per_page') === 'all';
         $proposalTotal = $showAll ? (clone $q)->count() : null;
@@ -82,18 +84,16 @@ class ProposalController extends Controller
 
     public function store(Request $request, Term $term, WorkflowService $workflow)
     {
-        $d = $request->validate(['attribute' => 'required|string|max:60', 'language' => 'required|in:de,fr,it,en', 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer', 'supersedes_id' => 'nullable|integer', 'restored_revision_id' => 'nullable|integer']);
-        $workflow->propose($request->user(), $term, $d['attribute'], $d['language'], $d['value'], (int) $d['lock_version'], isset($d['supersedes_id']) ? (int) $d['supersedes_id'] : null, isset($d['restored_revision_id']) ? (int) $d['restored_revision_id'] : null);
+        $d = $request->validate([...$this->screenshotRules(), 'attribute' => 'required|string|max:60', 'language' => 'required|in:de,fr,it,en', 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer', 'supersedes_id' => 'nullable|integer', 'restored_revision_id' => 'nullable|integer']);
 
-        return back()->with('status', __('ui.proposal_saved'));
+        return $this->saveProposal($request, fn () => $workflow->propose($request->user(), $term, $d['attribute'], $d['language'], $d['value'], (int) $d['lock_version'], isset($d['supersedes_id']) ? (int) $d['supersedes_id'] : null, isset($d['restored_revision_id']) ? (int) $d['restored_revision_id'] : null, $request->file('screenshot'), $d['screenshot_action'] ?? 'keep'), true);
     }
 
     public function update(Request $request, Proposal $proposal, WorkflowService $workflow)
     {
-        $d = $request->validate(['value' => 'required|string|max:1000000', 'lock_version' => 'required|integer']);
-        $workflow->edit($request->user(), $proposal, $d['value'], (int) $d['lock_version']);
+        $d = $request->validate([...$this->screenshotRules(), 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer']);
 
-        return back()->with('status', __('ui.proposal_saved'));
+        return $this->saveProposal($request, fn () => $workflow->edit($request->user(), $proposal, $d['value'], (int) $d['lock_version'], $request->file('screenshot'), $d['screenshot_action'] ?? 'keep'));
     }
 
     public function decide(Request $request, Proposal $proposal, WorkflowService $workflow)
@@ -133,7 +133,7 @@ class ProposalController extends Controller
                     continue;
                 }
                 validator($row, ['attribute' => 'required|string', 'language' => 'required|in:de,fr,it,en', 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer'])->validate();
-                $workflow->propose($request->user(), Term::findOrFail($id), $row['attribute'], $row['language'], $row['value'], (int) $row['lock_version']);
+                $workflow->proposeUnderOperationLock($request->user(), Term::findOrFail($id), $row['attribute'], $row['language'], $row['value'], (int) $row['lock_version']);
                 $count++;
             }
             abort_if($count === 0, 422);

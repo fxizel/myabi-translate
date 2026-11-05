@@ -9,6 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}?v=2">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
     <script src="{{ asset('js/app.js') }}" defer></script>
+    <script src="{{ asset('js/proposal-screenshots.js') }}" defer></script>
 </head>
 <body data-confirm="{{ __('ui.confirm_action') }}" data-unsaved="{{ __('ui.unsaved_warning') }}" data-long-warning="{{ __('ui.long_value_warning') }}" data-unsent-label="{{ __('ui.unsent_draft') }}">
 <a class="skip-link" href="#main-content">{{ __('ui.skip_content') }}</a>
@@ -103,9 +104,14 @@
                 @if($errors->any())<div class="notice error" role="alert"><strong>{{ __('ui.review_errors') }}</strong><ul>@foreach($errors->all() as $error)<li>{{ __($error) }}</li>@endforeach</ul></div>@endif
                 @yield('content')
             </main>
-            <footer class="app-footer"><span>ARGE-ABI <span aria-hidden="true">/</span> myABI Translate</span><span>{{ __('ui.shared_reference') }}</span><a href="{{ url('help') }}">{{ __('ui.help') }}</a></footer>
+            <footer class="app-footer"><span>ARGE-ABI <span aria-hidden="true">/</span> myABI Translate · v{{ config('version.number') }}</span><span>{{ __('ui.shared_reference') }}</span><a href="{{ url('help') }}">{{ __('ui.help') }}</a></footer>
         </div>
     </div>
 </div>
+<dialog class="screenshot-dialog" data-screenshot-dialog aria-labelledby="screenshot-dialog-title">
+    <div class="screenshot-dialog-toolbar"><h2 id="screenshot-dialog-title">{{ __('screenshots.title') }}</h2><a class="button" data-screenshot-original>{{ __('screenshots.original') }}</a><button type="button" class="button screenshot-dialog-close" data-screenshot-close aria-label="{{ __('screenshots.close') }}" title="{{ __('screenshots.close') }}" autofocus>@include('partials.icon', ['name' => 'close'])</button></div>
+    <p class="client-error" data-screenshot-unavailable hidden>{{ __('screenshots.unavailable') }}</p>
+    <img data-screenshot-large alt="{{ __('screenshots.title') }}">
+</dialog>
 </body>
 </html>

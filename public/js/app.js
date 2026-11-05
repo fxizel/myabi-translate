@@ -1,7 +1,7 @@
 (() => {
     'use strict';
     const editors = [...document.querySelectorAll('[data-editor]')];
-    const isDraft = editor => editor.value !== editor.defaultValue || editor.dataset.restored === '1';
+    const isDraft = editor => editor.value !== editor.defaultValue || editor.dataset.restored === '1' || editor.form?.querySelector('[data-screenshot-editor]')?.dataset.dirty === '1';
     let submission = null;
     const proposalEligible = checkbox => checkbox.dataset.proposalEligible !== '0';
     const catalogueSubmission = event => event.submitter?.dataset.catalogueSubmit !== undefined;

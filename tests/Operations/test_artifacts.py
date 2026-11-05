@@ -59,7 +59,7 @@ class ArtifactSafetyTest(unittest.TestCase):
         self.assertEqual(20, release_inspector.inspect(self.release()))
 
     def test_release_rejects_secrets_traversal_business_data_and_dev_dependencies(self):
-        for name in ['../escape.php', '/tmp/escape', '.env', 'app/.env.backup', 'database/original.csv', 'vendor/phpunit/code.php', 'scripts/__pycache__/check.pyc', 'scripts/check.pyc']:
+        for name in ['../escape.php', '/tmp/escape', '.env', 'app/.env.backup', 'database/original.csv', 'storage/app/private/proposal-screenshots/image.png', 'vendor/phpunit/code.php', 'scripts/__pycache__/check.pyc', 'scripts/check.pyc']:
             with self.subTest(name=name), self.assertRaises(ValueError):
                 release_inspector.inspect(self.release(tarfile.TarInfo(name)))
 
@@ -77,6 +77,10 @@ class ArtifactSafetyTest(unittest.TestCase):
         private.mkdir()
         (release / 'RELEASE.json').write_text(json.dumps({'version': 'v1', 'commit': 'a' * 40}))
         (private / 'sample.devconf').write_bytes(b'Original\r\n"quoted";value\r\n')
+        screenshots = private / 'proposal-screenshots' / ('a' * 32)
+        screenshots.mkdir(parents=True)
+        (screenshots / 'image.png').write_bytes(b'Synthetic full image')
+        (screenshots / 'thumbnail.png').write_bytes(b'Synthetic thumbnail')
         (private / 'operations.lock').write_text('')
         defaults = self.root / 'backup.cnf'
         defaults.write_text('[client]\npassword=private\n')
@@ -94,10 +98,23 @@ class ArtifactSafetyTest(unittest.TestCase):
     def test_backup_stream_preserves_bytes_and_excludes_locks_and_secrets(self):
         path = self.coherent_backup()
         manifest = backup_verifier.verify(path)
-        self.assertEqual({'database.sql', 'private/sample.devconf'}, set(manifest['files']))
+        screenshot_root = 'private/proposal-screenshots/' + 'a' * 32 + '/'
+        self.assertEqual({'database.sql', 'private/sample.devconf', screenshot_root + 'image.png', screenshot_root + 'thumbnail.png'}, set(manifest['files']))
         with zipfile.ZipFile(path) as archive:
             self.assertEqual(b'Original\r\n"quoted";value\r\n', archive.read('private/sample.devconf'))
             self.assertNotIn(b'password=private', b''.join(archive.read(name) for name in archive.namelist()))
+
+    def test_restore_preserves_screenshot_bytes_into_new_private_storage(self):
+        archive = self.coherent_backup()
+        target = self.root / 'restored'
+        process = Mock(stdin=io.BytesIO())
+        process.wait.return_value = 0
+        process.poll.return_value = 0
+        with patch.object(restore.subprocess, 'run', return_value=Mock(stdout='0\n')), patch.object(restore.subprocess, 'Popen', return_value=process):
+            restore.restore(archive, target, self.root / 'backup.cnf', 'synthetic_restore')
+        screenshots = target / 'proposal-screenshots' / ('a' * 32)
+        self.assertEqual(b'Synthetic full image', (screenshots / 'image.png').read_bytes())
+        self.assertEqual(b'Synthetic thumbnail', (screenshots / 'thumbnail.png').read_bytes())
 
     def test_backup_verification_rejects_changed_members_before_restore(self):
         original = self.coherent_backup()

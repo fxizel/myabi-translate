@@ -2,7 +2,12 @@
 
 /** Create a fresh disposable schema on the already-running portable test instance. */
 $project = dirname(__DIR__, 2);
-$credentialsFile = $project.'/.runtime/mariadb-tests/connection.json';
+$testFile = match ($argv[1] ?? 'browser-extension') {
+    'browser-extension' => 'BrowserExtensionConcurrencyTest.php',
+    'proposal-screenshots' => 'ProposalScreenshotConcurrencyTest.php',
+    default => throw new RuntimeException('Unknown isolated test suite.'),
+};
+$credentialsFile = getenv('MYABI_TEST_CONNECTION_FILE') ?: $project.'/.runtime/mariadb-tests/connection.json';
 $schema = 'myabi_test_extension_concurrency_'.bin2hex(random_bytes(6));
 $pdo = null;
 $schemaCreated = false;
@@ -39,7 +44,7 @@ try {
         'MYABI_CONCURRENCY_DIRECTORY' => $directory,
     ]);
     $process = proc_open([PHP_BINARY, $project.'/vendor/bin/phpunit', '--configuration', $project.'/phpunit.xml',
-        '--colors=never', $project.'/tests/Integration/BrowserExtensionConcurrencyTest.php',
+        '--colors=never', $project.'/tests/Integration/'.$testFile,
     ], [0 => ['pipe', 'r'], 1 => ['file', $directory.'/phpunit.log', 'w'], 2 => ['file', $directory.'/phpunit-errors.log', 'w']], $pipes, $project, $environment, ['bypass_shell' => true]);
     if (! is_resource($process)) {
         throw new RuntimeException('The test process could not start.');

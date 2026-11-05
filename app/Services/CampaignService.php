@@ -13,6 +13,7 @@ use App\Models\TermGroup;
 use App\Models\TranslationCampaign;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -148,20 +149,23 @@ class CampaignService
         });
     }
 
-    public function propose(User $user, TranslationCampaign $campaign, Term $term, string $value, ?int $expected = null): Proposal
+    public function propose(User $user, TranslationCampaign $campaign, Term $term, string $value, ?int $expected = null, ?UploadedFile $screenshot = null, string $screenshotAction = 'keep'): Proposal
     {
-        return $this->write(function () use ($user, $campaign, $term, $value, $expected) {
+        abort_unless($this->canWork($user, $campaign->fresh(), $term), 403);
+        $prepared = app(ProposalScreenshots::class)->prepare($screenshot, $screenshotAction);
+
+        return $this->write(function () use ($user, $campaign, $term, $value, $expected, $prepared, $screenshotAction) {
             [$campaign, $term, $p] = $this->work($user, $campaign, $term);
             abort_if($p->status === 'to_arbitrate', 422);
             $this->assertSource($term, $campaign->language);
             if ($this->pertinentPending($term, $campaign->language)->isNotEmpty()) {
                 $this->invalid('proposal', __('campaigns.errors.existing_pending'));
             }
-            $proposal = app(WorkflowService::class)->propose($user, $term, $p->attribute, $campaign->language, $value, $expected);
+            $proposal = app(WorkflowService::class)->proposeUnderOperationLock($user, $term, $p->attribute, $campaign->language, $value, $expected, prepared: $prepared, screenshotAction: $screenshotAction);
             $this->track($campaign, $p, $proposal, $user, 'proposal_created');
 
             return $proposal;
-        });
+        }, $screenshotAction !== 'keep');
     }
 
     public function attachProposal(User $user, TranslationCampaign $campaign, Term $term, Proposal $proposal): void
@@ -721,10 +725,10 @@ class CampaignService
         DB::table('catalogue_state')->where('id', 1)->increment('generation');
     }
 
-    private function write(callable $callback): mixed
+    private function write(callable $callback, bool $heavy = false): mixed
     {
         $this->verifiedSources = [];
 
-        return $this->lock->run(fn () => DB::transaction($callback, 3));
+        return $this->lock->run(fn () => DB::transaction($callback, 3), $heavy);
     }
 }

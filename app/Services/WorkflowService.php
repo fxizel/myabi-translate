@@ -7,6 +7,7 @@ use App\Models\Proposal;
 use App\Models\Revision;
 use App\Models\Term;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -28,37 +29,50 @@ class WorkflowService
         return $result['warning_codes'];
     }
 
-    public function propose(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null): Proposal
+    public function propose(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null, ?UploadedFile $screenshot = null, string $screenshotAction = 'keep'): Proposal
     {
         abort_unless($user->canTranslate($language), 403);
+        $prepared = app(ProposalScreenshots::class)->prepare($screenshot, $screenshotAction);
 
-        return $this->lock->run(fn () => DB::transaction(function () use ($user, $term, $attribute, $language, $value, $expected, $supersedesId, $revisionId) {
-            $term = Term::whereKey($term->id)->lockForUpdate()->firstOrFail();
-            abort_unless($user->canTranslate($language), 403);
-            if ($expected !== null && $term->lock_version !== $expected) {
-                $this->stale();
-            }
-            $warnings = $this->checkValue($term, $attribute, $language, $value);
-            if ($supersedesId !== null) {
-                abort_unless(Proposal::whereKey($supersedesId)->where('term_id', $term->id)->where('attribute', $attribute)->where('language', $language)->where('status', 'rejected')->exists(), 422);
-            }
-            if ($revisionId !== null) {
-                abort_unless(Revision::whereKey($revisionId)->where(fn ($query) => $query->where('term_id', $term->id)
-                    ->orWhereIn('term_id', DB::table('term_consolidations')->where('common_term_id', $term->id)->select('legacy_term_id')))->exists(), 422);
-            }
-            $proposal = Proposal::create(['term_id' => $term->id, 'attribute' => $attribute, 'language' => $language, 'value' => $value, 'value_hash' => hash('sha256', $value),
-                'status' => 'pending', 'author_id' => $user->id, 'organization_id' => $user->organization_id, 'anomalies' => $warnings, 'edit_history' => [], 'claimed' => true, 'supersedes_id' => $supersedesId, 'restored_revision_id' => $revisionId]);
-            app(SearchText::class)->sync($term);
-            $this->audit->record('proposal.created', $proposal, [], ['value' => $value], $user);
-            $this->generation();
-
-            return $proposal->fresh();
-        }));
+        return $this->lock->run(fn () => DB::transaction(fn () => $this->proposeUnderOperationLock($user, $term, $attribute, $language, $value, $expected, $supersedesId, $revisionId, $prepared, $screenshotAction)), $screenshotAction !== 'keep' || $supersedesId !== null);
     }
 
-    public function edit(User $user, Proposal $proposal, string $value, int $expected): Proposal
+    /** Caller owns the transaction and holds the operation lock through its completion. */
+    public function proposeUnderOperationLock(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null, ?array $prepared = null, string $screenshotAction = 'keep'): Proposal
     {
-        return $this->lock->run(fn () => DB::transaction(function () use ($user, $proposal, $value, $expected) {
+        $term = Term::whereKey($term->id)->lockForUpdate()->firstOrFail();
+        abort_unless($user->canTranslate($language), 403);
+        if ($expected !== null && $term->lock_version !== $expected) {
+            $this->stale();
+        }
+        $warnings = $this->checkValue($term, $attribute, $language, $value);
+        $rejected = null;
+        if ($supersedesId !== null) {
+            $rejected = Proposal::whereKey($supersedesId)->where('term_id', $term->id)->where('attribute', $attribute)->where('language', $language)->where('status', 'rejected')->first();
+            abort_unless($rejected, 422);
+        }
+        if ($revisionId !== null) {
+            abort_unless(Revision::whereKey($revisionId)->where(fn ($query) => $query->where('term_id', $term->id)
+                ->orWhereIn('term_id', DB::table('term_consolidations')->where('common_term_id', $term->id)->select('legacy_term_id')))->exists(), 422);
+        }
+        $screenshots = app(ProposalScreenshots::class);
+        $image = $screenshots->change($rejected, $screenshotAction, $prepared, true);
+        $proposal = Proposal::create([...$image, 'term_id' => $term->id, 'attribute' => $attribute, 'language' => $language, 'value' => $value, 'value_hash' => hash('sha256', $value),
+            'status' => 'pending', 'author_id' => $user->id, 'organization_id' => $user->organization_id, 'anomalies' => $warnings, 'edit_history' => [], 'claimed' => true, 'supersedes_id' => $supersedesId, 'restored_revision_id' => $revisionId]);
+        app(SearchText::class)->sync($term);
+        $this->audit->record('proposal.created', $proposal, [], ['value' => $value, 'screenshot' => $screenshots->summary($image), 'screenshot_source_id' => $image['screenshot_path'] && $screenshotAction === 'keep' ? $supersedesId : null], $user);
+        $this->generation();
+
+        return $proposal->fresh();
+    }
+
+    public function edit(User $user, Proposal $proposal, string $value, int $expected, ?UploadedFile $screenshot = null, string $screenshotAction = 'keep'): Proposal
+    {
+        abort_unless($user->canTranslate($proposal->language) && ($proposal->author_id === $user->id || ($proposal->import_id && ! $proposal->claimed)), 403);
+        $screenshots = app(ProposalScreenshots::class);
+        $prepared = $screenshots->prepare($screenshot, $screenshotAction);
+
+        return $this->lock->run(fn () => DB::transaction(function () use ($user, $proposal, $value, $expected, $prepared, $screenshotAction, $screenshots) {
             $term = Term::whereKey($proposal->term_id)->lockForUpdate()->firstOrFail();
             $p = Proposal::whereKey($proposal->id)->lockForUpdate()->firstOrFail();
             abort_unless($user->canTranslate($p->language), 403);
@@ -68,18 +82,20 @@ class WorkflowService
             }
             $warnings = $this->checkValue($term, $p->attribute, $p->language, $value);
             $before = $p->value;
+            $beforeImage = $screenshots->summary($p->only(ProposalScreenshots::FIELDS));
+            $image = $screenshots->change($p, $screenshotAction, $prepared);
             $history = $p->edit_history;
             $history[] = ['value' => $before, 'author_id' => $p->author_id, 'organization_id' => $p->organization_id,
                 'import_ids' => array_values(array_unique(array_filter([$p->import_id, ...DB::table('proposal_imports')->where('proposal_id', $p->id)->pluck('import_id')->all()]))),
-                'at' => now()->toIso8601String()];
-            $p->update(['value' => $value, 'value_hash' => hash('sha256', $value), 'author_id' => $user->id, 'claimed' => true, 'lock_version' => $p->lock_version + 1, 'anomalies' => $warnings, 'edit_history' => $history]);
+                'screenshot' => $beforeImage, 'screenshot_action' => $screenshotAction, 'at' => now()->toIso8601String()];
+            $p->update([...$image, 'value' => $value, 'value_hash' => hash('sha256', $value), 'author_id' => $user->id, 'claimed' => true, 'lock_version' => $p->lock_version + 1, 'anomalies' => $warnings, 'edit_history' => $history]);
             $p->update(['context_fingerprint' => app(CampaignService::class)->contextFingerprint($term, $p->attribute, $p->language)]);
             app(SearchText::class)->sync($term);
-            $this->audit->record('proposal.edited', $p, ['value' => $before], ['value' => $value], $user);
+            $this->audit->record('proposal.edited', $p, ['value' => $before, 'screenshot' => $beforeImage], ['value' => $value, 'screenshot' => $screenshots->summary($image), 'screenshot_action' => $screenshotAction], $user);
             $this->generation();
 
             return $p;
-        }));
+        }), $screenshotAction !== 'keep');
     }
 
     public function decide(User $user, Proposal $proposal, string $decision, int $expected, ?string $reason = null, bool $override = false): void

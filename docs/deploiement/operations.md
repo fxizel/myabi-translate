@@ -59,17 +59,22 @@ Le quota de 1 073 741 824 octets des exemples est l'hypothèse de recette locale
 
 ## Construire et livrer le paquet
 
-Le dépôt ne fournit pas de workflow d'intégration ni de livraison automatique : les tests et la construction du paquet s'exécutent localement ou dans la chaîne d'intégration de l'exploitant. Depuis un clone propre du commit à livrer, sous Linux :
+Le dépôt ne fournit pas de workflow d'intégration ni de livraison automatique : les tests et la construction du paquet s'exécutent localement ou dans la chaîne d'intégration de l'exploitant.
+
+Préparer auparavant la [version applicative `AAAA.MM.compteur`](../../README.md#version-de-lapplication) en local avec `php artisan app:version --bump` et committer le fichier `config/version.php`. Le paquet et les images Docker embarquent ce fichier ; ne pas incrémenter la version sur le serveur. Une reconstruction ou un retour arrière conserve le numéro du code correspondant.
+
+Depuis un clone propre du commit à livrer, sous Linux :
 
 ```sh
 composer install --no-dev --optimize-autoloader --no-interaction
-bash scripts/package-release.sh v1.0.0 "$(git rev-parse HEAD)" myabi-v1.0.0.tar.gz
-python3 scripts/inspect-release.py myabi-v1.0.0.tar.gz
+version=$(php artisan app:version)
+bash scripts/package-release.sh "v$version" "$(git rev-parse HEAD)" "myabi-v$version.tar.gz"
+python3 scripts/inspect-release.py "myabi-v$version.tar.gz"
 ```
 
 La construction utilise les dépendances de production verrouillées sans les dépendances de test, vérifie les ressources CSS/JavaScript livrées, crée `RELEASE.json`, puis prépare une archive depuis une liste autorisée de répertoires. Secrets, données d’origine, stockage privé, tests du projet, seeders/factories de développement et caches générés sont exclus. L'inspecteur rejette les chemins inattendus, traversées de répertoires, liens, fichiers d’environnement et dépendances de test. Les sauvegardes métier ne transitent jamais par l'outil de construction.
 
-Transférer l'archive par SSH avec une clé dédiée à privilèges limités et une empreinte d'hôte vérifiée (`StrictHostKeyChecking=yes`, sans `ssh-keyscan` non vérifié), puis exécuter sur l'hébergement `bash scripts/deploy.sh /chemin/absolu/myabi myabi-v1.0.0.tar.gz`. Le chemin de l'application ne doit pas contenir d'espaces. Si cette livraison est automatisée, conserver ces mêmes garanties et ne jamais afficher les secrets dans les journaux. [Documentation SSH alwaysdata](https://help.alwaysdata.com/en/docs/web-hosting/remote-access/ssh/).
+Transférer l'archive par SSH avec une clé dédiée à privilèges limités et une empreinte d'hôte vérifiée (`StrictHostKeyChecking=yes`, sans `ssh-keyscan` non vérifié), puis exécuter sur l'hébergement `bash scripts/deploy.sh /chemin/absolu/myabi myabi-v2026.11.1.tar.gz` (adapter le numéro). Le chemin de l'application ne doit pas contenir d'espaces. Si cette livraison est automatisée, conserver ces mêmes garanties et ne jamais afficher les secrets dans les journaux. [Documentation SSH alwaysdata](https://help.alwaysdata.com/en/docs/web-hosting/remote-access/ssh/).
 
 Le script `deploy.sh` attend au maximum 35 minutes le verrou exclusif `shared/storage/app/private/operations.lock`, commun aux imports, publications et opérations. Il contrôle l’espace, installe le code, suspend les requêtes web, appelle le hook de sauvegarde, exécute les migrations avec le compte distinct, puis contrôle le schéma, les répertoires, les droits d’audit et les pages `/up` et `/login` en HTTPS. Le lien `current` est remplacé atomiquement. L’application ne rouvre qu’après ces contrôles.
 
@@ -185,3 +190,9 @@ La disponibilité et la capacité du compte alwaysdata, le hook vers le stockage
 Le dossier `public` contient un `.user.ini` pour PHP-FPM : mémoire 256 Mio, fichier 100 Mio, requête 110 Mio, lecture de la requête jusqu'à 1 800 secondes. Les traitements métier restent confiés au planificateur ; la requête web normale est limitée à 120 secondes. Vérifier dans le panneau alwaysdata que ces valeurs sont appliquées et que le frontal HTTP accepte aussi le DEVCONF Incident code complet. PHP CLI doit utiliser PHP 8.4 et une limite mémoire de 256 Mio. Le serveur intégré local ignore `.user.ini` : repérer son `php.ini` avec `php --ini`, y appliquer les mêmes limites, puis redémarrer le serveur. Voir le [diagnostic des imports locaux](../../README.md#installation-locale).
 
 Le test du téléversement se fait avec le fichier réel depuis un navigateur, séparément de la durée d'analyse et d'application. Ne pas considérer un import CLI comme preuve du transfert HTTP.
+
+## Captures associées aux propositions
+
+Les sauvegardes cohérentes existantes incluent automatiquement le dossier privé de captures et leurs miniatures. Le même verrou suspend les écritures pendant le dump MariaDB et la copie des fichiers. Après restauration dans une base et un dossier vides, vérifier les références SQL, les empreintes du manifeste, les permissions et l’ouverture authentifiée des captures de propositions en attente, validées et rejetées avant réouverture. Les secrets restent sauvegardés séparément.
+
+La commande ponctuelle `php artisan proposals:screenshots:prune` contrôle les références sans supprimer ; `--apply` retire les seuls orphelins reconnus de plus de 24 heures sous verrou exclusif. Aucune capture référencée n’est purgée. Voir le [contrat des captures](../technique/captures-propositions.md).

@@ -21,6 +21,7 @@ L’[index de la documentation](docs/README.md) présente l’arborescence des d
 - [Traitements en arrière-plan](#traitements-en-arrière-plan)
 - [Vérification](#vérification)
 - [Extension navigateur MyAB Translation Inspector](#extension-navigateur-myab-translation-inspector)
+- [Version de l’application](#version-de-lapplication)
 - [Livraison et exploitation](#livraison-et-exploitation)
 - [Données, licence et contribution](#données-licence-et-contribution)
 
@@ -96,7 +97,7 @@ Les fichiers figés d’une publication et leur manifeste permettent de retrouve
 
 Prérequis :
 
-- PHP **8.4.27 minimum dans la branche 8.4** avec `mbstring`, `intl`, `iconv`, `pdo_mysql`, `zip`, `xml` et `ctype` (PHP 8.5 : 8.5.12 minimum ; voir les [correctifs de sécurité PHP](docs/deploiement/security-deployment.md)) ;
+- PHP **8.4.27 minimum dans la branche 8.4** avec `mbstring`, `intl`, `iconv`, `pdo_mysql`, `zip`, `xml`, `ctype`, `fileinfo`, `gd` (PNG/JPEG) et `exif` (PHP 8.5 : 8.5.12 minimum ; voir les [correctifs de sécurité PHP](docs/deploiement/security-deployment.md)) ;
 - Composer 2 et MariaDB 11.4 ;
 - pour les tests rapides, SQLite avec `pdo_sqlite` ;
 - pour les tests JavaScript de développement et de CI seulement, Node 24, sans dépendance npm.
@@ -116,6 +117,8 @@ php artisan serve --host=127.0.0.1
 ```
 
 La commande d’installation demande le mot de passe de l’administrateur sans l’afficher. L’administrateur crée ensuite les organisations et invite les utilisateurs depuis l’administration. Le compte technique d’import est créé automatiquement et ne peut pas se connecter.
+
+**Captures des propositions.** Après mise à jour du code, appliquer la migration additive et vérifier `composer check-platform-reqs --no-dev` avec le PHP utilisé par le serveur. GD avec PNG/JPEG et EXIF doivent être activés dans son `php.ini`, puis le serveur redémarré. Un runtime de tests distinct ne modifie pas les extensions du serveur déjà démarré. Voir le [contrat des captures](docs/technique/captures-propositions.md).
 
 **Taille des imports locaux.** Le serveur intégré ignore `public/.user.ini`. Avant de le lancer, repérer son fichier de configuration avec `php --ini` (ou `.\.runtime\php\php.exe --ini` sur ce poste), puis régler `upload_max_filesize = 100M`, `post_max_size = 110M`, `max_input_time = 1800` et `max_execution_time = 120` dans le `php.ini` indiqué. Conserver une mémoire d’au moins 256 Mio et désactiver `display_errors` ainsi que `display_startup_errors`. Redémarrer ensuite le serveur local. Une erreur 413 avec « POST Content-Length exceeds the limit of 8388608 bytes » signifie que PHP utilise encore la limite de requête par défaut de 8 Mio, avant même la lecture du CSV par l’application. Les options `php -d ... artisan serve` ne suffisent pas : Artisan lance un processus PHP distinct sans ces options.
 
@@ -188,6 +191,21 @@ Le dossier [`extension/`](extension/README.md) contient une extension Chrome et 
 - Les routes `POST /api/browser-extension/search` et `/feedback` utilisent le [contrat v2](docs/technique/api-extension-navigateur.md), un jeton personnel créé dans le profil et une projection construite par `php artisan referentiel:extension-search-rebuild`. Voir la [mise en service et la recette](docs/technique/api-extension-implementation.md).
 - `npm run serve:mock` reste disponible dans le mode de test explicite ; aucune erreur de l’API réelle ne provoque de bascule vers lui.
 - Le [README de l’extension](extension/README.md) décrit le build, le chargement dans Chrome et Firefox, la configuration, le contrat de l’API, la sécurité et la page de test.
+
+## Version de l’application
+
+La version de myABI Translate suit le format **AAAA.MM.compteur** : `2026.11.1`, `2026.11.2`, puis `2026.12.1`. Le compteur commence à 1 et repart à 1 lors d’un changement de mois, selon l’heure suisse (`Europe/Zurich`). La version reste fixe tant qu’une nouvelle livraison n’est pas préparée.
+
+Le fichier suivi dans Git [`config/version.php`](config/version.php) est la source de référence. La version apparaît dans le pied de page et dans le champ `application_version` des nouvelles publications ; leurs manifestes conservent aussi l’identifiant technique de livraison dans `application_release`.
+
+```sh
+php artisan app:version          # Afficher la version installée
+php artisan app:version --bump   # Préparer la prochaine version en local
+```
+
+Exécuter `--bump` une seule fois par nouvelle version, avant le commit de livraison, puis inclure `config/version.php` dans ce commit. La commande incrémente le compteur si le mois est inchangé, sinon elle le remet à 1. Elle refuse une version invalide ou située dans un mois futur et vide le cache de configuration local après modification. Exécuter les préparations de version l’une après l’autre ; un nouveau déploiement du même code conserve son numéro.
+
+Le numéro est inclus dans les paquets natifs et images Docker avec la configuration. Le tag Git conseillé est `vAAAA.MM.compteur` (par exemple `v2026.11.1`), créé sur le commit livré. Les identifiants techniques existants (`RELEASE_VERSION`, `RELEASE.json`, tags Docker `sha-…`) continuent d’identifier les artefacts et les retours arrière. Les versions myABI du catalogue et celle de l’extension navigateur conservent leur numérotation propre.
 
 ## Livraison et exploitation
 

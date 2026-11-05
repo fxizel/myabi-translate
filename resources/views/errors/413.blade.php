@@ -1,6 +1,7 @@
 @php
     // PHP rejects oversized requests before the session and user locale are available.
     $locale = request()->getPreferredLanguage(['de', 'fr', 'it']) ?? 'de';
+    $proposalUpload = request()->is('terms/*/proposals', 'proposals/*', 'campaigns/*/terms/*/propose');
 @endphp
 <!doctype html>
 <html lang="{{ $locale }}">
@@ -16,8 +17,8 @@
         <p class="eyebrow">myABI Translate / 413</p>
         <h1>{{ __('ui.upload_too_large_title', [], $locale) }}</h1>
         <section class="surface block">
-            <p>{{ __('ui.upload_too_large_help', [], $locale) }}</p>
-            <a class="button primary" href="{{ url('imports') }}">{{ __('ui.upload_return', [], $locale) }}</a>
+            <p>{{ __($proposalUpload ? 'screenshots.upload_help' : 'ui.upload_too_large_help', [], $locale) }}</p>
+            <a class="button primary" href="{{ url($proposalUpload ? 'terms' : 'imports') }}">{{ __($proposalUpload ? 'screenshots.upload_return' : 'ui.upload_return', [], $locale) }}</a>
         </section>
     </main>
 </body>

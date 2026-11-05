@@ -123,7 +123,7 @@ L’affichage compact est permanent : l’espacement vertical des cellules de ta
 - **Onglets de travail** (`.app-tab-strip`) : onglet fixe « Gestion des traductions » marqué d’une étoile, puis les fiches ouvertes avec un bouton de fermeture. Un seul onglet porte `aria-current=page`. Les noms trop longs sont tronqués avec points de suspension (largeur maximale 340 px).
 - **Navigation latérale** (`.app-sidebar`) : Traductions, Validation, Imports, Exports selon les droits, Publications, Groupes de termes et Campagnes de traduction, puis les entrées d’administration autorisées. Le compteur de la validation affiche le nombre de propositions en attente. Sous la navigation : le contexte de travail (version myABI, organisation, langue de référence) et un pied discret.
 - **Barre de contexte** (`.context-bar`) : fil d’Ariane à gauche ; à droite la langue d’interface (DE/FR/IT) et la déconnexion.
-- **Pied de page** : portée et langues de référence, 10 px, filet supérieur.
+- **Pied de page** : identité myABI Translate avec sa version applicative (`vAAAA.MM.compteur`), portée et lien d’aide, 10 px, filet supérieur.
 
 Les écrans d’authentification (`.guest-shell`) gardent le bandeau, masquent la navigation et centrent un panneau de 460 px au maximum.
 
@@ -264,3 +264,7 @@ Contrôle de référence : bureau et 390 px de large, sans débordement horizont
 ## Référentiel commun du 13.10.2026
 
 La liste et la fiche de terme ne présentent plus de portée, de propriétaire ou de formulaire de confirmation de périmètre. Les filtres du catalogue restent centrés sur le type, la version, la langue, les états et le contexte. Dans la validation, le filtre « Organisation d’origine » couvre la provenance historique et les imports associés ; les détails distinguent l’auteur courant et les sources, avec une mention des valeurs antérieures lors d’une correction. Les liens vers les anciennes lignées affichent leurs révisions immuables sans renumérotation. Ces adaptations conservent les composants, densités et ressources locales définis ci-dessus.
+
+## Captures des propositions
+
+L’éditeur présente un champ facultatif de capture, le choix PNG/JPEG, une zone de collage au clavier, l’aperçu, l’action conserver/remplacer/retirer et le rappel de confidentialité. Le cadre reprend les filets, tailles et espacements des champs existants. Une miniature contenue dans 160 × 120 px ouvre un dialogue avec titre et croix de fermeture en haut à droite, dans une barre restant visible au défilement. Un clic autour de l’image ou Échap ferme aussi la fenêtre et restitue le focus à la miniature. Un clic sur l’image ne la ferme pas. La fenêtre s’adapte à l’écran, sans débordement de page. Les messages et noms accessibles sont traduits en DE/FR/IT. Les images pleine taille ne sont chargées qu’à l’ouverture.
