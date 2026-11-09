@@ -4,6 +4,8 @@ Extension navigateur (Chrome et Firefox, **un seul code source**) qui retrouve l
 
 **Elle ne modifie jamais MyAB.** Elle identifie un texte, collecte son contexte, interroge l'API de l'application de gestion et affiche les correspondances avec un lien vers la traduction.
 
+[Installer myABI Translation Inspector depuis le Chrome Web Store](https://chromewebstore.google.com/detail/kejepilmnmpmimbeghjodhkgedjipifn).
+
 > **Vérification.** `npm install && npm run check` contrôle le typage, les tests et les builds des deux navigateurs. La [recette du backend réel](../docs/technique/api-extension-implementation.md) décrit les vérifications intégrées et les conditions de mise en service.
 
 ## Utilisation

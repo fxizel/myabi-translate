@@ -185,6 +185,8 @@ Les mesures sur les fichiers complets, l’espace réellement consommé chez l�
 
 ## Extension navigateur myABI Translation Inspector
 
+[Installer myABI Translation Inspector depuis le Chrome Web Store](https://chromewebstore.google.com/detail/kejepilmnmpmimbeghjodhkgedjipifn). Le [manuel utilisateur](docs/utilisateur/manuel-utilisateur.md#11-utiliser-lextension-dans-chrome-et-firefox) décrit l’installation et la configuration.
+
 Le dossier [`extension/`](extension/README.md) contient une extension Chrome et Firefox (WebExtensions MV3, TypeScript). Alt+clic sur un texte de MyAB interroge la recherche réelle Laravel et affiche les cellules correspondantes : type, clé, attribut, langue, référence, valeur importée et traduction validée. Le verdict conserve les ambiguïtés même si un seul résultat est affiché. Les corrections passent par la fiche web ; un retour de correspondance ne valide aucune traduction.
 
 - L’extension est indépendante de l’application Laravel et hors des livraisons Laravel et Docker. Node 20.19+ n’est requis que pour la développer : `cd extension && npm install && npm run check`.
