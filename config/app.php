@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'host_aliases' => array_filter(array_map('trim', explode(',', strtolower((string) env('APP_HOST_ALIASES', ''))))),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

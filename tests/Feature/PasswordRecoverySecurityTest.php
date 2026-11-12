@@ -65,6 +65,28 @@ class PasswordRecoverySecurityTest extends TestCase
         Notification::assertSentTo($user, ResetPassword::class);
     }
 
+    public function test_production_serves_explicit_host_aliases_and_keeps_reset_links_canonical(): void
+    {
+        $this->app->instance('env', 'production');
+        config([
+            'app.url' => 'https://203.0.113.10',
+            'app.host_aliases' => ['preview.example.test'],
+        ]);
+
+        $this->get('https://203.0.113.10/login')->assertOk();
+        $this->get('https://preview.example.test/login')->assertOk()
+            ->assertSee('action="https://preview.example.test/login"', false);
+        $this->get('https://child.preview.example.test/login')->assertBadRequest();
+
+        $user = User::factory()->create(['email' => 'recovery@example.test']);
+        $this->withSession(['_token' => 'synthetic-csrf'])->postJson('https://preview.example.test/forgot-password', [
+            '_token' => 'synthetic-csrf', 'email' => $user->email,
+        ])->assertOk();
+        Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user) {
+            return str_starts_with($notification->toMail($user)->actionUrl, 'https://203.0.113.10/reset-password/');
+        });
+    }
+
     public function test_json_recovery_responses_hide_account_existence_and_broker_throttling(): void
     {
         $user = User::factory()->create(['email' => 'recovery@example.test']);

@@ -11,8 +11,12 @@ class EnsureCanonicalHost
     public function handle(Request $request, Closure $next): Response
     {
         if (app()->environment('production')) {
-            $host = parse_url(config('app.url'), PHP_URL_HOST);
-            abort_unless(is_string($host) && strcasecmp($request->getHost(), $host) === 0, 400);
+            $canonicalHost = parse_url(config('app.url'), PHP_URL_HOST);
+            $host = $request->getHost();
+
+            abort_unless(is_string($canonicalHost) && (
+                strcasecmp($host, $canonicalHost) === 0 || in_array($host, config('app.host_aliases', []), true)
+            ), 400);
         }
 
         return $next($request);
