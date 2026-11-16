@@ -97,7 +97,7 @@ chown 10001:10001 secrets/app.env
 chmod 0640 secrets/app.env
 ```
 
-Compléter le SMTP, l'expéditeur autorisé, les mesures de stockage et `RELEASE_VERSION` dans `secrets/app.env`. Conserver `APP_KEY` durablement et séparément des sauvegardes de données. Les sauvegardes et sessions chiffrées dépendent de cette clé ; ne pas la régénérer lors d'une mise à jour. `provision` réconcilie explicitement les mots de passe SQL avec ces fichiers : c'est une opération administrative.
+Dans `secrets/app.env`, régler `APP_URL` sur l'URL HTTPS canonique de l'application, par exemple `https://myabi.example.org`. Compléter le SMTP, l'expéditeur autorisé, les mesures de stockage et `RELEASE_VERSION`. Conserver `APP_KEY` durablement et séparément des sauvegardes de données. Les sauvegardes et sessions chiffrées dépendent de cette clé ; ne pas la régénérer lors d'une mise à jour. `provision` réconcilie explicitement les mots de passe SQL avec ces fichiers : c'est une opération administrative.
 
 Dans `compose.env`, fixer `APP_REVISION` au SHA Git complet et `RELEASE_TAG` à une version immuable correspondant à ce code. Ajouter les clés de `compose.caddy.env.example` : `COMPOSE_FILE=compose.yml:compose.caddy.yml`, `COMPOSE_PATH_SEPARATOR=:`, `CADDY_NETWORK` avec le nom du réseau existant et `CADDY_TRUSTED_PROXY_CIDR` avec l'adresse réelle de Caddy. Les commandes et unités systemd lisent toutes `compose.env` et sélectionnent ainsi le même profil. Préférer une adresse stable précise `/32` ou `/128` ; un sous-réseau dédié au proxy est possible si tous ses membres sont de confiance. Ne jamais utiliser `0.0.0.0/0` ni un réseau privé entier par commodité. Si l'adresse Caddy change lors d'une recréation, mettre à jour cette valeur et recréer `myabi-web`. Ne pas utiliser les tags locaux `vps-preparation` pour une livraison officielle.
 
@@ -122,6 +122,8 @@ La commande d'installation demande l'adresse, le nom et le mot de passe du premi
 
 ### 3. Raccorder le HTTPS existant
 
+Demander au gestionnaire de la zone DNS de créer un enregistrement `A` pour le nom utilisé dans `APP_URL`, par exemple `myabi` dans la zone `example.org`, vers l'adresse IPv4 du frontal HTTPS. Si l'hébergeur fournit un nom DNS comme cible, demander un `CNAME` vers ce nom à la place. Utiliser le TTL standard du gestionnaire et préciser depuis quels réseaux les utilisateurs doivent pouvoir résoudre ce nom. Conserver la demande avec les valeurs réelles dans la documentation locale hors Git.
+
 Caddy appartient déjà à son propre projet Docker. Le fichier `compose.caddy.yml` utilise son réseau déclaré **externe** : il doit exister avant le démarrage de myABI et ne sera pas créé ou supprimé par ce projet. Seul `myabi-web` y reçoit l'alias `myabi-translate-web`. `ports: !reset []` supprime la publication locale du profil de base. [Réseaux Compose](https://docs.docker.com/compose/how-tos/networking/), [fusion des configurations](https://docs.docker.com/reference/compose-file/merge/).
 
 Ajouter ou importer **le seul bloc de site** de `Caddyfile.docker.example` dans la configuration existante, en conservant ses autres domaines et options globales :
@@ -144,7 +146,7 @@ docker exec NOM_CADDY caddy reload --config CHEMIN_CADDYFILE --adapter caddyfile
 
 Le montage existant doit effectivement fournir le fichier modifié au conteneur. Si Caddy est administré par API ou `caddy-docker-proxy`, utiliser son mécanisme actuel plutôt que remplacer sa configuration par ce fragment. L'inventaire doit le confirmer. [Commandes Caddy](https://caddyserver.com/docs/command-line).
 
-Contrôler ensuite la page de connexion, les cookies Secure, l'adresse cliente, un refus sur `/.env`, les limites d'upload et le renouvellement du certificat. Le paramètre FPM termine une requête à 120 secondes ; l'upload est tamponné par Nginx avec une limite de 110 Mio et un délai de lecture distinct. Les imports longs restent en CLI.
+Depuis le réseau des utilisateurs, vérifier la résolution DNS, la validité du certificat pour ce nom et l'accès à `/login` en HTTPS. Contrôler aussi les cookies Secure, l'adresse cliente, un refus sur `/.env`, les limites d'upload et le renouvellement du certificat. Le paramètre FPM termine une requête à 120 secondes ; l'upload est tamponné par Nginx avec une limite de 110 Mio et un délai de lecture distinct. Les imports longs restent en CLI.
 
 ### Capacité et temporaires des téléversements
 
