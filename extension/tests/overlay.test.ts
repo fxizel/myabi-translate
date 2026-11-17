@@ -101,6 +101,20 @@ describe('panneau — résultats', () => {
         expect(open.rel).toContain('noopener');
     });
 
+    it('affiche une première traduction proposée et conserve le statut des valeurs validées', () => {
+        overlay.showLoading(loading());
+        const message = results();
+        const result = message.results[0]!;
+        message.results = [
+            { ...result, status: 'missing', currentTranslation: '', pendingCount: 1 },
+            { ...result, status: 'missing', currentTranslation: '', pendingCount: 0 },
+            { ...result, status: 'validated', pendingCount: 1 },
+        ];
+        overlay.showResults(message);
+
+        expect(texts('.card .chip')).toEqual(['Proposée', 'Non traduit', 'Validé']);
+    });
+
     it('n’affiche pas « Ouvrir la traduction » sans lien validé', () => {
         overlay.showLoading(loading());
         const message = results();

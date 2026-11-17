@@ -157,7 +157,7 @@ describe('panneau v2', () => {
         overlay.showResults({ type: 'panel:results', requestId: 'r1', request, lang: 'fr', ...view, manualSearchUrl: null, feedbackEnabled: false, mock: true });
         const root = document.querySelector('myab-translation-inspector')!.shadowRoot!;
         expect(root.textContent).toContain('Texte trouvé (valeur importée)'); expect(root.textContent).toContain('Référence (langue inconnue)'); expect(root.textContent).toContain('Propositions en attente');
-        expect(root.textContent).toContain('Non traduit'); expect(root.textContent).toContain('Mode test'); expect(root.textContent).not.toContain('allemand');
+        expect(root.querySelector('.chip')?.textContent).toBe('Proposée'); expect(root.textContent).toContain('Mode test'); expect(root.textContent).not.toContain('allemand');
         const button = [...root.querySelectorAll('button')].find(b => b.textContent === 'Copier l’aperçu source (tronqué)')!;
         button.click(); await vi.waitFor(() => expect(button.textContent).toBe('Aperçu tronqué copié')); expect(writeText).toHaveBeenCalledWith('Source…');
         overlay.close(); Reflect.deleteProperty(navigator, 'clipboard');

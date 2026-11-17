@@ -194,7 +194,7 @@ class TermController extends Controller
             $pending = $proposals->get($term->id, collect())->get($attribute, collect())->get($language, collect());
             $term->display_attribute = $attribute;
             $term->current_value = data_get($term->validated, "$attribute.$language");
-            $term->current_state = $term->state($attribute, $language);
+            $term->current_state = $term->state($attribute, $language, $pending->isNotEmpty());
             if ($state === 'missing' && $term->current_value !== null) {
                 $term->missing_attributes = array_filter(array_slice($attributes, 1, preserve_keys: true),
                     fn ($name) => data_get($term->validated, [$name, $language]) === null);

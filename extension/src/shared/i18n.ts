@@ -62,7 +62,7 @@ const fr = {
     statusApproved: 'Validé',
     statusReview: 'En révision',
     statusPending: 'En attente',
-    statusProposed: 'Proposé',
+    statusProposed: 'Proposée',
     statusRejected: 'Rejeté',
     statusDraft: 'Brouillon',
     statusObsolete: 'Obsolète',

@@ -282,6 +282,24 @@ class CampaignAccessTest extends TestCase
         $this->get('/terms')->assertOk()->assertSee($visible->label)->assertSee($private->label);
     }
 
+    public function test_group_and_campaign_show_pending_translation_in_their_reference_state(): void
+    {
+        $term = $this->term('Pending reference');
+        $group = $this->group('Pending group');
+        $this->post('/groups/assign', ['group_id' => $group->id, 'term_ids' => [$term->id]])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $campaign = $this->campaign('Pending campaign', ['group_ids' => [$group->id]]);
+        $this->post('/terms/'.$term->id.'/proposals', ['attribute' => 'label', 'language' => 'fr',
+            'value' => 'Synthetic candidate', 'lock_version' => $term->lock_version])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $pendingBadge = '<span class="badge badge-pending">Proposée</span>';
+        $this->get('/groups/'.$group->id.'?language=fr')->assertOk()->assertSee($pendingBadge, false);
+        $this->get('/groups/'.$group->id.'?language=it')->assertOk()->assertDontSee($pendingBadge, false);
+        $this->get('/campaigns/'.$campaign->id)->assertOk()
+            ->assertSee('Statut dans le référentiel</span>'.$pendingBadge, false);
+    }
+
     public function test_translator_cannot_reclassify_a_term(): void
     {
         $group = $this->group('Protected grouping');

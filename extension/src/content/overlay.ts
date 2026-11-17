@@ -335,9 +335,10 @@ export class Overlay {
         const card = create(this.doc, 'li', `card${index === 0 ? ' top' : ''}`);
 
         const head = create(this.doc, 'div', 'card-head', create(this.doc, 'span', `score ${tier}`, result.scoreLabel), create(this.doc, 'span', 'key', result.key));
-        if (result.status) {
-            const statusClass = result.status.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-            head.append(create(this.doc, 'span', `chip ${statusClass}`, statusLabel(lang, result.status)));
+        const status = result.status === 'missing' && (result.pendingCount ?? 0) > 0 ? 'proposed' : result.status;
+        if (status) {
+            const statusClass = status.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+            head.append(create(this.doc, 'span', `chip ${statusClass}`, statusLabel(lang, status)));
         }
         card.append(head);
 

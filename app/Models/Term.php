@@ -84,7 +84,7 @@ class Term extends Model
         return app(SourceRecord::class)->attributes($this);
     }
 
-    public function state(string $attribute, string $language): string
+    public function state(string $attribute, string $language, bool $hasPendingProposal = false): string
     {
         if ($this->obsolete) {
             return 'obsolete';
@@ -93,7 +93,7 @@ class Term extends Model
             return 'review';
         }
         if (data_get($this->validated, "$attribute.$language") === null) {
-            return 'missing';
+            return $hasPendingProposal ? 'pending' : 'missing';
         }
         if ($this->last_published_revision === $this->revision_no && $this->lastPublication?->status === 'published') {
             return 'published';

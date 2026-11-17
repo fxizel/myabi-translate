@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\CampaignService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class Proposal extends Model
@@ -32,6 +33,12 @@ class Proposal extends Model
     {
         return ['anomalies' => 'array', 'edit_history' => 'array', 'divergence' => 'boolean', 'claimed' => 'boolean', 'decided_at' => 'datetime',
             'screenshot_bytes' => 'integer', 'screenshot_width' => 'integer', 'screenshot_height' => 'integer'];
+    }
+
+    public static function pendingAttributesForTerms(array $termIds, string $language): Collection
+    {
+        return static::whereIn('term_id', $termIds)->where('language', $language)->where('status', 'pending')
+            ->distinct()->toBase()->get(['term_id', 'attribute'])->groupBy('term_id')->map->pluck('attribute');
     }
 
     public function term()

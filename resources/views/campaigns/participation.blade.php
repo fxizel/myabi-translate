@@ -2,9 +2,10 @@
     $attribute = $campaignService->primaryAttribute($term);
     $display = $participation ? $term->attributesForDisplay() : [];
     $current = data_get($term->validated, $attribute.'.'.$campaign->language);
+    $hasPendingProposal = $pendingAttributes->get($term->id)?->containsStrict($attribute) ?? false;
 @endphp
 <tr><td><span class="cell-caption">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$attribute) ? __('catalogue.attributes.'.$attribute) : $attribute }}</span><a class="source-text" href="{{ route('terms.show',['term'=>$term->id,'language'=>$campaign->language]) }}">{{ data_get($display,$attribute.'.reference',$term->source_text ?: $term->label) }}</a><span class="key">{{ $term->label }}</span>@if($term->group)@include('groups.badge',['group'=>$term->group])@endif @if($participation)<span class="cell-caption">{{ __($participation->direct ? 'campaigns.direct_term' : 'campaigns.group_term') }}</span>@endif</td>
-<td><p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p><span class="cell-caption">{{ __('campaigns.reference_status') }}</span>@include('partials.status',['status'=>$term->state($attribute,$campaign->language)])</td>
+<td><p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p><span class="cell-caption">{{ __('campaigns.reference_status') }}</span>@include('partials.status',['status'=>$term->state($attribute,$campaign->language,$hasPendingProposal)])</td>
 @if($participation === null)
     <td><span class="badge badge-todo">{{ __('campaigns.group_context') }}</span></td>
     <td>—</td>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Devconf\FormatRegistry;
+use App\Models\Proposal;
 use App\Models\Term;
 use App\Models\TermGroup;
 use App\Services\GroupService;
@@ -57,8 +58,11 @@ class GroupController extends Controller
         $language = $request->query('language');
         $language = in_array($language, ['de', 'fr', 'it', 'en'], true) ? $language : 'fr';
         $terms = $group->terms()->visibleTo($request->user())->with('lastPublication:id,status')->orderBy('label')->paginate(50)->withQueryString();
+        $pendingAttributes = Proposal::pendingAttributesForTerms($terms->getCollection()->modelKeys(), $language);
         foreach ($terms as $term) {
-            $term->current_state = $term->state(FormatRegistry::get($term->type)->attributeNames[0], $language);
+            $attribute = FormatRegistry::get($term->type)->attributeNames[0];
+            $hasPendingProposal = $pendingAttributes->get($term->id)?->containsStrict($attribute) ?? false;
+            $term->current_state = $term->state($attribute, $language, $hasPendingProposal);
         }
         $group->load(['campaigns' => fn ($query) => $query->visibleTo($request->user())->orderByDesc('id')]);
 

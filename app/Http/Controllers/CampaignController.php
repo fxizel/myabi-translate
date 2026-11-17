@@ -128,6 +128,7 @@ class CampaignController extends Controller
             ->orderByRaw('CASE WHEN participation.id IS NULL THEN 1 ELSE 0 END')
             ->orderBy('participation.id')->orderBy('terms.id')->paginate(30)->withQueryString();
         $participations = $participationQuery->whereIn('term_id', $terms->getCollection()->modelKeys())->with('trackedProposal')->get()->keyBy('term_id');
+        $pendingAttributes = Proposal::pendingAttributesForTerms($terms->getCollection()->modelKeys(), $campaign->language);
         $pending = $terms->getCollection()->filter(fn ($term) => $participations->has($term->id))
             ->mapWithKeys(fn ($term) => [$term->id => $service->pertinentPending($term, $campaign->language)]);
         $events = $campaign->events()->with('actor', 'participation:id,term_id', 'participation.term:id,label')->latest('id')->paginate(40, ['*'], 'history_page')->withQueryString();
@@ -136,7 +137,7 @@ class CampaignController extends Controller
         $historyProposals = Proposal::whereIn('id', $historyProposalIds)->whereIn('term_id', $campaign->participations()->select('term_id'))->get(['id', 'term_id', 'status'])->keyBy('id');
 
         return view('campaigns.show', [
-            ...compact('historyProposals', 'campaign', 'terms', 'termScope', 'participations', 'pending', 'events', 'groupCoverage'),
+            ...compact('historyProposals', 'campaign', 'terms', 'termScope', 'participations', 'pending', 'pendingAttributes', 'events', 'groupCoverage'),
             'canWorkCampaign' => $service->canWork($request->user(), $campaign),
             'canReviewCampaign' => $service->canReview($request->user(), $campaign),
             'campaignService' => $service,

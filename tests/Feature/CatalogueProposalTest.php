@@ -75,9 +75,28 @@ class CatalogueProposalTest extends TestCase
         $row = $response->viewData('terms')->first();
         self::assertSame($latest->value, $row->pending_value);
         self::assertSame(3, $row->pending_count);
+        self::assertSame('validated', $row->current_state);
         $response->assertDontSee('id="proposal-'.$term->id.'"', false)->assertDontSee('Italian primary');
         $details = $this->get('/terms/'.$term->id)->assertOk()->viewData('proposals');
         self::assertGreaterThan($details->search(fn ($proposal) => $proposal->id === $latest->id), $details->search(fn ($proposal) => $proposal->value === 'Earlier tie'));
+    }
+
+    public function test_catalogue_badge_requires_a_pending_proposal_for_the_displayed_cell(): void
+    {
+        $term = $this->term('law');
+        $term->update(['validated' => []]);
+        $this->proposal($term, 'Short Justification', 'French secondary');
+        $this->proposal($term, 'Cause Text', 'Italian primary', 'it');
+        $this->proposal($term, 'Cause Text', 'Rejected primary')->update(['status' => 'rejected']);
+        $stateBadge = '//td[@data-column="state"]/span';
+
+        $french = $this->get('/terms?language=fr')->assertOk();
+        self::assertSame('À traduire', $this->xpath($french->getContent())->evaluate('string('.$stateBadge.')'));
+
+        $this->proposal($term, 'Cause Text', 'French primary');
+        $french = $this->get('/terms?language=fr&state=missing')->assertOk();
+        self::assertSame('Proposée', $this->xpath($french->getContent())->evaluate('string('.$stateBadge.')'));
+        $french->assertSee('Aucune traduction validée');
     }
 
     public function test_detail_shows_pending_only_for_the_matching_unvalidated_translation(): void
