@@ -7,6 +7,7 @@ use App\Models\Organisation;
 use App\Models\Proposal;
 use App\Models\Term;
 use App\Models\User;
+use App\Services\CatalogueSearch\Profile;
 use App\Services\SourceRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -95,6 +96,53 @@ class CatalogueSearchTest extends TestCase
         $response = $this->get('/terms?'.http_build_query(['q' => '"literal 50%_value"']))->assertOk();
         self::assertSame([$phrase->id], $response->viewData('terms')->pluck('id')->all());
         self::assertSame(0, $this->get('/terms?'.http_build_query(['q' => '"phrase literal"']))->assertOk()->viewData('terms')->total());
+    }
+
+    public function test_text_probe_keeps_the_exact_totals_and_pages_on_mariadb(): void
+    {
+        if (DB::getDriverName() !== 'mariadb') {
+            $this->markTestSkipped('The text probe uses MariaDB statement limits.');
+        }
+
+        $ids = [];
+        for ($i = 0; $i < 12; $i++) {
+            $ids[] = $this->term('Sample text '.$i, $i < 8 ? 'server' : 'mric')->id;
+        }
+        $this->term('Sample text legacy')->update(['consolidated_into_id' => $ids[0]]);
+        $this->term('Different text');
+        $url = '/terms?q=sample&per_page=10&sort=updated';
+        foreach ([0, 13, 1] as $limit) {
+            config(['catalogue-search.text_probe_limit' => $limit]);
+            DB::enableQueryLog();
+            DB::flushQueryLog();
+            $first = $this->get($url)->assertOk();
+            $queries = array_column(DB::getQueryLog(), 'query');
+            DB::disableQueryLog();
+            $probes = array_filter($queries, fn ($sql) => str_starts_with($sql, 'SET STATEMENT max_statement_time'));
+            self::assertCount($limit > 0 ? 1 : 0, $probes);
+            $forcedSort = array_filter($queries, fn ($sql) => str_contains(strtolower($sql), 'force index (terms_updated_page_index)'));
+            self::assertCount($limit === 13 ? 0 : 1, $forcedSort);
+            self::assertSame(12, $first->viewData('terms')->total());
+            self::assertSame(['mric' => 4, 'server' => 8], $first->viewData('typeCounts')->all());
+            self::assertSame(array_slice($ids, 0, 10), $first->viewData('terms')->pluck('id')->all());
+            self::assertSame(array_slice($ids, 10), $this->get($url.'&page=2')->assertOk()->viewData('terms')->pluck('id')->all());
+        }
+    }
+
+    public function test_approximate_index_status_is_visible_and_can_be_checked_from_the_cli(): void
+    {
+        $this->get('/terms')->assertOk()->assertSee(__('search.index_not_initialized'));
+        $this->artisan('referentiel:catalogue-search-status')->expectsOutput('not_prepared')->assertExitCode(1);
+
+        DB::table('catalogue_search_state')->where('id', 1)->update([
+            'references_ready' => true, 'ready' => true, 'active_generation' => 1, 'normalization_version' => Profile::VERSION,
+        ]);
+        $this->get('/terms')->assertOk()->assertDontSee(__('search.index_not_initialized'))->assertDontSee(__('search.service_unavailable'));
+        $this->artisan('referentiel:catalogue-search-status')->expectsOutput('ready')->assertExitCode(0);
+
+        DB::table('catalogue_search_dirty')->insert(['term_id' => 1, 'mutation_no' => 1]);
+        $this->get('/terms')->assertOk()->assertSee(__('search.service_unavailable'));
+        $this->artisan('referentiel:catalogue-search-status')->expectsOutput('unavailable')->assertExitCode(1);
     }
 
     public function test_pending_counts_terms_once_and_preserves_language_scope_and_decision_changes(): void

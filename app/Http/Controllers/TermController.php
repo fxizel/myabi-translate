@@ -15,8 +15,11 @@ use App\Models\TranslationCampaign;
 use App\Services\CatalogueSearch\ListUnavailable;
 use App\Services\CatalogueSearch\Search;
 use App\Services\SourceRecord;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -69,9 +72,21 @@ class TermController extends Controller
             'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
             'campaign_id' => 'nullable|integer|exists:translation_campaigns,id', 'approximate' => 'nullable|boolean']);
         $language = $data['language'] ?? 'fr';
-        $approximate = ($data['approximate'] ?? false) && ($data['search_mode'] ?? 'text') === 'text';
+        $mode = $data['search_mode'] ?? 'text';
+        $approximate = ($data['approximate'] ?? false) && $mode === 'text';
+        $text = $data['q'] ?? '';
+        $quoted = str_starts_with($text, '"') && str_ends_with($text, '"');
+        $literal = $quoted ? substr($text, 1, -1) : $text;
+        $probeLimit = (int) config('catalogue-search.text_probe_limit');
+        $probeText = $probeLimit > 0 && ! $approximate && $mode === 'text' && mb_strlen($literal) >= 3
+            && DB::getDriverName() === 'mariadb'
+            && ! $request->anyFilled(['context', 'group_id', 'campaign_id', 'type', 'version_id', 'state']);
+        if ($probeText && DB::transactionLevel() === 0) {
+            return app(Search::class)->snapshot(fn () => $this->index($request));
+        }
         $searchInfo = null;
         $searchError = false;
+        $textIds = null;
         $query = Term::visibleTo($request->user())->with('sourceImport', 'lastPublication');
         if (($data['group_id'] ?? '') === 'none') {
             $query->whereNull('term_group_id');
@@ -92,8 +107,6 @@ class TermController extends Controller
             $query->where('context', $data['context']);
         }
         if ($request->filled('q') && ! $approximate) {
-            $text = $data['q'];
-            $mode = $data['search_mode'] ?? 'text';
             if ($mode === 'regex') {
                 abort_unless($request->user()->canManage(), 403);
                 if (! in_array(DB::getDriverName(), ['mariadb', 'mysql'])) {
@@ -103,17 +116,20 @@ class TermController extends Controller
                     throw ValidationException::withMessages(['q' => __('ui.regex_invalid')]);
                 }
                 $query->whereIn('id', DB::table('term_search')->select('term_id')->whereRaw('search_text REGEXP ?', [$text]));
-            } elseif (str_starts_with($text, '"') && str_ends_with($text, '"')) {
-                $exact = substr($text, 1, -1);
-                $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $exact).'%';
-                $query->whereIn('id', DB::table('term_search')->select('term_id')->whereRaw("search_text LIKE ? ESCAPE '!'", [$pattern]));
             } else {
-                $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $text);
-                $pattern = ($mode === 'prefix' ? '' : '%').$escaped.'%';
-                if ($mode === 'prefix') {
+                $prefix = $mode === 'prefix' && ! $quoted;
+                $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $literal);
+                $pattern = ($prefix ? '' : '%').$escaped.'%';
+                if ($prefix) {
                     $query->whereRaw("label LIKE ? ESCAPE '!'", [$pattern]);
                 } else {
-                    $query->whereIn('id', DB::table('term_search')->select('term_id')->whereRaw("search_text LIKE ? ESCAPE '!'", [$pattern]));
+                    $matches = DB::table('term_search')->select('term_id')->whereRaw("search_text LIKE ? ESCAPE '!'", [$pattern]);
+                    $textIds = $probeText ? $this->probeTextIds($matches, $probeLimit) : null;
+                    if ($textIds === null) {
+                        $query->whereIn('id', $matches);
+                    } else {
+                        $query->whereKey($textIds->all());
+                    }
                 }
             }
         }
@@ -138,6 +154,8 @@ class TermController extends Controller
                 $searchError = true;
                 $ids = $typeCounts = collect();
             }
+        } elseif ($textIds?->isEmpty()) {
+            $ids = $typeCounts = collect();
         } else {
             // A single aggregate supplies the totals by type and paginator total.
             // GROUP BY type otherwise encourages MariaDB to walk the type index and
@@ -157,7 +175,7 @@ class TermController extends Controller
             // Select only this page's IDs first so the date/id index covers the
             // ordered scan; hydrate at most 100 large rows after SQL filtering.
             $pageQuery = (clone $query)->withoutEagerLoads()->select('id');
-            if (in_array(DB::getDriverName(), ['mariadb', 'mysql']) && $sort !== 'label' && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
+            if ($textIds === null && in_array(DB::getDriverName(), ['mariadb', 'mysql']) && $sort !== 'label' && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && $mode !== 'prefix') {
                 // Keep the ordered catalogue page on its covering date/id index.
                 $pageQuery->forceIndex($sort === 'created_at' ? 'terms_created_page_index' : 'terms_updated_page_index');
             }
@@ -198,6 +216,24 @@ class TermController extends Controller
         $view = view('terms.index', [...self::filters(), ...compact('terms', 'language', 'typeCounts', 'groups', 'filterCampaigns', 'compositionCampaigns', 'approximate', 'searchInfo', 'searchError')]);
 
         return $searchError ? response($view, 503) : $view;
+    }
+
+    private function probeTextIds(QueryBuilder $matches, int $limit): ?Collection
+    {
+        $probe = (clone $matches)->limit($limit + 1);
+        try {
+            $seconds = (float) config('catalogue-search.text_probe_seconds');
+            $rows = DB::select('SET STATEMENT max_statement_time = '.$seconds.' FOR '.$probe->toSql(), $probe->getBindings());
+        } catch (QueryException $error) {
+            if ((int) ($error->errorInfo[1] ?? 0) !== 1969) {
+                throw $error;
+            }
+
+            return null;
+        }
+
+        // Only a complete candidate set can drive the totals and page.
+        return count($rows) <= $limit ? collect(array_column($rows, 'term_id')) : null;
     }
 
     public function show(Request $request, string $term, SourceRecord $source)

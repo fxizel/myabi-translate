@@ -101,7 +101,7 @@
                 @if(session('status'))<div class="notice success" role="status">{{ session('status') }}</div>@endif
                 @if(session('warning'))<div class="notice" role="status">{{ session('warning') }}</div>@endif
                 @if(session('catalogue_search_warning'))<div class="notice warning" role="status">{{ __('search.saved_unavailable') }}</div>@endif
-                @if(($catalogueSearchUnavailable ?? false) && !session('catalogue_search_warning'))<div class="notice warning" role="status">{{ __('search.service_unavailable') }}</div>@endif
+                @if(isset($catalogueSearchWarning) && !session('catalogue_search_warning'))<div class="notice warning" role="status">{{ __($catalogueSearchWarning) }}</div>@endif
                 @if(session('error'))<div class="notice error" role="alert">{{ session('error') }}</div>@endif
                 @if($errors->any())<div class="notice error" role="alert"><strong>{{ __('ui.review_errors') }}</strong><ul>@foreach($errors->all() as $error)<li>{{ __($error) }}</li>@endforeach</ul></div>@endif
                 @yield('content')

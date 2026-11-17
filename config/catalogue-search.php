@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'text_probe_limit' => 1000,
+    'text_probe_seconds' => 1.5,
+
     // Calibration hypotheses, not guarantees. Keep the public criteria in the documentation.
     // 20-second ceiling accepted on 2026-11-05; reserve three seconds for the response.
     'work_seconds' => 17.0,

@@ -14,6 +14,7 @@ return [
     'unavailable' => 'Die Ähnlichkeitssuche ist vorübergehend nicht verfügbar. Es werden nur normale Treffer im gewählten Suchbereich angezeigt.',
     'saved_unavailable' => 'Änderung gespeichert. Die Ähnlichkeitssuche ist vorübergehend nicht verfügbar.',
     'service_unavailable' => 'Die Ähnlichkeitssuche ist vorübergehend nicht verfügbar. Die normale Suche bleibt zugänglich.',
+    'index_not_initialized' => 'Die Ähnlichkeitssuche ist verfügbar, sobald der Index aufgebaut ist. Sie können die normale Suche verwenden.',
     'not_prepared' => 'Für diesen Suchbereich muss der Katalogindex neu aufgebaut werden. Die normale Suche bleibt bei deaktivierter Option verfügbar.',
     'baseline_unavailable' => 'Innerhalb des Zeitbudgets konnte keine vollständige Liste erstellt werden. Versuchen Sie genauere Filter.',
     'badge' => 'Ähnlich', 'reference' => 'DE-Referenz', 'current' => 'Gültiger Wert :language', 'proposal' => 'Vorschlag :language',

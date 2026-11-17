@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class Search
 {
-    public function __construct(private Profile $profile, private Alignment $alignment) {}
+    public function __construct(private Profile $profile, private Alignment $alignment, private IndexStatus $indexStatus) {}
 
     public function snapshot(callable $callback): mixed
     {
@@ -42,8 +42,7 @@ class Search
         $quoted = strlen($query) >= 2 && str_starts_with($query, '"') && str_ends_with($query, '"');
         $literal = $quoted ? substr($query, 1, -1) : $query;
         $budget = new Budget($started);
-        $available = $state->ready && $state->active_generation && (int) $state->normalization_version === Profile::VERSION
-            && ! DB::table('catalogue_search_dirty')->exists();
+        $available = $this->indexStatus->isReady($state);
         $fallbackStatus = 'unavailable';
         try {
             $smallIds = $budget->sql(fn () => (clone $scope)->withoutEagerLoads()->select('id')->limit(501)->pluck('id'));

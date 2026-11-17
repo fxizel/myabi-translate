@@ -2,10 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\CatalogueSearch\IndexStatus;
 use App\Services\CatalogueSearch\Profile;
 use App\Services\OperationLock;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,11 +24,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         View::composer('layouts.app', function ($view) {
-            if (auth()->check() && Schema::hasTable('catalogue_search_state')) {
-                $state = DB::table('catalogue_search_state')->where('id', 1)->first();
-                $view->with('catalogueSearchUnavailable', $state?->references_ready && (! $state->ready
-                    || (int) $state->normalization_version !== Profile::VERSION
-                    || DB::table('catalogue_search_dirty')->exists()));
+            if (auth()->check()) {
+                $status = app(IndexStatus::class)->check();
+                if ($status === IndexStatus::NOT_PREPARED && request()->routeIs('terms.index')) {
+                    $view->with('catalogueSearchWarning', 'search.index_not_initialized');
+                } elseif ($status === IndexStatus::UNAVAILABLE) {
+                    $view->with('catalogueSearchWarning', 'search.service_unavailable');
+                }
             }
         });
         View::composer('*', function ($view) {

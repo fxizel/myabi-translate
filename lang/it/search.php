@@ -14,6 +14,7 @@ return [
     'unavailable' => 'La ricerca approssimativa è temporaneamente indisponibile. Sono visualizzate solo le corrispondenze abituali nell’ambito richiesto.',
     'saved_unavailable' => 'Modifica registrata. La ricerca approssimativa è temporaneamente indisponibile.',
     'service_unavailable' => 'La ricerca approssimativa è temporaneamente indisponibile. La ricerca abituale rimane accessibile.',
+    'index_not_initialized' => 'La ricerca approssimativa sarà disponibile dopo la preparazione dell’indice. È possibile usare la ricerca abituale.',
     'not_prepared' => 'La ricerca in questo ambito richiede la ricostruzione dell’indice del catalogo. La ricerca abituale rimane accessibile disattivando l’opzione.',
     'baseline_unavailable' => 'Non è stato possibile completare l’elenco nel tempo disponibile. Riprovare con filtri più precisi.',
     'badge' => 'Approssimativa', 'reference' => 'Riferimento DE', 'current' => 'Valore in vigore :language', 'proposal' => 'Proposta :language',
