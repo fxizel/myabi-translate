@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Devconf\FormatRegistry;
 use App\Models\Proposal;
 use App\Models\Term;
 use App\Models\TermGroup;
 use App\Models\TranslationCampaign;
 use App\Models\User;
 use App\Services\CampaignService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -99,20 +101,46 @@ class CampaignController extends Controller
     public function show(Request $request, TranslationCampaign $campaign, CampaignService $service)
     {
         $this->visible($request, $campaign);
-        $request->validate(['participation' => 'nullable|in:active,removed', 'treatment' => 'nullable|in:to_process,to_arbitrate,proposal_sent,confirmed']);
+        $request->validate(['participation' => 'nullable|in:all,active,removed', 'treatment' => 'nullable|in:to_process,to_arbitrate,proposal_sent,confirmed']);
         $campaign->load('groups', 'assignees');
-        $query = $campaign->participations()->where('active', $request->query('participation') !== 'removed')->whereHas('term', fn ($q) => $q->visibleTo($request->user()))->with('term.group', 'trackedProposal');
-        if ($request->filled('treatment')) {
-            $query->where('status', $request->query('treatment'));
+
+        $groupTerms = Term::visibleTo($request->user())->whereIn('term_group_id', $campaign->groups->modelKeys());
+        $groupCoverage = $campaign->groups->isEmpty() ? null : [
+            'total' => $groupTerms->count(),
+            'validated' => $this->countValidatedGroupTerms(clone $groupTerms, $campaign->language),
+        ];
+
+        $termScope = $request->query('participation') ?? ($groupCoverage === null ? 'active' : 'all');
+        $treatment = $request->query('treatment');
+        $participationQuery = $campaign->participations()->where('active', $termScope !== 'removed')->getQuery();
+        $termQuery = Term::withoutGlobalScope('current')->visibleTo($request->user())->select('terms.*')
+            ->leftJoinSub((clone $participationQuery)->select('id', 'term_id', 'status'), 'participation', 'participation.term_id', '=', 'terms.id')
+            ->where(function ($query) use ($termScope, $treatment, $groupTerms) {
+                $query->whereNotNull('participation.id');
+                if ($termScope === 'all' && $treatment === null) {
+                    $query->orWhereIn('terms.id', (clone $groupTerms)->select('terms.id'));
+                }
+            });
+        if ($treatment !== null) {
+            $termQuery->where('participation.status', $treatment);
         }
-        $participations = $query->orderBy('id')->paginate(30)->withQueryString();
-        $pending = $participations->mapWithKeys(fn ($participation) => [$participation->term_id => $service->pertinentPending($participation->term, $campaign->language)]);
+        $terms = $termQuery->with('group', 'sourceImport', 'lastPublication:id,status')
+            ->orderByRaw('CASE WHEN participation.id IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('participation.id')->orderBy('terms.id')->paginate(30)->withQueryString();
+        $participations = $participationQuery->whereIn('term_id', $terms->getCollection()->modelKeys())->with('trackedProposal')->get()->keyBy('term_id');
+        $pending = $terms->getCollection()->filter(fn ($term) => $participations->has($term->id))
+            ->mapWithKeys(fn ($term) => [$term->id => $service->pertinentPending($term, $campaign->language)]);
         $events = $campaign->events()->with('actor', 'participation:id,term_id', 'participation.term:id,label')->latest('id')->paginate(40, ['*'], 'history_page')->withQueryString();
 
         $historyProposalIds = $events->getCollection()->flatMap(fn ($event) => array_filter([$event->payload['proposal_id'] ?? null, $event->payload['previous_proposal_id'] ?? null]))->unique()->take(500);
         $historyProposals = Proposal::whereIn('id', $historyProposalIds)->whereIn('term_id', $campaign->participations()->select('term_id'))->get(['id', 'term_id', 'status'])->keyBy('id');
 
-        return view('campaigns.show', ['historyProposals' => $historyProposals, 'campaign' => $campaign, 'participations' => $participations, 'pending' => $pending, 'events' => $events, 'canWorkCampaign' => $service->canWork($request->user(), $campaign), 'canReviewCampaign' => $service->canReview($request->user(), $campaign), 'campaignService' => $service]);
+        return view('campaigns.show', [
+            ...compact('historyProposals', 'campaign', 'terms', 'termScope', 'participations', 'pending', 'events', 'groupCoverage'),
+            'canWorkCampaign' => $service->canWork($request->user(), $campaign),
+            'canReviewCampaign' => $service->canReview($request->user(), $campaign),
+            'campaignService' => $service,
+        ]);
     }
 
     public function groups(Request $request, TranslationCampaign $campaign, CampaignService $service)
@@ -239,5 +267,17 @@ class CampaignController extends Controller
     private function visible(Request $request, TranslationCampaign $campaign): void
     {
         abort_unless(TranslationCampaign::visibleTo($request->user())->whereKey($campaign->id)->exists(), 404);
+    }
+
+    private function countValidatedGroupTerms(Builder $groupTerms, string $language): int
+    {
+        return $groupTerms->where('obsolete', false)->where(function ($query) use ($language) {
+            foreach (FormatRegistry::all() as $code => $format) {
+                $path = $format->attributeNames[0].'->'.$language;
+                $query->orWhere(fn ($type) => $type->where('type', $code)
+                    ->whereNotNull('validated->'.$path)
+                    ->where(fn ($review) => $review->whereNull('review_needed->'.$path)->orWhereJsonDoesntContain('review_needed->'.$path, true)));
+            }
+        })->count();
     }
 }

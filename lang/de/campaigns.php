@@ -34,6 +34,8 @@ return [
     'treatment_label' => 'Bearbeitung in der Kampagne',
     'treatment' => ['to_process' => 'Zu bearbeiten', 'to_arbitrate' => 'Zur Klärung', 'proposal_sent' => 'Vorschlag eingereicht', 'confirmed' => 'Übersetzung bestätigt'],
     'participation' => 'Teilnahme', 'active_terms' => 'Aktive Begriffe', 'removed_terms' => 'Entfernte Teilnahmen',
+    'all_terms' => 'Alle Begriffe', 'group_context' => 'Gruppenübersicht',
+    'group_coverage' => 'Verknüpfte Gruppen · :validated von :total mit validierter Übersetzung (:language)',
     'reference_status' => 'Status im Referenzbestand', 'work' => 'Kampagnenarbeit',
     'tracked_proposal' => 'Verfolgter Vorschlag', 'pending_proposal' => 'Ausstehender Vorschlag',
     'confirm_current' => 'Aktuelle Übersetzung bestätigen',

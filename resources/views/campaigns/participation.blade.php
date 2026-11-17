@@ -1,14 +1,19 @@
 @php
-    $term = $participation->term;
     $attribute = $campaignService->primaryAttribute($term);
-    $display = $term->attributesForDisplay();
+    $display = $participation ? $term->attributesForDisplay() : [];
     $current = data_get($term->validated, $attribute.'.'.$campaign->language);
+@endphp
+<tr><td><span class="cell-caption">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$attribute) ? __('catalogue.attributes.'.$attribute) : $attribute }}</span><a class="source-text" href="{{ route('terms.show',['term'=>$term->id,'language'=>$campaign->language]) }}">{{ data_get($display,$attribute.'.reference',$term->source_text ?: $term->label) }}</a><span class="key">{{ $term->label }}</span>@if($term->group)@include('groups.badge',['group'=>$term->group])@endif @if($participation)<span class="cell-caption">{{ __($participation->direct ? 'campaigns.direct_term' : 'campaigns.group_term') }}</span>@endif</td>
+<td><p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p><span class="cell-caption">{{ __('campaigns.reference_status') }}</span>@include('partials.status',['status'=>$term->state($attribute,$campaign->language)])</td>
+@if($participation === null)
+    <td><span class="badge badge-todo">{{ __('campaigns.group_context') }}</span></td>
+    <td>—</td>
+@else
+@php
     $canWorkTerm = $participation->active && $canWorkCampaign && auth()->user()->canTranslate($campaign->language);
     $termPending = $pending->get($term->id, collect())->where('attribute', $attribute);
     $url = url('campaigns/'.$campaign->id.'/terms/'.$term->id);
 @endphp
-<tr><td><span class="cell-caption">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$attribute) ? __('catalogue.attributes.'.$attribute) : $attribute }}</span><a class="source-text" href="{{ route('terms.show',['term'=>$term->id,'language'=>$campaign->language]) }}">{{ data_get($display,$attribute.'.reference',$term->source_text ?: $term->label) }}</a><span class="key">{{ $term->label }}</span>@if($term->group)@include('groups.badge',['group'=>$term->group])@endif <span class="cell-caption">{{ __($participation->direct ? 'campaigns.direct_term' : 'campaigns.group_term') }}</span></td>
-<td><p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p><span class="cell-caption">{{ __('campaigns.reference_status') }}</span>@include('partials.status',['status'=>$term->state($attribute,$campaign->language)])</td>
 <td><span class="badge badge-{{ ['to_process'=>'todo','to_arbitrate'=>'review','proposal_sent'=>'pending','confirmed'=>'validated'][$participation->status] }}">{{ __('campaigns.treatment.'.$participation->status) }}</span>@if(!$participation->active)<span class="cell-caption">{{ __('campaigns.removed_terms') }}</span>@endif @if($participation->reason)<p class="preserve section">{{ $participation->reason }}</p>@endif @if($participation->trackedProposal)<div class="section"><span class="cell-caption">{{ __('campaigns.tracked_proposal') }} #{{ $participation->trackedProposal->id }} · @include('partials.status',['status'=>$participation->trackedProposal->status])</span><p class="translation-text">{{ $participation->trackedProposal->value }}</p>@include('partials.proposal-screenshot', ['proposal' => $participation->trackedProposal])@if($participation->trackedProposal->rejection_reason)<p class="client-error">{{ $participation->trackedProposal->rejection_reason }}</p>@endif</div>@endif</td>
 <td>
 @if($canWorkTerm)
@@ -25,4 +30,6 @@
 @endif
 @if(($canManage ?? false) && $participation->active && $participation->direct && $campaign->status!=='completed' && !$campaign->archived_at)<form class="section" method="post" action="{{ $url }}/remove" data-confirm="{{ __('ui.confirm_action') }}">@csrf<button class="button small danger">{{ __('campaigns.remove_direct') }}</button><p class="field-hint">{{ __('campaigns.remove_hint') }}</p></form>@endif
 @if(!$canWorkTerm && !$canReviewCampaign)<span class="empty-value">{{ __('campaigns.read_only') }}</span>@endif
-</td></tr>
+</td>
+@endif
+</tr>

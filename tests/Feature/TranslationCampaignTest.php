@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Devconf\FormatRegistry;
+use App\Http\Middleware\RequireTwoFactor;
 use App\Models\CampaignParticipation;
 use App\Models\Proposal;
 use App\Models\Revision;
@@ -120,6 +121,45 @@ class TranslationCampaignTest extends TestCase
         self::assertSame([$missing->id], $translation->participations()->where('active', true)->pluck('term_id')->all());
         self::assertSame([$empty->id, $zero->id], $revision->participations()->where('active', true)->orderBy('term_id')->pluck('term_id')->all());
         self::assertFalse($translation->participations()->where('term_id', $absent->id)->exists());
+    }
+
+    public function test_campaign_shows_the_whole_group_and_counts_reference_validations_separately(): void
+    {
+        $alreadyValidated = collect(range(1, 13))->map(fn ($number) => $this->term($number === 1 ? '' : 'Existing translation '.$number));
+        $confirmed = $this->term();
+        $pending = [$this->term(), $this->term()];
+        $work = [$confirmed, ...$pending];
+        $orderedIds = [...array_column($work, 'id'), ...$alreadyValidated->pluck('id')->all()];
+        $proposals = array_map(fn ($term) => $this->pending($term), $work);
+        $groups = app(GroupService::class);
+        $group = $groups->create($this->manager, ['title' => 'Synthetic campaign group']);
+        $groups->assignTerms($this->manager, $group, $orderedIds);
+
+        $campaign = $this->service()->create($this->manager, [
+            'title' => 'Whole group campaign', 'objective' => 'translation', 'language' => 'fr',
+            'assignee_ids' => [$this->participant->id], 'group_ids' => [$group->id],
+        ]);
+        $this->service()->start($this->manager, $campaign);
+        app(WorkflowService::class)->decide($this->validator, $proposals[0], 'validate', $proposals[0]->lock_version);
+
+        $this->withoutMiddleware(RequireTwoFactor::class)->actingAs($this->participant);
+        $url = route('campaigns.show', $campaign);
+        $response = $this->get($url)->assertOk()
+            ->assertSeeText('14 sur 16 avec une traduction validée (FR)')
+            ->assertSeeText('Consultation du groupe')
+            ->assertSeeText($alreadyValidated->last()->label)
+            ->assertDontSee($url.'/terms/'.$alreadyValidated->first()->id.'/propose');
+        $terms = $response->viewData('terms');
+        self::assertSame(16, $terms->total());
+        self::assertSame($orderedIds, $terms->getCollection()->modelKeys());
+        self::assertSame(['confirmed', 'proposal_sent', 'proposal_sent'], $response->viewData('participations')->pluck('status')->all());
+        self::assertSame(3, $campaign->metrics()['total']);
+        self::assertSame(33.3, $campaign->metrics()['confirmed_progress']);
+
+        $active = $this->get($url.'?participation=active&treatment=')->assertOk()->assertDontSeeText('Consultation du groupe');
+        self::assertSame(3, $active->viewData('terms')->total());
+        $filtered = $this->get($url.'?participation=all&treatment=proposal_sent')->assertOk();
+        self::assertSame(array_column($pending, 'id'), $filtered->viewData('terms')->getCollection()->modelKeys());
     }
 
     public function test_language_and_objective_lock_survives_removal_of_all_terms(): void

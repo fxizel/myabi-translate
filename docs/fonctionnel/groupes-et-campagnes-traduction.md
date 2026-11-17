@@ -223,7 +223,9 @@ Le menu **Campagnes de traduction** présente une vue Kanban avec trois colonnes
 
 Les cartes représentent les campagnes. Elles présentent leur titre, les personnes assignées, l’échéance, le nombre de termes, l’avancement du travail et la part des traductions confirmées.
 
-La fiche d’une campagne donne accès aux consignes, aux termes concernés et à leur statut de traitement propre à la campagne. Le statut du référentiel doit rester identifiable séparément, afin d’éviter toute confusion avec le statut de campagne.
+La fiche d’une campagne donne accès aux consignes, aux termes concernés et à leur statut de traitement. Par défaut, le tableau affiche les participations actives en tête, puis les autres termes des groupes liés en consultation. Le filtre « Termes actifs » recentre le tableau sur le travail de la campagne. Un filtre de traitement porte sur les participations affichées.
+
+Pour une campagne liée à des groupes, la fiche indique combien de leurs termes ont une traduction validée ou publiée pour l’attribut principal dans la langue cible. Ce compteur suit le contenu actuel des groupes. Les deux barres d’avancement reposent sur les participations actives.
 
 La vue propose une recherche par titre et les filtres langue cible, objectif, groupe, personne assignée, **Mes campagnes** et retard. Mes campagnes correspond aux campagnes auxquelles le compte est assigné.
 
