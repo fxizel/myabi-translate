@@ -214,6 +214,7 @@ class TermController extends Controller
         $term->load('group');
         $language = in_array($request->query('language'), ['de', 'fr', 'it', 'en']) ? $request->query('language') : 'fr';
         $attributes = $term->attributesForDisplay();
+        $pendingAttributes = $term->proposals()->where('language', $language)->where('status', 'pending')->distinct()->pluck('attribute');
         $proposalPage = null;
         if ($request->filled('match_proposal')) {
             $request->validate(['match_proposal' => 'integer|min:1']);
@@ -246,6 +247,6 @@ class TermController extends Controller
 
         $groups = TermGroup::visibleTo($request->user())->orderBy('title')->get();
 
-        return view('terms.show', [...self::filters(), ...compact('term', 'attributes', 'proposals', 'revisions', 'presences', 'comparison', 'language', 'events', 'restoreRevision', 'groups', 'lineages', 'lineageId', 'historicalLineage'), 'sourceMetadata' => $source->row($term)]);
+        return view('terms.show', [...self::filters(), ...compact('term', 'attributes', 'pendingAttributes', 'proposals', 'revisions', 'presences', 'comparison', 'language', 'events', 'restoreRevision', 'groups', 'lineages', 'lineageId', 'historicalLineage'), 'sourceMetadata' => $source->row($term)]);
     }
 }

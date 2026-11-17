@@ -80,6 +80,25 @@ class CatalogueProposalTest extends TestCase
         self::assertGreaterThan($details->search(fn ($proposal) => $proposal->id === $latest->id), $details->search(fn ($proposal) => $proposal->value === 'Earlier tie'));
     }
 
+    public function test_detail_shows_pending_only_for_the_matching_unvalidated_translation(): void
+    {
+        $term = $this->term('law');
+        $pending = $this->proposal($term, 'Short Justification', 'French candidate');
+        $this->proposal($term, 'Legal Remedies', 'Rejected candidate')->update(['status' => 'rejected']);
+        $this->proposal($term, 'Legal Remedies', 'Italian candidate', 'it');
+        for ($i = 0; $i < 50; $i++) {
+            $this->proposal($term, 'Cause Text', 'Replacement '.$i);
+        }
+
+        $response = $this->get('/terms/'.$term->id.'?language=fr')->assertOk()
+            ->assertDontSee('id="proposal-'.$pending->id.'"', false);
+        $page = $this->xpath($response->getContent());
+        self::assertSame('Validée', $page->evaluate('string(//*[@id="translation-0"]//span[@class="badge badge-validated"])'));
+        self::assertSame('Proposée', $page->evaluate('string(//*[@id="translation-1"]//span[@class="badge badge-pending"])'));
+        self::assertSame('Aucune traduction validée', $page->evaluate('string(//*[@id="translation-1"]/p[@class="translation-text"])'));
+        self::assertSame('À traduire', $page->evaluate('string(//*[@id="translation-2"]//span[@class="badge badge-missing"])'));
+    }
+
     public function test_failed_corrections_restore_only_their_form_and_success_clears_the_draft(): void
     {
         $term = $this->term('law');

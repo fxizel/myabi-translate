@@ -11,11 +11,19 @@
 @include('partials.trace',['entity'=>$term])<hr class="divider"><h3>{{ __('ui.presence') }}</h3><div class="table-wrap"><table class="mini-table"><thead><tr><th>{{ __('ui.version') }}</th><th>{{ __('ui.imports') }}</th><th>{{ __('ui.date') }}</th></tr></thead><tbody>@foreach($presences as $presence)<tr><td>{{ $presence->version_number }}</td><td>@if($canManage ?? false)<a href="{{ url('imports/'.($presence->import_id ?? $presence->import_batch_id)) }}">#{{ $presence->import_id ?? $presence->import_batch_id }}</a>@else#{{ $presence->import_id ?? $presence->import_batch_id }}@endif</td><td>{{ \Illuminate\Support\Carbon::parse($presence->created_at)->timezone('Europe/Zurich')->format('d.m.Y') }}</td></tr>@endforeach</tbody></table></div>@include('partials.pagination',['items'=>$presences])
 </section><div class="stack-gap">
 @foreach($attributes as $attribute=>$values)
-@php($current = data_get($term->validated, $attribute.'.'.$language))
+@php
+    $current = data_get($term->validated, $attribute.'.'.$language);
+    $translationStatus = match (true) {
+        (bool) data_get($term->review_needed, $attribute.'.'.$language) => 'review',
+        $current !== null => 'validated',
+        $pendingAttributes->containsStrict($attribute) => 'pending',
+        default => 'missing',
+    };
+@endphp
 @php($restoredInput = old('term_id')==$term->id && old('attribute')===$attribute && old('language')===$language && !old('proposal_id') && !old('supersedes_id') && \Illuminate\Support\Arr::has(session()->getOldInput(), 'value'))
 @php($restoredValue = $restoredInput ? old('value','') : data_get($restoreRevision ?? null,'validated.'.$attribute.'.'.$language,''))
-<section class="surface block" id="translation-{{ $loop->index }}"><div class="panel-label">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$attribute) ? __('catalogue.attributes.'.$attribute) : $attribute }} <span>{{ $language }}</span></div><p class="source-text">{{ $values['reference'] ?? '' }}</p><hr class="divider"><div class="panel-label">{{ __('ui.current_value') }} @include('partials.status', ['status'=>data_get($term->review_needed,$attribute.'.'.$language) ? 'review' : ($current !== null ? 'validated' : 'missing')])</div><p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p>
-@if(data_get($term->review_needed,$attribute.'.'.$language) && auth()->user()->canValidate($language))<form action="{{ url('terms/'.$term->id.'/confirm') }}" method="post" class="section">@csrf<input type="hidden" name="term_id" value="{{ $term->id }}"><input type="hidden" name="attribute" value="{{ $attribute }}"><input type="hidden" name="language" value="{{ $language }}"><input type="hidden" name="lock_version" value="{{ $term->lock_version ?? 1 }}"><button class="button">{{ __('ui.confirm_value') }}</button></form>@endif
+<section class="surface block" id="translation-{{ $loop->index }}"><div class="panel-label">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$attribute) ? __('catalogue.attributes.'.$attribute) : $attribute }} <span>{{ $language }}</span></div><p class="source-text">{{ $values['reference'] ?? '' }}</p><hr class="divider"><div class="panel-label">{{ __('ui.current_value') }} @include('partials.status', ['status'=>$translationStatus])</div><p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p>
+@if($translationStatus === 'review' && auth()->user()->canValidate($language))<form action="{{ url('terms/'.$term->id.'/confirm') }}" method="post" class="section">@csrf<input type="hidden" name="term_id" value="{{ $term->id }}"><input type="hidden" name="attribute" value="{{ $attribute }}"><input type="hidden" name="language" value="{{ $language }}"><input type="hidden" name="lock_version" value="{{ $term->lock_version ?? 1 }}"><button class="button">{{ __('ui.confirm_value') }}</button></form>@endif
 @php($placeholderCounts = \App\Domain\Devconf\TranslationValidator::placeholders($values['reference'] ?? ''))
 @php($tokenMatches = [array_keys($placeholderCounts)])
 @if($tokenMatches[0])<hr class="divider"><div class="panel-label">{{ __('ui.tokens') }}</div><div class="tokens">@foreach($tokenMatches[0] as $token)<span class="token">{{ $token }} ×{{ $placeholderCounts[$token] }}</span>@endforeach</div>@endif
