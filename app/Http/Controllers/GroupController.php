@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Term;
 use App\Models\TermGroup;
 use App\Services\GroupService;
 use Illuminate\Http\Request;
@@ -14,13 +15,25 @@ class GroupController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate(['q' => 'nullable|string|max:200', 'archived' => 'nullable|boolean']);
-        $query = TermGroup::visibleTo($request->user())->withCount('terms');
+        $query = TermGroup::visibleTo($request->user());
         $request->boolean('archived') ? $query->whereNotNull('archived_at') : $query->whereNull('archived_at');
         if (! empty($data['q'])) {
             $query->where('title', 'like', '%'.addcslashes($data['q'], '%_\\').'%');
         }
 
-        return view('groups.index', ['groups' => $query->orderBy('title')->paginate(30)->withQueryString()]);
+        $groups = $query->orderBy('title')->paginate(30)->withQueryString();
+        if ($groups->isNotEmpty()) {
+            // Explicit group IDs let MariaDB use the group index for the counts.
+            $termCounts = Term::query()->whereIn('term_group_id', $groups->getCollection()->modelKeys())
+                ->select('term_group_id')->selectRaw('COUNT(*) AS terms_count')
+                ->groupBy('term_group_id')->pluck('terms_count', 'term_group_id');
+
+            foreach ($groups as $group) {
+                $group->terms_count = (int) ($termCounts[$group->id] ?? 0);
+            }
+        }
+
+        return view('groups.index', compact('groups'));
     }
 
     public function create(Request $request)

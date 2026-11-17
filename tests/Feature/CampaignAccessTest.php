@@ -11,6 +11,7 @@ use App\Models\TranslationCampaign;
 use App\Models\User;
 use App\Services\SourceRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -180,6 +181,42 @@ class CampaignAccessTest extends TestCase
         self::assertSame([$ungrouped->id, $private->id], $without->viewData('terms')->pluck('id')->all());
         self::assertSame(2, $without->viewData('terms')->total());
         $filtered->assertDontSee('Grouped private');
+    }
+
+    public function test_group_list_counts_only_non_consolidated_terms_for_groups_on_the_current_page(): void
+    {
+        $first = $this->group('Example group 00');
+        $last = $this->group('Example group 30');
+        foreach (range(1, 29) as $number) {
+            TermGroup::create(['title' => sprintf('Example group %02d', $number),
+                'created_by' => $this->manager->id, 'updated_by' => $this->manager->id]);
+        }
+
+        $canonical = $this->term('Canonical group term');
+        $canonical->update(['term_group_id' => $first->id]);
+        $this->term('Historical group term')->update(['term_group_id' => $first->id, 'consolidated_into_id' => $canonical->id]);
+        $this->term('Obsolete group term')->update(['term_group_id' => $first->id, 'obsolete' => true]);
+        $this->term('Later group term')->update(['term_group_id' => $last->id]);
+
+        DB::enableQueryLog();
+        try {
+            $groups = $this->get('/groups?q=Example')->assertOk()->viewData('groups');
+            $termQueries = collect(DB::getQueryLog())
+                ->filter(fn ($query) => preg_match('/\bfrom ["`]terms["`]/', $query['query']));
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+
+        self::assertSame(31, $groups->total());
+        self::assertSame(30, $groups->count());
+        self::assertSame(2, $groups->first()->terms_count);
+        self::assertSame([0], $groups->pluck('terms_count')->slice(1)->unique()->values()->all());
+        self::assertCount(1, $termQueries);
+        self::assertSame($groups->getCollection()->modelKeys(), $termQueries->first()['bindings']);
+        self::assertStringContainsString('q=Example', $groups->nextPageUrl());
+        $nextGroups = $this->get('/groups?q=Example&page=2')->assertOk()->viewData('groups');
+        self::assertSame([$last->id => 1], $nextGroups->pluck('terms_count', 'id')->all());
     }
 
     public function test_catalogue_campaign_filter_combines_with_group_and_excludes_removed_participations(): void
