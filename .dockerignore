@@ -16,6 +16,8 @@
 !resources/
 !resources/views/
 !resources/views/**
+!resources/search/
+!resources/search/lexical-families.php
 !routes/
 !routes/**
 !scripts/

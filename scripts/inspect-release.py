@@ -28,9 +28,11 @@ def inspect(path):
                 raise ValueError(f'Possible business data in release: {name}')
             if p.parts[:2] in [('vendor', 'phpunit'), ('vendor', 'fakerphp'), ('database', 'factories'), ('database', 'seeders')]:
                 raise ValueError(f'Development dependency in release: {name}')
-            names.add(name)
+            if member.isfile():
+                names.add(name)
             total += member.size
-    for required in ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php', 'RELEASE.json']:
+    for required in ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php',
+                     'resources/search/lexical-families.php', 'RELEASE.json']:
         if required not in names:
             raise ValueError(f'Missing release file: {required}')
     return total

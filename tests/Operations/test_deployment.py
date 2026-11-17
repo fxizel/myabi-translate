@@ -61,9 +61,10 @@ echo curl >> "$TRACE"
 if [[ "$*" != *--fail* && "${FAIL_TLS:-0}" == 1 ]]; then exit 60; fi
 ''')
         stage = self.root / 'fixture'
-        for directory in ['vendor', 'public', 'scripts', 'bootstrap/cache', 'database/migrations']:
+        for directory in ['vendor', 'public', 'scripts', 'bootstrap/cache', 'database/migrations', 'resources/search']:
             (stage / directory).mkdir(parents=True, exist_ok=True)
-        for name in ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php', 'scripts/operations.php', 'scripts/check-php-runtime.php']:
+        for name in ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php', 'scripts/operations.php',
+                     'scripts/check-php-runtime.php', 'resources/search/lexical-families.php']:
             (stage / name).write_text('synthetic fixture')
         shutil.copyfile(SCRIPTS / 'inspect-release.py', stage / 'scripts/inspect-release.py')
         (stage / 'RELEASE.json').write_text(json.dumps({'commit': self.commit}))

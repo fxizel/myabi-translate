@@ -44,10 +44,13 @@ class ArtifactSafetyTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.addCleanup(self.temp.cleanup)
 
-    def release(self, extra=None):
+    def release(self, extra=None, *, include_lexical_profile=True):
         path = self.root / 'release.tar.gz'
         with tarfile.open(path, 'w:gz') as archive:
-            for name in ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php', 'RELEASE.json']:
+            names = ['artisan', 'composer.lock', 'vendor/autoload.php', 'public/index.php', 'RELEASE.json']
+            if include_lexical_profile:
+                names.append('resources/search/lexical-families.php')
+            for name in names:
                 info = tarfile.TarInfo('./' + name)
                 info.size = 4
                 archive.addfile(info, io.BytesIO(b'test'))
@@ -56,7 +59,11 @@ class ArtifactSafetyTest(unittest.TestCase):
         return path
 
     def test_release_expanded_size_is_computed(self):
-        self.assertEqual(20, release_inspector.inspect(self.release()))
+        self.assertEqual(24, release_inspector.inspect(self.release()))
+
+    def test_release_rejects_missing_lexical_profile(self):
+        with self.assertRaisesRegex(ValueError, 'Missing release file: resources/search/lexical-families.php'):
+            release_inspector.inspect(self.release(include_lexical_profile=False))
 
     def test_release_rejects_secrets_traversal_business_data_and_dev_dependencies(self):
         for name in ['../escape.php', '/tmp/escape', '.env', 'app/.env.backup', 'database/original.csv', 'storage/app/private/proposal-screenshots/image.png', 'vendor/phpunit/code.php', 'scripts/__pycache__/check.pyc', 'scripts/check.pyc']:

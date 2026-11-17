@@ -190,7 +190,7 @@ class Transport:
 
 
 BUILD_PATHS = ['.dockerignore', 'app', 'bootstrap', 'config', 'database/migrations',
-               'lang', 'public', 'resources/views', 'routes', 'scripts', 'artisan',
+               'lang', 'public', 'resources/views', 'resources/search/lexical-families.php', 'routes', 'scripts', 'artisan',
                'composer.json', 'composer.lock', 'deploy/docker']
 CRITICAL_PATHS = ['database/migrations', 'deploy/docker/Dockerfile', 'deploy/docker/compose.yml',
                   'deploy/docker/compose.caddy.yml', 'deploy/docker/php.ini', 'deploy/docker/php-fpm.conf',

@@ -23,6 +23,7 @@ COPY database/migrations ./database/migrations
 COPY lang ./lang
 COPY public ./public
 COPY resources/views ./resources/views
+COPY resources/search/lexical-families.php ./resources/search/lexical-families.php
 COPY routes ./routes
 COPY scripts ./scripts
 COPY artisan ./artisan
