@@ -171,11 +171,16 @@ class TermController extends Controller
         $proposals = Proposal::whereIn('term_id', $terms->pluck('id'))->where('language', $language)->where('status', 'pending')
             ->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy(['term_id', 'attribute', 'language']);
         foreach ($terms as $term) {
-            $attribute = FormatRegistry::get($term->type)->attributeNames[0];
+            $attributes = FormatRegistry::get($term->type)->attributeNames;
+            $attribute = $attributes[0];
             $pending = $proposals->get($term->id, collect())->get($attribute, collect())->get($language, collect());
             $term->display_attribute = $attribute;
             $term->current_value = data_get($term->validated, "$attribute.$language");
             $term->current_state = $term->state($attribute, $language);
+            if ($state === 'missing' && $term->current_value !== null) {
+                $term->missing_attributes = array_filter(array_slice($attributes, 1, preserve_keys: true),
+                    fn ($name) => data_get($term->validated, [$name, $language]) === null);
+            }
             $term->pending_value = $pending->first()?->value;
             $term->pending_id = $pending->first()?->id;
             $term->pending_count = $pending->count();

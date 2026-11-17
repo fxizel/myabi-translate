@@ -56,6 +56,7 @@ Dans **Groupes de termes**, ouvrez un groupe et choisissez une langue. La colonn
 ### Suivre l’état d’un terme
 
 Dans **Traductions**, la colonne **État** indique où en est la traduction de l’attribut principal dans la langue choisie.
+Avec le filtre **À traduire**, si l’attribut principal a déjà une traduction validée, la ligne indique les autres attributs encore à traduire et donne un lien vers chacun d’eux.
 
 ![Pour un terme « À traduire », l’action Proposer crée une contribution à l’état « Proposée ». Valider fait passer la traduction à « Validée », puis Publier la fait passer à « Publiée ». Un rejet motivé donne l’état « Rejetée ». Soumettre une nouvelle proposition crée une autre contribution à l’état « Proposée ». Si la référence change, la traduction passe à « À réviser » jusqu’à confirmation de la valeur ou validation d’une correction.](captures/schema-etat-traduction.png)
 

@@ -79,6 +79,26 @@ class CatalogueStateTest extends TestCase
         self::assertSame(0, $this->get('/terms?state=missing&language=fr&type=law')->assertOk()->viewData('terms')->total());
     }
 
+    public function test_missing_filter_links_to_the_untranslated_secondary_attribute(): void
+    {
+        $this->reader->update(['locale' => 'fr']);
+        $attributes = FormatRegistry::get('law')->attributeNames;
+        $term = $this->term('law', [
+            $attributes[0] => ['fr' => 'Motif validé'],
+            $attributes[1] => ['it' => 'Justification italienne'],
+            $attributes[2] => ['fr' => 'Recours validé'],
+        ]);
+        $this->term('law', array_fill_keys($attributes, ['fr' => 'Traduction validée']));
+        $secondaryLink = '/terms/'.$term->id.'?language=fr#translation-1';
+
+        $response = $this->get('/terms?state=missing&language=fr&type=law')->assertOk();
+        self::assertSame([$term->id], $response->viewData('terms')->pluck('id')->all());
+        self::assertSame(1, $response->viewData('terms')->total());
+        $response->assertSee('Motif validé')->assertSee('badge badge-missing', false)
+            ->assertSee($secondaryLink, false)->assertSee('Justification courte');
+        $this->get('/terms?state=validated&language=fr&type=law')->assertOk()->assertDontSee($secondaryLink, false);
+    }
+
     public function test_raw_sql_changes_obsolescence_and_rollback_keep_projection_coherent(): void
     {
         $term = $this->term('server');

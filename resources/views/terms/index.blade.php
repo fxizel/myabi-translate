@@ -72,7 +72,16 @@
         @if($term->other_pending_attributes->isNotEmpty())<div class="cell-caption">{{ __('catalogue.other_pending_attributes') }} : @foreach($term->other_pending_attributes as $pendingAttribute=>$pendingCount)<a href="{{ url('terms/'.$term->id) }}?language={{ $language }}#translation-{{ array_search($pendingAttribute, array_keys($display), true) }}">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$pendingAttribute) ? __('catalogue.attributes.'.$pendingAttribute) : $pendingAttribute }} ({{ $pendingCount }})</a>@unless($loop->last) · @endunless @endforeach</div>@endif
         @include('partials.catalogue-match', ['matchOrigin' => 'proposal'])
     </td>
-    <td data-column="state" data-sort-value="{{ __('ui.status_'.($term->current_state ?? 'missing')) }}">@include('partials.status',['status'=>$term->current_state ?? 'missing'])</td>
+    <td data-column="state" data-sort-value="{{ __('ui.status_'.($term->current_state ?? 'missing')) }}">
+        @include('partials.status',['status'=>$term->current_state ?? 'missing'])
+        @if($term->missing_attributes)
+        <span class="cell-caption">@include('partials.status', ['status'=>'missing']) :
+            @foreach($term->missing_attributes as $index=>$attribute)
+            <a href="{{ url('terms/'.$term->id) }}?language={{ $language }}#translation-{{ $index }}">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$attribute) ? __('catalogue.attributes.'.$attribute) : $attribute }}</a>@unless($loop->last), @endunless
+            @endforeach
+        </span>
+        @endif
+    </td>
     <td data-column="group">@if(!$term->group || $groups->contains('id',$term->term_group_id))@include('groups.badge',['group'=>$term->group])@else<span class="empty-value">{{ __('campaigns.restricted_group') }}</span>@endif </td>
 </tr>
 @empty<tr><td colspan="7" data-column-span><div class="empty-state"><h2>{{ __('ui.empty_title') }}</h2><p>{{ $searchInfo ? __('search.empty') : __('ui.empty_description') }}</p>@if($canManage ?? false)<a href="{{ url('imports') }}" class="button primary">{{ __('ui.new_import') }} →</a>@endif</div></td></tr>@endforelse
