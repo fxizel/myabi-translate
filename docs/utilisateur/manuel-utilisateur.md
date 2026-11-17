@@ -51,6 +51,16 @@ Figure 2 — Recherche dans le catalogue commun.
 
 La langue cible est indépendante de la langue de l’interface. Vous pouvez travailler en italien avec des menus français.
 
+Dans **Groupes de termes**, ouvrez un groupe et choisissez une langue. La colonne **État** indique où en est la traduction de l’attribut principal de chaque terme. **Ouvrir le catalogue** conserve le groupe et la langue sélectionnés.
+
+### Suivre l’état d’un terme
+
+Dans **Traductions**, la colonne **État** indique où en est la traduction de l’attribut principal dans la langue choisie.
+
+![Pour un terme « À traduire », l’action Proposer crée une contribution à l’état « Proposée ». Valider fait passer la traduction à « Validée », puis Publier la fait passer à « Publiée ». Un rejet motivé donne l’état « Rejetée ». Soumettre une nouvelle proposition crée une autre contribution à l’état « Proposée ». Si la référence change, la traduction passe à « À réviser » jusqu’à confirmation de la valeur ou validation d’une correction.](captures/schema-etat-traduction.png)
+
+Dans le catalogue, une première traduction reste **À traduire** jusqu’à sa validation. Les états **Proposée** et **Rejetée** se lisent sur la fiche du terme, dans **Propositions**. L’état **Obsolète** concerne le terme entier, quelle que soit la langue choisie.
+
 ### Retrouver un libellé proche
 
 1. Saisissez votre texte, par exemple « dosier » ou « ouvrir dossier ».
