@@ -129,7 +129,7 @@ Le serveur accepte une liste explicite de destinataires à la création d’une 
 
 ## États et indicateurs disponibles
 
-Les propositions ont trois états : en attente, validée ou rejetée. Les termes exposent les états manquant, validé, publié, à revoir et obsolète, ainsi qu’un filtre de propositions en attente. Les attributs d’un même terme peuvent présenter des états différents ; la ligne principale du catalogue affiche le premier attribut du format, alors que les filtres d’état peuvent correspondre à un autre attribut.
+Les propositions ont trois états : en attente, validée ou rejetée. Le catalogue affiche l’état du premier attribut du format dans la langue sélectionnée. Les badges sont « À traduire », « Proposée », « Validée », « Publiée », « À réviser » et « Obsolète ». Le filtre « Proposée » se limite aux lignes où cet attribut porte ce badge. Les autres filtres d’état peuvent correspondre à un autre attribut du même terme.
 
 Les imports exposent l’attente, l’analyse, le résultat analysé, l’attente d’application, l’application, le résultat appliqué, l’échec et l’annulation. Les publications exposent l’attente, la construction, la publication, l’échec et le retrait. Les validations en arrière-plan exposent des compteurs de traitement et d’exclusion.
 

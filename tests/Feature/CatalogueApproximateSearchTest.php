@@ -126,10 +126,12 @@ class CatalogueApproximateSearchTest extends TestCase
     {
         $one = $this->term(['label' => ['fr' => 'Dossier']]);
         $two = $this->term(['TEXT' => ['fr' => 'Dossier']], type: 'incident');
+        $firstProposal = $this->term(reference: 'Dossier');
         DB::table('terms')->where('id', $two->id)->update(['context' => 'other', 'obsolete' => true]);
         $this->proposal($one, 'Dossier');
+        $this->proposal($firstProposal, 'Dossier');
         $this->rebuild();
-        self::assertSame([$one->id], $this->find('dosier', ['type' => 'server', 'state' => 'pending'])->assertOk()->viewData('terms')->pluck('id')->all());
+        self::assertSame([$firstProposal->id], $this->find('dosier', ['type' => 'server', 'state' => 'pending'])->assertOk()->viewData('terms')->pluck('id')->all());
         self::assertSame([$two->id], $this->find('dosier', ['context' => 'other', 'state' => 'obsolete'])->assertOk()->viewData('terms')->pluck('id')->all());
         self::assertSame(0, $this->find('dosier', ['type' => 'server', 'context' => 'other'])->assertOk()->viewData('terms')->total());
     }

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Domain\Devconf\FormatRegistry;
 use App\Services\CampaignService;
 use App\Services\SourceRecord;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
@@ -100,6 +102,30 @@ class Term extends Model
         }
 
         return 'validated';
+    }
+
+    public function scopeMatchingPendingBadge(Builder $query, string $language): Builder
+    {
+        $formatsByAttribute = collect(FormatRegistry::all())->groupBy(fn ($format) => $format->attributeNames[0], preserveKeys: true);
+        $mysql = in_array($query->getConnection()->getDriverName(), ['mysql', 'mariadb'], true);
+        $review = $mysql
+            ? 'CAST(JSON_EXTRACT(terms.review_needed, ?) AS CHAR)'
+            : 'JSON_TYPE(terms.review_needed, ?)';
+
+        return $query->where('terms.obsolete', false)->whereHas('proposals', function (Builder $proposals) use ($formatsByAttribute, $language, $review) {
+            // The catalogue groups proposals by exact attribute and language keys in PHP.
+            $proposals->where('proposals.status', 'pending')->where('proposals.language', $language)
+                ->whereRaw('HEX(proposals.language) = ?', [strtoupper(bin2hex($language))])
+                ->where(function (Builder $primary) use ($formatsByAttribute, $language, $review) {
+                    foreach ($formatsByAttribute as $attribute => $formats) {
+                        $path = '$.'.json_encode($attribute, JSON_THROW_ON_ERROR).'.'.json_encode($language, JSON_THROW_ON_ERROR);
+                        $primary->orWhere(fn (Builder $cell) => $cell->whereIn('terms.type', $formats->keys())
+                            ->whereRaw('HEX(proposals.attribute) = ?', [strtoupper(bin2hex($attribute))])
+                            ->whereNull("terms.validated->$attribute->$language")
+                            ->whereRaw("COALESCE($review, 'null') IN ('null', 'false')", [$path]));
+                    }
+                });
+        });
     }
 
     public function scopeVisibleTo($query, User $user)

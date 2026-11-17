@@ -60,7 +60,7 @@ Avec le filtre **À traduire**, si l’attribut principal a déjà une traductio
 
 ![Pour un terme « À traduire », l’action Proposer crée une contribution à l’état « Proposée ». Valider fait passer la traduction à « Validée », puis Publier la fait passer à « Publiée ». Un rejet motivé donne l’état « Rejetée ». Soumettre une nouvelle proposition crée une autre contribution à l’état « Proposée ». Si la référence change, la traduction passe à « À réviser » jusqu’à confirmation de la valeur ou validation d’une correction.](captures/schema-etat-traduction.png)
 
-Le badge passe de **À traduire** à **Proposée** lorsqu’une première proposition est en attente pour le champ et la langue affichés. Le filtre **À traduire** inclut ces termes jusqu’à validation d’une valeur. Lorsqu’une valeur est déjà validée, le badge continue de décrire l’état de cette valeur. La section **Propositions** de la fiche montre le statut de chaque contribution. L’état **Obsolète** concerne le terme entier, quelle que soit la langue choisie.
+Le badge passe de **À traduire** à **Proposée** lorsqu’une première proposition est en attente pour le champ et la langue affichés. Le filtre **Proposée** sélectionne uniquement les lignes qui portent ce badge. Le filtre **À traduire** inclut ces termes jusqu’à validation d’une valeur. Lorsqu’une valeur est déjà validée, le badge continue de décrire l’état de cette valeur. La section **Propositions** de la fiche montre le statut de chaque contribution. L’état **Obsolète** concerne le terme entier, quelle que soit la langue choisie.
 
 ### Retrouver un libellé proche
 

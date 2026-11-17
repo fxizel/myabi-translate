@@ -6,6 +6,7 @@ use App\Domain\Devconf\FormatRegistry;
 use App\Http\Middleware\RequireTwoFactor;
 use App\Models\MyabiVersion;
 use App\Models\Organisation;
+use App\Models\Proposal;
 use App\Models\Publication;
 use App\Models\Term;
 use App\Models\TermState;
@@ -119,6 +120,32 @@ class CatalogueStateTest extends TestCase
         self::assertSame(0, TermState::findOrFail($term->id)->review_languages);
         $term->delete();
         self::assertFalse(TermState::whereKey($term->id)->exists());
+    }
+
+    public function test_pending_filter_returns_only_rows_with_the_pending_badge_in_the_selected_language(): void
+    {
+        $law = $this->term('law', ['Cause Text' => ['fr' => null], 'Legal Remedies' => ['fr' => 'Validé']], ['Cause Text' => ['fr' => false]]);
+        $incident = $this->term('incident');
+        $italian = $this->term('server');
+        $secondaryOnly = $this->term('law');
+        $replacement = $this->term('server', ['label' => ['fr' => '0']]);
+        $review = $this->term('server', [], ['label' => ['fr' => true]]);
+        $obsolete = $this->term('server');
+        $obsolete->update(['obsolete' => true]);
+
+        foreach ([[$law, 'Cause Text', 'fr'], [$incident, 'TEXT', 'fr'], [$italian, 'label', 'it'],
+            [$secondaryOnly, 'Short Justification', 'fr'], [$replacement, 'label', 'fr'], [$review, 'label', 'fr'], [$obsolete, 'label', 'fr']] as [$term, $attribute, $language]) {
+            Proposal::create(['term_id' => $term->id, 'attribute' => $attribute, 'language' => $language,
+                'value' => 'Synthetic proposal', 'value_hash' => hash('sha256', 'Synthetic proposal'), 'status' => 'pending',
+                'author_id' => $this->reader->id, 'anomalies' => [], 'edit_history' => []]);
+        }
+
+        $french = $this->get('/terms?state=pending&language=fr')->assertOk();
+        self::assertEqualsCanonicalizing([$law->id, $incident->id], $french->viewData('terms')->pluck('id')->all());
+        self::assertSame(2, $french->viewData('terms')->total());
+        self::assertSame(['law' => 1, 'incident' => 1], $french->viewData('typeCounts')->all());
+        self::assertSame(['pending'], $french->viewData('terms')->pluck('current_state')->unique()->values()->all());
+        self::assertSame([$italian->id], $this->get('/terms?state=pending&language=it')->assertOk()->viewData('terms')->pluck('id')->all());
     }
 
     public function test_published_filter_requires_current_revision_language_available_publication_and_version(): void

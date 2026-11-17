@@ -72,6 +72,7 @@ class TermController extends Controller
             'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
             'campaign_id' => 'nullable|integer|exists:translation_campaigns,id', 'approximate' => 'nullable|boolean']);
         $language = $data['language'] ?? 'fr';
+        $state = $data['state'] ?? null;
         $mode = $data['search_mode'] ?? 'text';
         $approximate = ($data['approximate'] ?? false) && $mode === 'text';
         $text = $data['q'] ?? '';
@@ -81,7 +82,7 @@ class TermController extends Controller
         $probeText = $probeLimit > 0 && ! $approximate && $mode === 'text' && mb_strlen($literal) >= 3
             && DB::getDriverName() === 'mariadb'
             && ! $request->anyFilled(['context', 'group_id', 'campaign_id', 'type', 'version_id', 'state']);
-        if ($probeText && DB::transactionLevel() === 0) {
+        if (($probeText || $state === 'pending') && DB::transactionLevel() === 0) {
             return app(Search::class)->snapshot(fn () => $this->index($request));
         }
         $searchInfo = null;
@@ -133,9 +134,8 @@ class TermController extends Controller
                 }
             }
         }
-        $state = $data['state'] ?? null;
         if ($state === 'pending') {
-            $query->whereHas('proposals', fn ($q) => $q->where('status', 'pending')->where('language', $language));
+            $query->matchingPendingBadge($language);
         }
         if (in_array($state, ['missing', 'validated', 'review', 'published', 'obsolete'])) {
             $query->whereIn('id', TermState::matchingState($state, $language, $request->filled('version_id') ? (int) $data['version_id'] : null)->select('id'));
@@ -161,12 +161,6 @@ class TermController extends Controller
             // GROUP BY type otherwise encourages MariaDB to walk the type index and
             // fetch every large catalogue row in index order for text predicates.
             $countQuery = (clone $query)->withoutEagerLoads();
-            if ($state === 'pending' && in_array(DB::getDriverName(), ['mariadb', 'mysql'])
-                && ! $request->filled('context') && ! $request->filled('group_id') && ! $request->filled('campaign_id') && ($data['search_mode'] ?? 'text') !== 'prefix') {
-                // Keep the count on a covering term index. A proposal-first
-                // LooseScan otherwise fetches every large matching term by PK.
-                $countQuery->forceIndex('terms_type_obsolete_id_index');
-            }
             foreach (array_keys(FormatRegistry::all()) as $type) {
                 $countQuery->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) AS '.$type, [$type]);
             }
