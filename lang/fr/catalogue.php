@@ -4,6 +4,7 @@ return [
     'pending_count' => '{1} :count proposition en attente|[2,*] :count propositions en attente',
     'latest_proposal' => 'La plus récente est affichée.',
     'other_pending_attributes' => 'Autres attributs en attente',
+    'incident_secondary_attributes' => 'Autres champs de traduction',
     'types' => [
         'mric' => 'mRic-js',
         'monomot' => 'MonoMOT',

@@ -59,7 +59,31 @@ class CatalogueProposalTest extends TestCase
             }
             $details = $this->xpath($this->get('/terms/'.$term->id)->assertOk()->getContent());
             self::assertSame(count($attributes) - 1, $details->query('//form/input[@name="proposal_id"]')->length);
+            $secondaryPanel = '//details[@id="incident-secondary-attributes"]';
+            if ($type === 'incident') {
+                self::assertSame('Reference TEXT', $details->evaluate('normalize-space(//main//h1)'));
+                self::assertSame(1, $details->query('//*[@id="proposals"]/following-sibling::details[@id="incident-secondary-attributes" and not(@open)]')->length);
+                self::assertSame(0, $details->query($secondaryPanel.'//*[@id="translation-0"]')->length);
+                foreach (array_slice($attributes, 1, preserve_keys: true) as $index => $attribute) {
+                    self::assertSame($attribute, $details->evaluate('string('.$secondaryPanel.'//*[@id="translation-'.$index.'"]//form[.//textarea]/input[@name="attribute"]/@value)'));
+                }
+            } else {
+                self::assertSame(0, $details->query($secondaryPanel)->length);
+            }
         }
+    }
+
+    public function test_failed_incident_secondary_proposal_reopens_its_panel_with_the_draft(): void
+    {
+        $term = $this->term('incident');
+        $url = '/terms/'.$term->id.'?language=fr';
+        $this->from($url)->post('/terms/'.$term->id.'/proposals', [
+            'term_id' => $term->id, 'attribute' => 'SHORTTEXT', 'language' => 'fr',
+            'value' => 'Unsaved short text', 'lock_version' => 0,
+        ])->assertRedirect($url)->assertSessionHasErrors('version');
+
+        $details = $this->xpath($this->get($url)->assertOk()->getContent());
+        self::assertSame('Unsaved short text', $details->evaluate('string(//details[@id="incident-secondary-attributes" and @open]//textarea[@id="new-proposal-1" and @data-restored="1"])'));
     }
 
     public function test_concurrent_proposals_are_counted_per_attribute_and_language_in_stable_newest_order(): void

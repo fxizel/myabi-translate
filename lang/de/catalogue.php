@@ -4,6 +4,7 @@ return [
     'pending_count' => '{1} :count offener Vorschlag|[2,*] :count offene Vorschläge',
     'latest_proposal' => 'Der neueste Vorschlag wird angezeigt.',
     'other_pending_attributes' => 'Weitere Attribute mit offenen Vorschlägen',
+    'incident_secondary_attributes' => 'Weitere Übersetzungsfelder',
     'types' => [
         'mric' => 'mRic-js',
         'monomot' => 'MonoMOT',

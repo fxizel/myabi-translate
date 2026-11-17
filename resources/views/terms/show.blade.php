@@ -1,8 +1,19 @@
 @extends('layouts.app')
 @section('title', __('ui.details'))
 @section('content')
+@php
+    $isIncident = $term->type === 'incident';
+    $attributeNames = array_keys($attributes);
+    $mainAttributes = $isIncident ? array_slice($attributeNames, 0, 1) : $attributeNames;
+    $secondaryAttributes = $isIncident ? array_slice($attributeNames, 1, preserve_keys: true) : [];
+    $heading = $isIncident ? ($attributes['TEXT']['reference'] ?? '') : $term->source_text;
+    $draftAttribute = old('term_id') == $term->id && old('language') === $language
+        && !old('proposal_id') && !old('supersedes_id') && \Illuminate\Support\Arr::has(session()->getOldInput(), 'value')
+        ? old('attribute')
+        : null;
+@endphp
 <a class="button quiet" href="{{ url('terms') }}?language={{ $language }}">← {{ __('ui.translations') }}</a>
-<div class="section">@include('partials.heading', ['heading'=>($term->source_text !== null && $term->source_text !== '' ? $term->source_text : $term->label), 'eyebrow'=>($types[$term->type] ?? $term->type).' / '.__('ui.details')])</div>
+<div class="section">@include('partials.heading', ['heading'=>($heading !== null && $heading !== '' ? $heading : $term->label), 'eyebrow'=>($types[$term->type] ?? $term->type).' / '.__('ui.details')])</div>
 @include('partials.languages')
 @if($restoreRevision ?? null)<div class="notice">{{ __('ui.restored_from',['number'=>$restoreRevision->number]) }}</div>@endif
 <section class="surface block section term-group-panel"><h2>{{ __('campaigns.group') }}</h2>@if(!$term->group || $groups->contains('id',$term->term_group_id))@include('groups.badge',['group'=>$term->group])@else<span class="empty-value">{{ __('campaigns.restricted_group') }}</span>@endif
@@ -10,27 +21,8 @@
 <div class="detail-grid"><section class="surface block"><div class="panel-label">{{ __('ui.key') }} <span>r{{ $term->revision_no }}</span></div><span class="key">{{ $term->label }}</span><dl class="meta"><dt>{{ __('ui.type') }}</dt><dd>{{ $types[$term->type] ?? $term->type }}</dd><dt>{{ __('ui.context') }}</dt><dd>{{ $term->context ?: '—' }}</dd><dt>{{ __('ui.revision') }}</dt><dd>{{ $term->revision_no }}</dd><dt>{{ __('ui.created_at') }}</dt><dd>{{ $term->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</dd><dt>{{ __('ui.updated_at') }}</dt><dd>{{ $term->updated_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</dd></dl>
 @include('partials.trace',['entity'=>$term])<hr class="divider"><h3>{{ __('ui.presence') }}</h3><div class="table-wrap"><table class="mini-table"><thead><tr><th>{{ __('ui.version') }}</th><th>{{ __('ui.imports') }}</th><th>{{ __('ui.date') }}</th></tr></thead><tbody>@foreach($presences as $presence)<tr><td>{{ $presence->version_number }}</td><td>@if($canManage ?? false)<a href="{{ url('imports/'.($presence->import_id ?? $presence->import_batch_id)) }}">#{{ $presence->import_id ?? $presence->import_batch_id }}</a>@else#{{ $presence->import_id ?? $presence->import_batch_id }}@endif</td><td>{{ \Illuminate\Support\Carbon::parse($presence->created_at)->timezone('Europe/Zurich')->format('d.m.Y') }}</td></tr>@endforeach</tbody></table></div>@include('partials.pagination',['items'=>$presences])
 </section><div class="stack-gap">
-@foreach($attributes as $attribute=>$values)
-@php
-    $current = data_get($term->validated, $attribute.'.'.$language);
-    $translationStatus = match (true) {
-        (bool) data_get($term->review_needed, $attribute.'.'.$language) => 'review',
-        $current !== null => 'validated',
-        $pendingAttributes->containsStrict($attribute) => 'pending',
-        default => 'missing',
-    };
-@endphp
-@php($restoredInput = old('term_id')==$term->id && old('attribute')===$attribute && old('language')===$language && !old('proposal_id') && !old('supersedes_id') && \Illuminate\Support\Arr::has(session()->getOldInput(), 'value'))
-@php($restoredValue = $restoredInput ? old('value','') : data_get($restoreRevision ?? null,'validated.'.$attribute.'.'.$language,''))
-<section class="surface block" id="translation-{{ $loop->index }}"><div class="panel-label">{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$attribute) ? __('catalogue.attributes.'.$attribute) : $attribute }} <span>{{ $language }}</span></div><p class="source-text">{{ $values['reference'] ?? '' }}</p><hr class="divider"><div class="panel-label">{{ __('ui.current_value') }} @include('partials.status', ['status'=>$translationStatus])</div><p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p>
-@if($translationStatus === 'review' && auth()->user()->canValidate($language))<form action="{{ url('terms/'.$term->id.'/confirm') }}" method="post" class="section">@csrf<input type="hidden" name="term_id" value="{{ $term->id }}"><input type="hidden" name="attribute" value="{{ $attribute }}"><input type="hidden" name="language" value="{{ $language }}"><input type="hidden" name="lock_version" value="{{ $term->lock_version ?? 1 }}"><button class="button">{{ __('ui.confirm_value') }}</button></form>@endif
-@php($placeholderCounts = \App\Domain\Devconf\TranslationValidator::placeholders($values['reference'] ?? ''))
-@php($tokenMatches = [array_keys($placeholderCounts)])
-@if($tokenMatches[0])<hr class="divider"><div class="panel-label">{{ __('ui.tokens') }}</div><div class="tokens">@foreach($tokenMatches[0] as $token)<span class="token">{{ $token }} ×{{ $placeholderCounts[$token] }}</span>@endforeach</div>@endif
-@if(auth()->user()->canTranslate($language) && !$term->obsolete)<hr class="divider"><form action="{{ url('terms/'.$term->id.'/proposals') }}" method="post" enctype="multipart/form-data">@csrf<input type="hidden" name="term_id" value="{{ $term->id }}"><input type="hidden" name="attribute" value="{{ $attribute }}"><input type="hidden" name="language" value="{{ $language }}"><input type="hidden" name="lock_version" value="{{ $term->lock_version ?? 1 }}">@if($restoreRevision ?? null)<input type="hidden" name="restored_revision_id" value="{{ $restoreRevision->id }}">@endif
-<x-proposal-editor :id="'new-proposal-'.$loop->index" :label="__('ui.new_proposal')" :value="$restoredValue" :restored="$restoredInput || (($restoreRevision ?? null) && $restoredValue !== '')" :source="$values['reference'] ?? ''" :hint="__('ui.proposal_hint').' '.__('ui.keyboard_hint')" /><x-proposal-screenshot :id="'new-image-'.$loop->index" /><div class="form-actions"><button class="button primary">{{ __('ui.propose') }} →</button></div></form>@endif
-<details class="section"><summary>{{ __('ui.imported_values') }}</summary><div class="table-wrap"><table class="mini-table"><tbody>@foreach($values['translations'] ?? [] as $lang=>$value)<tr><th>{{ $lang }}</th><td class="preserve">{{ $value }}</td></tr>@endforeach</tbody></table></div></details>
-</section>
+@foreach($mainAttributes as $index => $attribute)
+    @include('terms.translation-panel', ['values' => $attributes[$attribute]])
 @endforeach
 </div></div>
 <section class="surface block section" id="proposals"><div class="section-heading"><h2>{{ __('ui.proposals') }}</h2></div>
@@ -59,4 +51,14 @@
 <ol class="history">@forelse($revisions as $revision)<li><strong>r{{ $revision->number ?? $revision->revision_no }} · {{ $revision->origin ?? __('ui.revision') }}</strong><span>{{ $revision->author?->name ?? '—' }}</span><time>{{ $revision->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i:s') }}</time>@if(auth()->user()->canTranslate($language))<a class="button small section" href="{{ url()->current() }}?language={{ $language }}&lineage={{ $lineageId }}&restore_revision={{ $revision->number }}#translation-0">{{ __('ui.restore_revision') }}</a>@endif</li>@empty<li>{{ __('ui.no_history') }}</li>@endforelse</ol>@include('partials.pagination',['items'=>$revisions])</section>
 @if(isset($sourceMetadata))<section class="surface block section"><details><summary>{{ __('ui.original_trace') }} / {{ __('ui.technical_attributes') }}</summary><div class="table-wrap"><table class="mini-table"><tbody>@foreach($sourceMetadata as $column=>$value)<tr><th>{{ $column }}</th><td class="preserve">{{ $value }}</td></tr>@endforeach</tbody></table></div></details></section>@endif
 @if(isset($events))<section class="surface block section"><h2>{{ __('ui.history') }}</h2><ol class="history">@forelse($events as $event)<li><strong>@include('partials.event-label', ['value'=>$event->action])</strong><span>{{ $event->user?->name ?? $event->actor?->name ?? '—' }}</span><time>{{ $event->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i:s') }}</time></li>@empty<li>{{ __('ui.no_history') }}</li>@endforelse</ol></section>@endif
+@if($secondaryAttributes)
+    <details class="surface block section" id="incident-secondary-attributes" @if(($restoreRevision ?? null) || in_array($draftAttribute, $secondaryAttributes, true)) open @endif>
+        <summary>{{ __('catalogue.incident_secondary_attributes') }}</summary>
+        <div class="stack-gap section">
+            @foreach($secondaryAttributes as $index => $attribute)
+                @include('terms.translation-panel', ['values' => $attributes[$attribute]])
+            @endforeach
+        </div>
+    </details>
+@endif
 @endsection
