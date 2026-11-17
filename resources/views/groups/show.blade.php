@@ -10,7 +10,7 @@
         @forelse($terms as $term)
         <tr>
             <td><a class="source-text" href="{{ route('terms.show', ['term'=>$term, 'language'=>$language]) }}">{{ $term->source_text ?: $term->label }}</a></td>
-            <td class="key">{{ $term->label }}</td>
+            <td><span class="key">{{ $term->label }}</span></td>
             <td>{{ \App\Http\Controllers\TermController::typeLabels()[$term->type] ?? $term->type }}</td>
             <td>@include('partials.status', ['status'=>$term->current_state])</td>
         </tr>
