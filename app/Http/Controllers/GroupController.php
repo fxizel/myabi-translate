@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Devconf\FormatRegistry;
 use App\Models\Term;
 use App\Models\TermGroup;
 use App\Services\GroupService;
@@ -53,10 +54,15 @@ class GroupController extends Controller
     public function show(Request $request, TermGroup $group)
     {
         $this->visible($request, $group);
-        $terms = $group->terms()->visibleTo($request->user())->orderBy('label')->paginate(50)->withQueryString();
+        $language = $request->query('language');
+        $language = in_array($language, ['de', 'fr', 'it', 'en'], true) ? $language : 'fr';
+        $terms = $group->terms()->visibleTo($request->user())->with('lastPublication:id,status')->orderBy('label')->paginate(50)->withQueryString();
+        foreach ($terms as $term) {
+            $term->current_state = $term->state(FormatRegistry::get($term->type)->attributeNames[0], $language);
+        }
         $group->load(['campaigns' => fn ($query) => $query->visibleTo($request->user())->orderByDesc('id')]);
 
-        return view('groups.show', compact('group', 'terms'));
+        return view('groups.show', compact('group', 'terms', 'language'));
     }
 
     public function edit(Request $request, TermGroup $group)
