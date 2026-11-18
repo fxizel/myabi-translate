@@ -122,7 +122,9 @@ La commande d'installation demande l'adresse, le nom et le mot de passe du premi
 
 ### 3. Raccorder le HTTPS existant
 
-Demander au gestionnaire de la zone DNS de créer un enregistrement `A` pour le nom utilisé dans `APP_URL`, par exemple `myabi` dans la zone `example.org`, vers l'adresse IPv4 du frontal HTTPS. Si l'hébergeur fournit un nom DNS comme cible, demander un `CNAME` vers ce nom à la place. Utiliser le TTL standard du gestionnaire et préciser depuis quels réseaux les utilisateurs doivent pouvoir résoudre ce nom. Conserver la demande avec les valeurs réelles dans la documentation locale hors Git.
+Pour un site public dont Caddy obtient le certificat par HTTP-01 ou TLS-ALPN-01, faire publier le domaine dans le DNS public. Un enregistrement `A` peut pointer vers l'IPv4 du frontal. Un `CNAME` peut pointer vers le nom d'hôte fourni par l'hébergeur et reprendre ses adresses IPv4 et IPv6. Vérifier l'accès au frontal sur chaque adresse publiée. Conserver les valeurs réelles dans la documentation locale hors Git.
+
+Comparer la résolution depuis le réseau des utilisateurs avec celle des serveurs publics faisant autorité. Par exemple, `dig +short NS example.org` liste les serveurs de la zone. Pour chacun d'eux, vérifier le domaine avec `dig @SERVEUR_DNS myabi.example.org A +norecurse`. Une réponse `NXDOMAIN` faisant autorité indique que le nom est absent de cette vue de la zone. Une résolution depuis le réseau interne peut coexister avec ce résultat et les validations HTTP-01 et TLS-ALPN-01 échoueront tant que l'autorité de certification ne pourra pas résoudre le domaine. [Validations Let's Encrypt](https://letsencrypt.org/docs/challenge-types/).
 
 Caddy appartient déjà à son propre projet Docker. Le fichier `compose.caddy.yml` utilise son réseau déclaré **externe** : il doit exister avant le démarrage de myABI et ne sera pas créé ou supprimé par ce projet. Seul `myabi-web` y reçoit l'alias `myabi-translate-web`. `ports: !reset []` supprime la publication locale du profil de base. [Réseaux Compose](https://docs.docker.com/compose/how-tos/networking/), [fusion des configurations](https://docs.docker.com/reference/compose-file/merge/).
 
@@ -146,7 +148,9 @@ docker exec NOM_CADDY caddy reload --config CHEMIN_CADDYFILE --adapter caddyfile
 
 Le montage existant doit effectivement fournir le fichier modifié au conteneur. Si Caddy est administré par API ou `caddy-docker-proxy`, utiliser son mécanisme actuel plutôt que remplacer sa configuration par ce fragment. L'inventaire doit le confirmer. [Commandes Caddy](https://caddyserver.com/docs/command-line).
 
-Depuis le réseau des utilisateurs, vérifier la résolution DNS, la validité du certificat pour ce nom et l'accès à `/login` en HTTPS. Contrôler aussi les cookies Secure, l'adresse cliente, un refus sur `/.env`, les limites d'upload et le renouvellement du certificat. Le paramètre FPM termine une requête à 120 secondes ; l'upload est tamponné par Nginx avec une limite de 110 Mio et un délai de lecture distinct. Les imports longs restent en CLI.
+Pour remplacer une adresse provisoire, attendre que le certificat soit valide et que `/up` réponde sur le nouveau domaine. Régler ensuite `APP_URL` sur cette URL dans `secrets/app.env`. Si les anciennes adresses doivent rester accessibles, conserver leurs blocs Caddy et inscrire leurs hôtes dans `APP_HOST_ALIASES`, séparés par des virgules. Appliquer la [procédure de rechargement Docker](#recharger-la-configuration-docker).
+
+Depuis le réseau des utilisateurs, vérifier la redirection HTTP vers HTTPS, la validité du certificat et les réponses de `/up` et `/login` sur le domaine officiel. Tester également `/login` sur chaque adresse conservée. Contrôler aussi les cookies Secure, l'adresse cliente, un refus sur `/.env`, les limites d'upload et le renouvellement du certificat. Le paramètre FPM termine une requête à 120 secondes ; l'upload est tamponné par Nginx avec une limite de 110 Mio et un délai de lecture distinct. Les imports longs restent en CLI.
 
 ### Capacité et temporaires des téléversements
 
@@ -208,18 +212,24 @@ Prévoir une sauvegarde périodique après choix de sa destination et de sa rét
 
 ## Longueur minimale des mots de passe
 
-`AUTH_PASSWORD_MIN_LENGTH=8` fixe la longueur minimale, avec 8 caractères par défaut lorsque la variable est absente. Ce réglage s’applique à l’installation du premier administrateur et à toute définition ou modification d’un mot de passe. Avec Docker, modifier `/opt/myabi/deploy/docker/secrets/app.env`, puis appliquer les commandes de recréation du service `app`, de `config:cache` et de rechargement PHP-FPM de la [procédure ci-dessous](#réglage-global-du-mfa). En installation native, modifier `/srv/myabi/shared/.env`, exécuter `php artisan config:cache` depuis la version active et recharger son service PHP-FPM. En développement, modifier `.env` puis exécuter `php artisan config:clear`.
+`AUTH_PASSWORD_MIN_LENGTH=8` fixe la longueur minimale, avec 8 caractères par défaut lorsque la variable est absente. Ce réglage s’applique à l’installation du premier administrateur et à toute définition ou modification d’un mot de passe. Avec Docker, modifier `/opt/myabi/deploy/docker/secrets/app.env`, puis suivre la [procédure de rechargement](#recharger-la-configuration-docker). En installation native, modifier `/srv/myabi/shared/.env`, exécuter `php artisan config:cache` depuis la version active et recharger son service PHP-FPM. En développement, modifier `.env` puis exécuter `php artisan config:clear`.
 
 ## Réglage global du MFA
 
 Le paramètre `MFA_ENABLED=false`, valeur par défaut, désactive le second facteur pour tous les comptes : ni défi TOTP à la connexion, ni obligation de configuration selon le rôle. Les secrets et codes de récupération existants restent conservés, sans être affichés dans le profil. Avec `MFA_ENABLED=true`, le TOTP redevient obligatoire pour Validateur, Gestionnaire et Administrateur, et facultatif pour les autres rôles. Tout compte ayant déjà confirmé son TOTP doit fournir un code à la connexion. À la réactivation, les sessions ouvertes sans MFA doivent se reconnecter pour les comptes déjà configurés ; les comptes soumis à l'obligation et non encore configurés sont dirigés vers leur profil.
 
-Pour Docker, modifier `MFA_ENABLED` dans `/opt/myabi/deploy/docker/secrets/app.env` (le `.env` privé monté dans l'application), puis appliquer au seul service PHP de myABI :
+Pour Docker, modifier `MFA_ENABLED` dans `/opt/myabi/deploy/docker/secrets/app.env`, puis suivre la [procédure de rechargement](#recharger-la-configuration-docker).
+
+Pour la variante native, modifier `/srv/myabi/shared/.env`, reconstruire la configuration avec `php artisan config:cache` depuis la version active et recharger son service PHP-FPM. En développement local, modifier `.env` puis exécuter `php artisan config:clear`. Conserver le cache applicatif des limites de tentatives et de protection anti-rejeu TOTP.
+
+## Recharger la configuration Docker
+
+Après une modification de `secrets/app.env`, recréer le service PHP, reconstruire son cache de configuration et recharger PHP-FPM et Nginx. Utiliser le domaine officiel de l'instance pour les contrôles HTTPS.
 
 ```sh
 cd /opt/myabi/deploy/docker
 docker compose --env-file compose.env up -d --no-deps --force-recreate app
-docker compose --env-file compose.env exec app php artisan config:cache
+docker compose --env-file compose.env exec -T app php artisan config:cache
 docker compose --env-file compose.env kill -s USR2 app
 # Attendre que PHP écoute après le rechargement (au plus 60 secondes).
 docker compose --env-file compose.env exec -T app php -r '
@@ -236,11 +246,9 @@ curl --fail --silent --show-error --output /dev/null https://myabi.example.org/u
 curl --fail --silent --show-error --output /dev/null https://myabi.example.org/login
 ```
 
-Exécuter chaque étape seulement si la précédente réussit (`set -e`). La recréation reprend le fichier privé même si l'éditeur l'a remplacé ; le cache de configuration est reconstruit dans le conteneur web, dont `bootstrap/cache` est un volume temporaire. Le signal `USR2` recharge PHP-FPM et son OPcache (PHP-FPM est le processus principal de l'image). Les commandes CLI ponctuelles lisent le même fichier privé et disposent de leur propre cache temporaire ; une commande `config:cache` lancée avec `run --rm cli` ne mettrait pas à jour le conteneur web. La disponibilité du port PHP, la validation Nginx et les deux contrôles HTTP conditionnent la fin de l'intervention. Aucun redémarrage du frontal Caddy partagé n'est nécessaire.
+Exécuter chaque étape seulement si la précédente réussit (`set -e`). La recréation reprend le fichier privé même si l'éditeur l'a remplacé. Le cache de configuration est reconstruit dans le conteneur `app`, dont `bootstrap/cache` est un volume temporaire. Le signal `USR2` recharge PHP-FPM et son OPcache (PHP-FPM est le processus principal de l'image). Les commandes CLI ponctuelles lisent le même fichier privé et disposent de leur propre cache temporaire. La disponibilité du port PHP, la validation Nginx et les deux contrôles HTTP conditionnent la fin de l'intervention.
 
 L'upstream livré utilise une zone partagée et `resolve` avec le DNS Docker `127.0.0.11`, afin de retrouver l'adresse PHP après recréation. Cette fonction est disponible dans Nginx libre depuis 1.27.3 et l'image livrée utilise 1.30. Le rechargement explicite ci-dessus couvre aussi les installations conservant l'ancienne configuration. Dans une stack jetable, forcer un changement d'adresse PHP et contrôler les réponses HTTP après expiration du cache DNS de cinq secondes. [Résolution Nginx](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#resolve), [remplacement des conteneurs Docker](https://docs.docker.com/compose/how-tos/networking/#updating-containers-on-the-network).
-
-Pour la variante native, modifier `/srv/myabi/shared/.env`, reconstruire la configuration avec `php artisan config:cache` depuis la version active et recharger son service PHP-FPM. En développement local, modifier `.env` puis exécuter `php artisan config:clear`. Conserver le cache applicatif des limites de tentatives et de protection anti-rejeu TOTP. Aucun changement de configuration ni déploiement distant n'est effectué par l'ajout de cette option au code.
 
 ## Commande de mise à jour rapide Docker
 

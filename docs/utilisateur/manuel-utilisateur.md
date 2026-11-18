@@ -8,12 +8,15 @@ Les captures utilisent uniquement des données fictives. Le même exemple accomp
 
 Objectif : accéder aux fonctions autorisées pour votre compte.
 
-1. Sélectionnez **FR** dans **Langue de l’interface**.
-2. Renseignez **Adresse e-mail** et **Mot de passe**.
-3. Cliquez sur **Se connecter**.
-4. Fournissez le second facteur si l’application le demande.
+1. Ouvrez l’adresse HTTPS officielle de votre instance myABI Translate, communiquée par votre organisation.
+2. Sélectionnez **FR** dans **Langue de l’interface**.
+3. Renseignez **Adresse e-mail** et **Mot de passe**.
+4. Cliquez sur **Se connecter**.
+5. Fournissez le second facteur si l’application le demande.
 
 Résultat : le tableau de bord et les menus accessibles s’affichent.
+
+Si vous utilisiez une adresse provisoire, mettez à jour votre favori et connectez-vous à l’adresse officielle avec votre compte habituel.
 
 ![Écran de connexion en français, sans identifiant ni mot de passe saisi](captures/01-connexion.png)
 
@@ -344,6 +347,8 @@ Objectif : relier l’extension à votre compte personnel.
 Résultat : l’extension peut rechercher avec les droits de votre compte.
 
 L’adresse HTTPS de l’API se termine par `/api/browser-extension`. **Test uniquement : résultats fictifs** ne consulte pas votre référentiel. La langue du panneau est indépendante de celle du texte recherché et de la langue cible de la fiche.
+
+Si l’extension est déjà configurée avec une adresse provisoire, remplacez l’**URL de l’API** par celle communiquée pour le domaine officiel. Si l’extension demande un jeton pour cette adresse, saisissez votre jeton personnel ou créez-en un depuis **Mon profil**. Cliquez sur **Enregistrer**, acceptez les autorisations demandées, puis utilisez **Tester la connexion**.
 
 ### Retrouver une traduction depuis MyAB
 
