@@ -158,6 +158,19 @@ class RemoteDeploymentTests(unittest.TestCase):
             self.error_code("audit_check_failed", lambda: remote.runtime_checks(self.layout, {}))
         self.assertEqual(2, command.call_count)
 
+    def test_unavailable_extension_index_refuses_candidate_runtime(self):
+        responses = [
+            subprocess.CompletedProcess([], 0, stdout=b"Database, schema and private runtime directories are healthy."),
+            subprocess.CompletedProcess([], 0, stdout=b"Audit SELECT/INSERT succeed; UPDATE/DELETE are rejected; no broad destructive grants were detected."),
+            subprocess.CompletedProcess([], 1, stdout=b"unavailable"),
+        ]
+        with mock.patch.object(remote, "run", side_effect=responses) as command:
+            self.error_code("projection_not_ready", lambda: remote.runtime_checks(self.layout, {}, check_extension=True))
+        self.assertEqual(3, command.call_count)
+        self.assertEqual(["cli", "php", "artisan", "referentiel:extension-search-status", "--no-interaction"],
+                         command.call_args.args[0][-5:])
+        self.assertIs(False, command.call_args.kwargs["check"])
+
     def test_nginx_reload_waits_for_live_master_after_failed_pid_probes(self):
         lease = {"phase": "switching"}
         probe_results = iter([

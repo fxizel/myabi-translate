@@ -210,6 +210,17 @@ mv backups/myabi.partial.zip backups/myabi.zip
 
 Prévoir une sauvegarde périodique après choix de sa destination et de sa rétention ; aucun envoi externe n'est configuré sans cette information. Le test de restauration réutilise `scripts/restore-backup.py` vers une base et un dossier privés neufs, avec un compte autorisé à recréer les triggers/DEFINER. Ne jamais tester en écrasant la base active.
 
+### 5. Mettre en service la recherche de l’extension
+
+Après le premier import du catalogue, si l’API de l’extension est activée, construire son index de recherche depuis `deploy/docker`. Prévoir une plage sans écriture dans le catalogue. La commande vérifie les originaux privés et active la génération complète à la fin.
+
+```sh
+docker compose --env-file compose.env run --rm --no-deps -T cli php artisan referentiel:extension-search-rebuild --no-interaction
+docker compose --env-file compose.env run --rm --no-deps -T cli php artisan referentiel:extension-search-status --no-interaction
+```
+
+Le contrôle renvoie `ready` si la génération active est exploitable ou `disabled` si l’API de l’extension est désactivée. Un index indisponible renvoie `unavailable` et un code de sortie 1. Avec l’API activée, attendre `ready`, puis utiliser **Tester la connexion** dans les paramètres de l’extension avec un jeton valide. Voir la [mise en service de l’API](../technique/api-extension-implementation.md#mise-en-service-du-backend).
+
 ## Longueur minimale des mots de passe
 
 `AUTH_PASSWORD_MIN_LENGTH=8` fixe la longueur minimale, avec 8 caractères par défaut lorsque la variable est absente. Ce réglage s’applique à l’installation du premier administrateur et à toute définition ou modification d’un mot de passe. Avec Docker, modifier `/opt/myabi/deploy/docker/secrets/app.env`, puis suivre la [procédure de rechargement](#recharger-la-configuration-docker). En installation native, modifier `/srv/myabi/shared/.env`, exécuter `php artisan config:cache` depuis la version active et recharger son service PHP-FPM. En développement, modifier `.env` puis exécuter `php artisan config:clear`.
@@ -287,7 +298,7 @@ python scripts/deploy-vps.py
 
 La préparation se déroule avant maintenance : inventaire des services, comparaison des fichiers critiques, tests locaux, construction des deux images avec cache Docker et transfert compressé des seules images absentes. Les résultats de tests sont réutilisés uniquement si les fichiers testés, les commandes, les exécutables, les métadonnées des dépendances locales, la configuration locale et les originaux ont la même empreinte. Les images sont contrôlées par leur identifiant et par leur manifeste de release ; aucune image n’est construite sur le VPS.
 
-Ensuite, le client acquiert un bail de déploiement persistant, arrête uniquement les timers myABI initialement actifs et attend les traitements admis. Il ferme l’application, transfère la sauvegarde vers le poste et vérifie tous les membres du ZIP avant de basculer. Seuls `app` et `myabi-web` sont recréés. Le conteneur SQL, les autres projets, les fichiers privés, le verrou des opérations, les compteurs du catalogue et la projection de recherche de l’extension sont contrôlés. La santé CLI, les droits d’audit, PHP-FPM, Nginx et les routes HTTPS `/up` et `/login` sont vérifiés avant le succès final. Les timers retrouvent leur état initial.
+Ensuite, le client acquiert un bail de déploiement persistant, arrête uniquement les timers myABI initialement actifs et attend les traitements admis. Il ferme l’application, transfère la sauvegarde vers le poste et vérifie tous les membres du ZIP avant de basculer. Seuls `app` et `myabi-web` sont recréés. Le conteneur SQL, les autres projets, les fichiers privés, le verrou des opérations, les compteurs du catalogue et la projection de recherche de l’extension sont contrôlés. La santé CLI, les droits d’audit, PHP-FPM, Nginx et les routes HTTPS `/up` et `/login` sont vérifiés avant le succès final. Avant la réouverture, `referentiel:extension-search-status` vérifie que la nouvelle version peut utiliser l’index si l’API est activée. Les timers retrouvent leur état initial.
 
 Cette voie rapide exige un schéma et une infrastructure inchangés. Une modification des migrations, de la projection/normalisation de recherche ou des fichiers Docker critiques arrête la commande **avant maintenance** ; suivre alors la procédure complète ci-dessous, avec examen des migrations et des droits SQL. Le client ne lance ni migration, ni reconstruction de projection, ni nettoyage global Docker. L’extension navigateur reste hors des livraisons Laravel ; son API côté Laravel est incluse.
 
@@ -308,7 +319,7 @@ Un bail appartenant à un autre déploiement, une maintenance préexistante ou u
 1. Préparer les nouvelles images et garder les tags/digests de la version précédente. Mesurer la marge disque ; aucun nettoyage global Docker.
 2. Arrêter uniquement les deux timers myABI et attendre la fin des services déjà actifs. Ne pas tuer un import en cours pour gagner du temps.
 3. Avec l'ancienne image, placer l'application en maintenance (`cli php artisan down --quiet`), produire une sauvegarde cohérente, vérifier puis copier hors VPS. Arrêter `myabi-web` et `app` du projet après fermeture ; ne pas arrêter `db` ni les autres projets.
-4. Fixer la nouvelle version dans `compose.env`, exécuter `migrate`, puis `provision` pour les droits des nouvelles tables. Contrôler la santé CLI et `security:check-audit`.
+4. Fixer la nouvelle version dans `compose.env`, exécuter `migrate`, puis `provision` pour les droits des nouvelles tables. Contrôler la santé CLI et `security:check-audit`. Lancer `referentiel:extension-search-status` dans le service CLI. Si l’index est indisponible, vérifier le schéma et les originaux privés, puis lancer la [construction de l’index](#5-mettre-en-service-la-recherche-de-lextension) et confirmer son état avant la réouverture.
 5. Recréer `app` et `myabi-web`, rouvrir explicitement, vérifier HTTPS et la connexion, puis réactiver les timers. En cas d'échec, laisser/remettre la maintenance et examiner la cause.
 
 Un retour au tag précédent n'est sûr que si le schéma reste compatible. Si les migrations ont changé, restaurer une copie cohérente ou établir la compatibilité avant réouverture. Ne pas lancer `migrate:rollback` automatiquement. Les volumes/bind mounts survivent aux recréations ; **ne jamais employer `down -v` sur l'installation réelle**.
@@ -326,6 +337,7 @@ La commande de mise à jour rapide ci-dessus automatise les livraisons sans chan
 - Système hôte maintenu, services existants inventoriés, HTTPS et sauvegarde hors serveur fonctionnels.
 - Droits SQL contrôlés ; premier administrateur nominatif et TOTP configuré si `MFA_ENABLED=true` ; SMTP testé vers une adresse de recette autorisée.
 - Sept formats DEVCONF, progression, publication et transfert complet vérifiés sur cette cible.
+- Si l’API de l’extension est activée, index de recherche à l’état `ready` et **Tester la connexion** réussi dans l’extension avec un jeton valide.
 - Réimport des 100 traductions dans myABI, arbitrages métier restants et performances de cinq utilisateurs.
 - Capacité mesurée avec historique, réimport, publication, sauvegarde et images conservées ; restauration complète éprouvée.
 

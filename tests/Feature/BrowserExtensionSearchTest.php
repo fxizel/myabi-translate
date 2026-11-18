@@ -315,6 +315,34 @@ class BrowserExtensionSearchTest extends TestCase
         $this->search('absent');
     }
 
+    public function test_index_status_requires_a_current_generation_without_pending_changes(): void
+    {
+        config(['browser-extension.enabled' => true]);
+        $command = 'referentiel:extension-search-status';
+        $this->artisan($command)->expectsOutput('unavailable')->assertFailed();
+
+        $this->rebuild();
+        $state = DB::table(SearchProjection::STATE)->where('id', 1);
+        $before = (array) $state->first();
+        $this->artisan($command)->expectsOutput('ready')->assertSuccessful();
+        self::assertSame($before, (array) $state->first());
+
+        DB::table(SearchProjection::DIRTY)->insert(['term_id' => 1]);
+        $this->artisan($command)->expectsOutput('unavailable')->assertFailed();
+        $this->assertDatabaseHas(SearchProjection::DIRTY, ['term_id' => 1]);
+
+        DB::table(SearchProjection::DIRTY)->delete();
+        $state->update(['normalization_version' => TextNormalizer::VERSION - 1]);
+        $this->artisan($command)->expectsOutput('unavailable')->assertFailed();
+    }
+
+    public function test_index_status_skips_projection_when_extension_is_disabled(): void
+    {
+        config(['browser-extension.enabled' => false]);
+
+        $this->artisan('referentiel:extension-search-status')->expectsOutput('disabled')->assertSuccessful();
+    }
+
     public function test_benchmark_refuses_existing_business_data_without_writes(): void
     {
         $before = User::count();

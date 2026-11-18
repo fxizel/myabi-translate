@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 final class SearchService
 {
-    public function __construct(private TextNormalizer $normalizer) {}
+    public function __construct(private TextNormalizer $normalizer, private IndexStatus $indexStatus) {}
 
     public function search(User $user, array $data): array
     {
@@ -20,7 +20,7 @@ final class SearchService
             // Writers' transactional triggers acquire the same row exclusively. All reads below
             // consequently use one complete generation, including the metadata and pending counts.
             $state = DB::table(SearchProjection::STATE)->where('id', 1)->sharedLock()->first();
-            if (! $state?->ready || ! $state->active_generation || (int) $state->normalization_version !== TextNormalizer::VERSION || DB::table(SearchProjection::DIRTY)->exists()) {
+            if (! $this->indexStatus->isReady($state)) {
                 throw new ApiProblem(503, 'search_index_unavailable');
             }
             if (! $user->canSeeCatalogue()) {

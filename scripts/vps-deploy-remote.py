@@ -283,6 +283,7 @@ $v=['counts'=>[], 'pending_migrations'=>count(array_diff(array_keys($a->make('mi
 foreach(['users','organizations','terms','proposals','revisions','import_batches','import_rows','publications','audit_events','myabi_versions'] as $t){$v['counts'][$t]=$db::table($t)->count();}
 $v['catalogue_generation']=$db::table('catalogue_state')->where('id',1)->value('generation');
 $v['unfinished']=$db::table('import_batches')->where('status','applying')->count()+$db::table('publications')->where('status','building')->count()+$db::table('bulk_operations')->where('status','running')->count();
+$v['extension_enabled']=config('browser-extension.enabled', true);
 $v['projection']=$schema::hasTable('browser_extension_search_state')?(array)$db::table('browser_extension_search_state')->where('id',1)->first():null;
 if($v['projection']) {foreach(['values','tokens','dirty'] as $t){$v['projection'][$t.'_count']=$db::table('browser_extension_search_'.$t)->count();}}
 echo json_encode($v, JSON_THROW_ON_ERROR); } catch(Throwable $e) {fwrite(STDERR,'metadata_check_failed'); exit(1);} """
@@ -341,11 +342,15 @@ def reload_nginx(layout, lease):
     run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-s", "reload"), layout, lease, timeout=30)
 
 
-def runtime_checks(layout, lease, opened=False):
+def runtime_checks(layout, lease, opened=False, check_extension=False):
     result = run(compose(layout, "run", "--rm", "--no-deps", "-T", "cli", "php", "scripts/operations.php", "health"), layout, lease)
     require(b"Database, schema and private runtime directories are healthy." in result.stdout, "cli_health_failed")
     audited = run(compose(layout, "run", "--rm", "--no-deps", "-T", "cli", "php", "artisan", "security:check-audit", "--no-interaction"), layout, lease)
     require(b"Audit SELECT/INSERT succeed; UPDATE/DELETE are rejected; no broad destructive grants were detected." in audited.stdout, "audit_check_failed")
+    if check_extension:
+        projection = run(compose(layout, "run", "--rm", "--no-deps", "-T", "cli", "php", "artisan",
+                                 "referentiel:extension-search-status", "--no-interaction"), layout, lease, check=False)
+        require(projection.returncode == 0, "projection_not_ready")
     run(compose(layout, "exec", "-T", "app", "php", "-r", "$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);"), layout, lease)
     run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-t"), layout, lease)
     if opened:
@@ -459,7 +464,8 @@ def freeze(layout, lease):
         lease["state_before"] = state(layout, lease)
         require(lease["state_before"]["unfinished"] == 0 and lease["state_before"]["pending_migrations"] == 0, "unfinished_business_writes")
         projection = lease["state_before"]["projection"]
-        require(projection is None or projection.get("ready") in (True, 1), "projection_not_ready")
+        require(not lease["state_before"]["extension_enabled"] or projection is None or projection.get("ready") in (True, 1),
+                "projection_not_ready")
         lease["private_hashes"] = private_hashes(layout)
     lease["phase"] = "frozen"
     save_lease(layout, lease)
@@ -519,7 +525,7 @@ def switch(layout, lease):
             require(time.monotonic() < deadline, "fpm_timeout")
             time.sleep(1)
         reload_nginx(layout, lease)
-        runtime_checks(layout, lease)
+        runtime_checks(layout, lease, check_extension=True)
         verify_preservation(layout, lease)
         require(manifest(layout, lease)["commit"] == layout["release"]["revision"], "manifest_mismatch")
         running = containers(layout, lease)
