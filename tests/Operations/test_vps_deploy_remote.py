@@ -171,6 +171,15 @@ class RemoteDeploymentTests(unittest.TestCase):
                          command.call_args.args[0][-5:])
         self.assertIs(False, command.call_args.kwargs["check"])
 
+    def test_php_fpm_reload_signals_pid_one_from_inside_the_container(self):
+        lease = {"phase": "switching"}
+        with mock.patch.object(remote, "run", return_value=subprocess.CompletedProcess([], 0)) as command:
+            remote.reload_php_fpm(self.layout, lease)
+        reload_call = mock.call(
+            remote.compose(self.layout, "exec", "-T", "app", "sh", "-c", "kill -s USR2 1"), self.layout, lease,
+        )
+        self.assertEqual(reload_call, command.call_args_list[1])
+
     def test_nginx_reload_waits_for_live_master_after_failed_pid_probes(self):
         lease = {"phase": "switching"}
         probe_results = iter([

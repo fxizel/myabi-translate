@@ -241,7 +241,7 @@ Après une modification de `secrets/app.env`, recréer le service PHP, reconstru
 cd /opt/myabi/deploy/docker
 docker compose --env-file compose.env up -d --no-deps --force-recreate app
 docker compose --env-file compose.env exec -T app php artisan config:cache
-docker compose --env-file compose.env kill -s USR2 app
+docker compose --env-file compose.env exec -T app sh -c 'kill -s USR2 1'
 # Attendre que PHP écoute après le rechargement (au plus 60 secondes).
 docker compose --env-file compose.env exec -T app php -r '
     for ($attempt = 0; $attempt < 60; $attempt++) {
@@ -257,7 +257,9 @@ curl --fail --silent --show-error --output /dev/null https://myabi.example.org/u
 curl --fail --silent --show-error --output /dev/null https://myabi.example.org/login
 ```
 
-Exécuter chaque étape seulement si la précédente réussit (`set -e`). La recréation reprend le fichier privé même si l'éditeur l'a remplacé. Le cache de configuration est reconstruit dans le conteneur `app`, dont `bootstrap/cache` est un volume temporaire. Le signal `USR2` recharge PHP-FPM et son OPcache (PHP-FPM est le processus principal de l'image). Les commandes CLI ponctuelles lisent le même fichier privé et disposent de leur propre cache temporaire. La disponibilité du port PHP, la validation Nginx et les deux contrôles HTTP conditionnent la fin de l'intervention.
+Exécuter chaque étape seulement si la précédente réussit (`set -e`). La recréation reprend le fichier privé même si l'éditeur l'a remplacé. Le cache de configuration est reconstruit dans le conteneur `app`, dont `bootstrap/cache` est un volume temporaire. Les commandes CLI ponctuelles lisent le même fichier privé et disposent de leur propre cache temporaire. La disponibilité du port PHP, la validation Nginx et les deux contrôles HTTP conditionnent la fin de l'intervention.
+
+Envoyer `USR2` depuis le conteneur au processus principal PHP-FPM (PID 1) recharge PHP-FPM et son OPcache. Avec `docker compose kill`, Docker enregistre un arrêt manuel même pour ce signal de rechargement. La politique `unless-stopped` laisse alors le conteneur arrêté au prochain redémarrage du VPS. [Incident Docker Engine](https://github.com/moby/moby/issues/47792).
 
 L'upstream livré utilise une zone partagée et `resolve` avec le DNS Docker `127.0.0.11`, afin de retrouver l'adresse PHP après recréation. Cette fonction est disponible dans Nginx libre depuis 1.27.3 et l'image livrée utilise 1.30. Le rechargement explicite ci-dessus couvre aussi les installations conservant l'ancienne configuration. Dans une stack jetable, forcer un changement d'adresse PHP et contrôler les réponses HTTP après expiration du cache DNS de cinq secondes. [Résolution Nginx](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#resolve), [remplacement des conteneurs Docker](https://docs.docker.com/compose/how-tos/networking/#updating-containers-on-the-network).
 

@@ -317,6 +317,17 @@ def open_owned(layout, lease):
     require(not layout["down"].exists(), "maintenance_remains")
 
 
+def reload_php_fpm(layout, lease):
+    run(compose(layout, "exec", "-T", "app", "php", "artisan", "config:cache", "--quiet"), layout, lease)
+    # Docker's kill API marks the container as manually stopped, even for USR2.
+    run(compose(layout, "exec", "-T", "app", "sh", "-c", "kill -s USR2 1"), layout, lease)
+    probe = compose(layout, "exec", "-T", "app", "php", "-r", "$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);")
+    deadline = time.monotonic() + 60
+    while run(probe, layout, lease, check=False).returncode:
+        require(time.monotonic() < deadline, "fpm_timeout")
+        time.sleep(1)
+
+
 def reload_nginx(layout, lease):
     run(compose(layout, "exec", "-T", "myabi-web", "nginx", "-t"), layout, lease, timeout=30)
     # Configuration validity does not mean that the newly created master has
@@ -518,12 +529,7 @@ def switch(layout, lease):
         require(metadata["pending_migrations"] == 0, "pending_migrations")
         run(compose(layout, "run", "--rm", "--no-deps", "-T", "cli", "php", "artisan", "view:clear", "--quiet"), layout, lease)
         run(compose(layout, "up", "-d", "--no-deps", "--force-recreate", "app", "myabi-web"), layout, lease)
-        run(compose(layout, "exec", "-T", "app", "php", "artisan", "config:cache", "--quiet"), layout, lease)
-        run(compose(layout, "kill", "-s", "USR2", "app"), layout, lease)
-        deadline = time.monotonic() + 60
-        while run(compose(layout, "exec", "-T", "app", "php", "-r", "$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);"), layout, lease, check=False).returncode:
-            require(time.monotonic() < deadline, "fpm_timeout")
-            time.sleep(1)
+        reload_php_fpm(layout, lease)
         reload_nginx(layout, lease)
         runtime_checks(layout, lease, check_extension=True)
         verify_preservation(layout, lease)
@@ -579,12 +585,7 @@ def recover(layout, lease):
                 atomic_bytes(path, (layout["stage"] / (label + ".env.before")).read_bytes(), lease[label + "_mode"], tuple(lease[label + "_owner"]))
             run(compose(layout, "config", "--quiet"), layout, lease)
             run(compose(layout, "up", "-d", "--no-deps", "--force-recreate", "app", "myabi-web"), layout, lease)
-            run(compose(layout, "exec", "-T", "app", "php", "artisan", "config:cache", "--quiet"), layout, lease)
-            run(compose(layout, "kill", "-s", "USR2", "app"), layout, lease)
-            deadline = time.monotonic() + 60
-            while run(compose(layout, "exec", "-T", "app", "php", "-r", "$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);"), layout, lease, check=False).returncode:
-                require(time.monotonic() < deadline, "fpm_timeout")
-                time.sleep(1)
+            reload_php_fpm(layout, lease)
             reload_nginx(layout, lease)
             runtime_checks(layout, lease)
             require(manifest(layout, lease)["commit"] == layout["release"]["previous_revision"], "rollback_manifest_mismatch")
