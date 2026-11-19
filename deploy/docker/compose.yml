@@ -33,7 +33,7 @@ x-app: &app
 
 services:
   db:
-    image: mariadb:11.4
+    image: mariadb:11.4.14
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: myabi

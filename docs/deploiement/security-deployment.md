@@ -8,7 +8,7 @@ Les avis définitifs décrivent deux risques critiques d’exécution de code à
 | --- | --- | --- |
 | PHP 8.2 | 8.2.35 | Non prise en charge |
 | PHP 8.3 | 8.3.36 | Non prise en charge |
-| PHP 8.4 | **8.4.27** | Référence : image `php:8.4.27-fpm-bookworm` |
+| PHP 8.4 | **8.4.27** | Version épinglée dans le [Dockerfile](../../deploy/docker/Dockerfile) |
 | PHP 8.5 | **8.5.12** | Autorisée par Composer, à qualifier avant changement de branche |
 
 Composer et son verrou refusent les versions précédentes, y compris PHP 8.5.0 à 8.5.11. `scripts/check-php-runtime.php`, indépendant de Laravel et des secrets, contrôle le binaire CLI lors de la construction et du démarrage Docker, du déploiement natif et des contrôles d’exploitation. Il ne certifie pas le binaire FPM d’un autre service. `composer audit` vérifie les bibliothèques ; il ne met pas PHP à jour.

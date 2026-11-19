@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM php:8.4.27-fpm-bookworm AS php-base
+FROM php:8.4.28-fpm-bookworm AS php-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libicu-dev libonig-dev libzip-dev libpng-dev libjpeg62-turbo-dev python3 mariadb-client ca-certificates unzip \
     && docker-php-ext-configure gd --with-jpeg \
@@ -50,6 +50,6 @@ USER 10001:10001
 ENTRYPOINT ["myabi-entrypoint"]
 CMD ["php-fpm", "-F"]
 
-FROM nginx:1.30-alpine AS web
+FROM nginx:1.30.7-alpine AS web
 COPY --from=build /release/public/ /var/www/html/public/
 COPY deploy/docker/nginx.conf.template /etc/nginx/templates/default.conf.template

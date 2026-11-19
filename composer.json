@@ -19,7 +19,7 @@
     "ext-pdo_mysql": "*",
     "ext-zip": "*",
     "laravel/fortify": "^1.30",
-    "laravel/framework": "^13.17",
+    "laravel/framework": "^13.43.0",
     "laravel/sanctum": "^4.0",
     "laravel/tinker": "^3.0"
   },
