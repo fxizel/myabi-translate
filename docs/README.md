@@ -1,10 +1,14 @@
 # Documentation myABI Translate
 
-La documentation est organisée par usage : fonctionnement du produit, réalisation technique, déploiement et identité visuelle.
+La documentation couvre l’utilisation, l’administration, le fonctionnement du produit, sa réalisation technique, le déploiement et l’identité visuelle.
 
 ```text
 docs/
 ├── README.md
+├── utilisateur/
+│   └── manuel-utilisateur.md
+├── administration/
+│   └── manuel-administration.md
 ├── fonctionnel/
 │   ├── PRD.md
 │   ├── personas.md
@@ -39,6 +43,13 @@ Le [PRD fonctionnel](fonctionnel/PRD.md) présente le produit existant et donne 
 La [spécification des groupes de termes et campagnes de traduction](fonctionnel/groupes-et-campagnes-traduction.md) définit le contrat de cette fonctionnalité. Son découpage, les choix retenus et les vérifications sont décrits dans la [mise en œuvre technique](technique/groupes-campagnes-implementation.md).
 
 La [conception de la recherche approximative](fonctionnel/recherche-approximative.md) rassemble le périmètre fonctionnel validé pour la page Traductions, les critères d’acceptation et les points de conception restant à préciser avant réalisation.
+
+## Manuels
+
+| Document | Contenu |
+| --- | --- |
+| [Manuel utilisateur](utilisateur/manuel-utilisateur.md) | Recherche, traduction, validation, imports, publications et extension navigateur. |
+| [Manuel d’administration](administration/manuel-administration.md) | Comptes, organisations, récupération d’accès, audit et diagnostic pour le support IT. |
 
 ## Technique
 
