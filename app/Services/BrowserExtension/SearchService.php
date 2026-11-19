@@ -87,7 +87,7 @@ final class SearchService
             $strong = $complete && $exactCount === 1 && ($candidates[0]['exact'] ?? false) && (($candidates[0]['score'] - ($candidates[1]['score'] ?? 0)) >= 0.15 - 1e-9);
             $matchState = $exactCount ? ($strong ? 'strong' : 'multiple') : ($candidates || ! $complete ? 'noExact' : 'none');
             $shown = array_slice($candidates, 0, $limit);
-            $results = $this->hydrate($shown, (int) $state->active_generation, $language);
+            $results = $this->hydrate($shown, (int) $state->active_generation, $language, $user);
 
             return ['contractVersion' => 2, 'query' => $literal, 'matchState' => $matchState, 'exactCandidateCount' => $exactCount,
                 'hasMore' => $overflow || count($candidates) > $limit, 'candidateSetComplete' => $complete, 'feedbackAllowed' => false, 'results' => $results];
@@ -238,10 +238,11 @@ final class SearchService
         return (array_search($a['attribute'], $attrs, true) <=> array_search($b['attribute'], $attrs, true)) ?: ($a['termId'] <=> $b['termId']);
     }
 
-    private function hydrate(array $candidates, int $generation, string $language): array
+    private function hydrate(array $candidates, int $generation, string $language, User $user): array
     {
         $ids = array_unique(array_column($candidates, 'termId'));
-        $terms = Term::with('lastPublication')->whereIn('id', $ids)->get()->keyBy('id');
+        $terms = Term::with(['lastPublication', 'group' => fn ($query) => $query->visibleTo($user)->select('id', 'title')])
+            ->whereIn('id', $ids)->get()->keyBy('id');
         $valueQuery = DB::table(SearchProjection::VALUES)->where('generation', $generation)->whereIn('term_id', $ids);
         $this->index($valueQuery, 'be_search_cell');
         $values = $valueQuery->get()->groupBy(fn ($value) => $value->term_id.'|'.$value->attribute);
@@ -272,6 +273,7 @@ final class SearchService
                 'keyParts' => $term->key, 'attribute' => $candidate['attribute'], 'targetLanguage' => $language, 'sourceLanguage' => $reference?->language ?? '',
                 ...$texts, 'proposedTranslation' => '', 'pendingCount' => (int) ($pending->get($cell)?->aggregate ?? 0), 'valueOrigin' => $candidate['valueOrigin'],
                 'matchReason' => $candidate['matchReason'], 'module' => '', 'status' => $term->state($candidate['attribute'], $language), 'score' => $candidate['score'],
+                'termGroupTitle' => $term->group?->title,
                 'exact' => $candidate['exact'], 'previewTruncated' => $preview,
                 'translationUrl' => rtrim(config('app.url'), '/').route('terms.show', ['term' => $term->id, 'language' => $language], false)];
         }

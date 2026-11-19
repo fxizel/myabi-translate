@@ -44,7 +44,7 @@ describe('contrat v2 réel', () => {
         expect(parsed.results[0]?.keyParts).toEqual(parts); expect(parsed.results[0]?.key).toBe(parts.join('|'));
     });
     it('refuse les scores, statuts, types et métadonnées incohérents', () => {
-        for (const extra of [{ score: '1' }, { score: Infinity }, { score: 100 }, { termId: 0 }, { keyParts: ['K', 3] }, { status: 'approved' }, { exact: 1 }, { pendingCount: -1 }, { proposedTranslation: 'Arbitrary' }]) {
+        for (const extra of [{ score: '1' }, { score: Infinity }, { score: 100 }, { termId: 0 }, { keyParts: ['K', 3] }, { status: 'approved' }, { exact: 1 }, { pendingCount: -1 }, { proposedTranslation: 'Arbitrary' }, { termGroupTitle: 42 }, { termGroupTitle: '𐐷'.repeat(201) }]) {
             expect(() => parseSearchResponse(response({ results: [result(extra)] }))).toThrow(ApiError);
         }
         expect(() => parseSearchResponse(response({ candidateSetComplete: false }))).toThrow(ApiError);
@@ -146,6 +146,26 @@ describe('panneau v2', () => {
         overlay.showResults({ type: 'panel:results', requestId: 'r1', request: sampleRequest(), lang: 'fr', ...view, manualSearchUrl: null, feedbackEnabled: false });
         const cards = document.querySelector('myab-translation-inspector')!.shadowRoot!.querySelectorAll('.card');
         expect(cards[0]?.textContent).toContain('Format DEVCONFmric'); expect(cards[1]?.textContent).toContain('Format DEVCONFserver');
+        overlay.close();
+    });
+    it('affiche le titre du groupe sur la bonne carte et traite le titre comme du texte', () => {
+        const overlay = new Overlay(document, { onClose: vi.fn(), onRetry: vi.fn(), onOpenSettings: vi.fn(), onFeedback: vi.fn(async () => true) }, { shadowMode: 'open' });
+        const request = sampleRequest();
+        const title = '<b>Groupe exemple</b>';
+        const cells = [
+            result({ termGroupTitle: title }),
+            result({ id: 'cell2.second', termId: 2, termGroupTitle: null }),
+            result({ id: 'cell2.third', termId: 3 }),
+        ];
+        const view = buildResultsView(parseSearchResponse(response({ matchState: 'multiple', exactCandidateCount: 3, results: cells })), request, settings);
+        overlay.showLoading({ type: 'panel:loading', requestId: 'r1', request, lang: 'fr' });
+        overlay.showResults({ type: 'panel:results', requestId: 'r1', request, lang: 'fr', ...view, manualSearchUrl: null, feedbackEnabled: false });
+        const cards = document.querySelector('myab-translation-inspector')!.shadowRoot!.querySelectorAll('.card');
+        const badge = cards[0]?.querySelector('.card-head .group-badge');
+        expect(badge?.textContent).toBe(title);
+        expect(badge?.children).toHaveLength(0);
+        expect(cards[1]?.querySelector('.group-badge')).toBeNull();
+        expect(cards[2]?.querySelector('.group-badge')).toBeNull();
         overlay.close();
     });
     it('distingue import, validation, référence inconnue et propositions, signale les previews copiés', async () => {

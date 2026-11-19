@@ -86,6 +86,14 @@ export const OVERLAY_CSS = `
     overflow-wrap: anywhere;
     user-select: all;
 }
+.group-badge {
+    font-size: 11px;
+    padding: 1px 6px;
+    border: 1px solid var(--ti-border);
+    border-left: 3px solid var(--ti-accent);
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+}
 .chip { margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #eaeef2; }
 .chip.approved { background: var(--ti-ok-bg); color: var(--ti-ok); }
 .chip.review, .chip.pending { background: var(--ti-warn-bg); color: var(--ti-warn); }

@@ -38,8 +38,8 @@ function scenarios(origin) {
     const link = (id) => `${origin}/translations/${id}`;
     return {
         commande: [
-            result({ id: 1245, key: 'PURCHASE_ORDER', sourceText: 'Bestellung', currentTranslation: 'Commande', proposedTranslation: 'Commande fournisseur', module: 'Purchasing', score: 0.96, translationUrl: link(1245) }),
-            result({ id: 678, key: 'ORDER', sourceText: 'Auftrag', currentTranslation: 'Commande', module: 'Sales', status: 'review', score: 0.71, translationUrl: link(678) }),
+            result({ id: 1245, key: 'PURCHASE_ORDER', sourceText: 'Bestellung', currentTranslation: 'Commande', proposedTranslation: 'Commande fournisseur', module: 'Purchasing', termGroupTitle: 'Achats', score: 0.96, translationUrl: link(1245) }),
+            result({ id: 678, key: 'ORDER', sourceText: 'Auftrag', currentTranslation: 'Commande', module: 'Sales', termGroupTitle: 'Ventes', status: 'review', score: 0.71, translationUrl: link(678) }),
         ],
         statut: [
             result({ id: 31, key: 'ORDER_STATUS', sourceText: 'Status', currentTranslation: 'Statut', module: 'Sales', score: 0.92, translationUrl: link(31) }),

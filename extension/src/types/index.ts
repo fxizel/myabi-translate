@@ -85,6 +85,7 @@ export interface SearchResult {
     proposedTranslation: string;
     targetLanguage: string;
     module: string;
+    termGroupTitle?: string | null;
     status: string;
     score: number;
     translationUrl: string;

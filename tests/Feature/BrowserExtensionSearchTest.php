@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Devconf\FormatRegistry;
 use App\Models\Proposal;
 use App\Models\Term;
+use App\Models\TermGroup;
 use App\Models\User;
 use App\Services\BrowserExtension\ApiProblem;
 use App\Services\BrowserExtension\SearchProjection;
@@ -94,6 +95,23 @@ class BrowserExtensionSearchTest extends TestCase
         self::assertSame(1, $response['exactCandidateCount']);
         self::assertSame($same->id, $response['results'][0]['termId']);
         self::assertSame('validated', $response['results'][0]['valueOrigin']);
+    }
+
+    public function test_search_returns_the_current_group_title_for_each_term(): void
+    {
+        $grouped = $this->term('A', imported: 'Libellé partagé');
+        $ungrouped = $this->term('B', imported: 'Libellé partagé');
+        $this->rebuild();
+
+        $group = TermGroup::create(['title' => 'Premier groupe', 'created_by' => $this->reader->id, 'updated_by' => $this->reader->id]);
+        $grouped->group()->associate($group)->save();
+        $results = collect($this->search('Libellé partagé')['results'])->keyBy('termId');
+        self::assertSame('Premier groupe', $results[$grouped->id]['termGroupTitle']);
+        self::assertNull($results[$ungrouped->id]['termGroupTitle']);
+
+        $group->update(['title' => 'Groupe renommé']);
+        $results = collect($this->search('Libellé partagé')['results'])->keyBy('termId');
+        self::assertSame('Groupe renommé', $results[$grouped->id]['termGroupTitle']);
     }
 
     public function test_unknown_reference_and_truncated_query_never_certify_exact(): void

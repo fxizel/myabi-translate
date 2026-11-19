@@ -46,6 +46,7 @@ describe('scénarios de résultats', () => {
             ['ORDER', '71 %'],
         ]);
         expect(result.results[0]?.openUrl).toBe(`${new URL(apiUrl).origin}/translations/1245`);
+        expect(result.results.map((r) => r.termGroupTitle)).toEqual(['Achats', 'Ventes']);
     });
 
     it('« Statut » : plusieurs correspondances possibles', async () => {

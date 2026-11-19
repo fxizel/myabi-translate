@@ -150,6 +150,7 @@ Exemple fictif d’une correspondance avec une valeur importée non validée :
       "valueOrigin": "imported",
       "matchReason": "literal",
       "module": "",
+      "termGroupTitle": "Exemple de groupe",
       "status": "missing",
       "score": 1.0,
       "exact": true,
@@ -161,6 +162,8 @@ Exemple fictif d’une correspondance avec une valeur importée non validée :
 ```
 
 `termId` est la fiche courante, `type` le code du format et `keyParts` le tuple exact dans l’ordre de `identityColumns`. Aucun trim, changement de casse, découpage ou assemblage avec un séparateur ne remplace ce tuple. `key` est seulement une représentation lisible ; une version raccourcie à l’écran ne doit pas être réutilisée comme identité.
+
+`termGroupTitle` contient le titre actuel du groupe lié au terme, dans la limite de 200 caractères. La valeur est `null` si aucun groupe n’est lié ou si le groupe est inaccessible. Le client accepte aussi l’absence du champ pour rester compatible avec les versions antérieures du serveur.
 
 `id` est un identifiant stable de cellule, opaque pour le client : préfixe `cell2.` suivi de l’encodage base64url du JSON `[termId, attribute, targetLanguage]`, sans padding. Il distingue les attributs et langues d’une même fiche et ne prouve aucun droit. Si le lot feedback est actif et autorisé, ajouter une propriété `feedbackProof` signée selon le contrat ci-dessous. Aucun besoin de signature ou de stockage de feedback ne bloque le lot de recherche. Une réponse respecte le plafond de taille ; si l’identité complète ne peut pas être transportée, elle échoue explicitement plutôt que de fournir une clé machine tronquée.
 
