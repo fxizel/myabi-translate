@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditEvent;
 use App\Models\Organisation;
 use App\Models\User;
 use App\Services\AdminAvailability;
@@ -29,10 +30,21 @@ class AdminController extends Controller
             $query->where('organization_id', $request->integer('organization_id'));
         }
         $users = $query->orderBy('name')->paginate(25)->withQueryString();
+        $lastLogins = collect();
+        if ($users->isNotEmpty()) {
+            $lastLogins = AuditEvent::query()
+                ->where('action', 'auth.login_succeeded')
+                ->whereIn('user_id', $users->getCollection()->modelKeys())
+                ->select('user_id')->selectRaw('MAX(created_at) AS last_login_at')
+                ->groupBy('user_id')
+                ->withCasts(['last_login_at' => 'immutable_datetime'])
+                ->pluck('last_login_at', 'user_id');
+        }
+
         $organisations = Organisation::orderByDesc('is_root')->orderBy('name')->get();
         $roles = User::ROLES;
 
-        return view('admin.index', compact('users', 'organisations', 'roles'));
+        return view('admin.index', compact('users', 'lastLogins', 'organisations', 'roles'));
     }
 
     public function storeUser(Request $request, InvitationService $invitations)

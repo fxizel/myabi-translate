@@ -10,6 +10,7 @@ use App\Services\AuditService;
 use App\Services\InvitationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -57,6 +58,26 @@ class AuthSecurityTest extends TestCase
         $this->assertDatabaseHas('audit_events', ['user_id' => $user->id, 'action' => 'auth.login_succeeded']);
         $this->assertNotNull(session('security.started_at'));
         $response->assertCookieMissing(auth()->guard()->getRecallerName());
+    }
+
+    public function test_administration_displays_latest_recorded_web_login_in_swiss_time(): void
+    {
+        $admin = $this->user(['admin' => ['fr']], ['locale' => 'fr']);
+        $this->confirmTotp($admin);
+        $inactiveUser = $this->user(attributes: ['name' => 'Ada Test', 'active' => false]);
+        $newUser = $this->user(attributes: ['name' => 'Zoe Test']);
+        $audit = app(AuditService::class);
+
+        $this->travelTo(Carbon::parse('2026-07-24 12:35:00', 'UTC'), fn () => $audit->record('auth.login_succeeded', $inactiveUser, [], [], $inactiveUser));
+        $this->travelTo(Carbon::parse('2026-07-23 12:00:00', 'UTC'), fn () => $audit->record('auth.login_succeeded', $inactiveUser, [], [], $inactiveUser));
+        $this->travelTo(Carbon::parse('2026-07-25 12:00:00', 'UTC'), fn () => $audit->record('auth.login_failed', $inactiveUser, [], [], $inactiveUser));
+
+        $this->actingAs($admin)->get('/admin?q=Ada+Test')->assertOk()
+            ->assertSeeInOrder([$inactiveUser->name, 'Dernière connexion', '24.07.2026 14:35'])
+            ->assertDontSee('Aucune connexion enregistrée');
+        $this->get('/admin?q=Zoe+Test')->assertOk()
+            ->assertSeeInOrder([$newUser->name, 'Aucune connexion enregistrée'])
+            ->assertDontSee('24.07.2026 14:35');
     }
 
     public function test_repeated_invalid_credentials_temporarily_lock_account_and_are_audited(): void
@@ -109,12 +130,14 @@ class AuthSecurityTest extends TestCase
         $this->post('/login', ['email' => $user->email, 'password' => 'Long-password-123'])->assertRedirect(route('two-factor.login'));
         $this->assertGuest();
         $this->post('/two-factor-challenge', ['code' => '000000'])->assertSessionHasErrors();
+        $this->assertDatabaseMissing('audit_events', ['user_id' => $user->id, 'action' => 'auth.login_succeeded']);
         $user->increment('session_version');
         $this->post('/two-factor-challenge', ['code' => app(Google2FA::class)->getCurrentOtp($secret)])->assertRedirect(route('login'));
         $this->assertGuest();
         $this->post('/login', ['email' => $user->email, 'password' => 'Long-password-123'])->assertRedirect(route('two-factor.login'));
         $this->post('/two-factor-challenge', ['code' => app(Google2FA::class)->getCurrentOtp($secret)])->assertRedirect('/');
         $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseHas('audit_events', ['user_id' => $user->id, 'action' => 'auth.login_succeeded']);
     }
 
     public function test_invitation_expires_at_72_hours_and_is_single_use(): void
@@ -132,6 +155,7 @@ class AuthSecurityTest extends TestCase
         $this->post($url, ['email' => $user->email, 'password' => 'short12', 'password_confirmation' => 'short12'])->assertSessionHasErrors('password');
         $this->post($url, ['email' => $user->email, 'password' => 'New-password-123', 'password_confirmation' => 'New-password-123'])->assertRedirect(route('profile.edit'));
         $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseHas('audit_events', ['user_id' => $user->id, 'action' => 'auth.login_succeeded']);
         $this->post('/logout');
         $this->get($url)->assertNotFound();
         $other = $this->user();
@@ -226,6 +250,7 @@ class AuthSecurityTest extends TestCase
         $this->confirmTotp($admin);
         $this->actingAs($admin);
         User::whereKey($admin->id)->update(['roles' => ['reader' => ['de', 'fr', 'it']]]);
+        $this->get('/admin')->assertForbidden();
         $this->post('/admin/organisations', ['name' => 'Denied', 'code' => 'DENIED'])->assertForbidden();
         $this->get('/audit')->assertForbidden();
     }

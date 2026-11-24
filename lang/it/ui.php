@@ -139,6 +139,8 @@ return [
     'initial_preview_count' => ':count proposte analizzate',
     'initial_view_preview' => 'Consulta l’anteprima prima della conferma',
     'admin_create_user' => 'Crea un utente',
+    'last_login' => 'Ultimo accesso',
+    'no_recorded_login' => 'Nessun accesso registrato',
     'activate_without_email' => 'Attiva direttamente senza conferma via e-mail',
     'create_manual_activation_help' => 'Per impostazione predefinita viene inviato un invito via e-mail: lasci i campi della password vuoti. Per attivare direttamente l’account, selezioni questa opzione e inserisca due volte una password di almeno :min caratteri. L’account sarà attivo anche se «Attivo» non è selezionato e non verrà inviato alcun invito via e-mail.',
     'activate_with_password' => 'Attiva e imposta una password',

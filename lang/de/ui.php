@@ -139,6 +139,8 @@ return [
     'initial_preview_count' => ':count Vorschläge analysiert',
     'initial_view_preview' => 'Vorschau vor der Bestätigung prüfen',
     'admin_create_user' => 'Benutzer erstellen',
+    'last_login' => 'Letzte Anmeldung',
+    'no_recorded_login' => 'Keine Anmeldung erfasst',
     'activate_without_email' => 'Direkt ohne E-Mail-Bestätigung aktivieren',
     'create_manual_activation_help' => 'Standardmässig wird eine Einladung per E-Mail gesendet: Lassen Sie die Passwortfelder leer. Um das Konto direkt zu aktivieren, wählen Sie diese Option und geben Sie ein Passwort mit mindestens :min Zeichen zweimal ein. Das Konto wird auch dann aktiviert, wenn «Aktiv» nicht ausgewählt ist. Es wird keine Einladung per E-Mail gesendet.',
     'activate_with_password' => 'Aktivieren und Passwort festlegen',

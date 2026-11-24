@@ -27,6 +27,14 @@
             {{ $record->name }} <span class="muted">· {{ $record->organization?->code }} · {{ $record->email }}</span>
             @include('partials.status', ['status' => $record->active ? 'active' : 'inactive'])
             @if($record->invitation_token !== null && $record->invitation_accepted_at === null)<span class="badge badge-pending">{{ __('ui.invitation_pending') }}</span>@endif
+            @php($lastLoginAt = $lastLogins->get($record->id))
+            <small>·
+                @if($lastLoginAt)
+                    {{ __('ui.last_login') }} <time datetime="{{ $lastLoginAt->toIso8601String() }}">{{ $lastLoginAt->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</time>
+                @else
+                    {{ __('ui.no_recorded_login') }}
+                @endif
+            </small>
         </summary>
         <form method="post" action="{{ route('admin.users.update', $record) }}" class="section">
             @csrf

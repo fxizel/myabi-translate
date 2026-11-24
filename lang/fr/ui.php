@@ -140,6 +140,8 @@ return [
     'initial_preview_count' => ':count propositions analysées',
     'initial_view_preview' => 'Consulter l’aperçu avant confirmation',
     'admin_create_user' => 'Créer un utilisateur',
+    'last_login' => 'Dernière connexion',
+    'no_recorded_login' => 'Aucune connexion enregistrée',
     'activate_without_email' => 'Activer directement sans validation par e-mail',
     'create_manual_activation_help' => 'Par défaut, un e-mail d’invitation est envoyé : laissez les champs de mot de passe vides. Pour activer directement le compte, cochez cette option puis saisissez et confirmez un mot de passe d’au moins :min caractères. Le compte sera actif, même si « Actif » est décoché, et aucun e-mail d’invitation ne sera envoyé.',
     'activate_with_password' => 'Activer et définir un mot de passe',
