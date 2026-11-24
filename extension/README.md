@@ -1,12 +1,12 @@
 # myABI Translation Inspector
 
-Extension navigateur (Chrome et Firefox, **un seul code source**) qui retrouve la clé technique d'un texte affiché dans l'ERP MyAB, pour corriger sa traduction dans l'application de gestion des traductions.
+Extension Chrome qui retrouve la clé technique d'un texte affiché dans l'ERP MyAB, pour corriger sa traduction dans l'application de gestion des traductions.
 
 **Elle ne modifie jamais MyAB.** Elle identifie un texte, collecte son contexte, interroge l'API de l'application de gestion et affiche les correspondances avec un lien vers la traduction.
 
 [Installer myABI Translation Inspector depuis le Chrome Web Store](https://chromewebstore.google.com/detail/kejepilmnmpmimbeghjodhkgedjipifn).
 
-> **Vérification.** `npm install && npm run check` contrôle le typage, les tests et les builds des deux navigateurs. La [recette du backend réel](../docs/technique/api-extension-implementation.md) décrit les vérifications intégrées et les conditions de mise en service.
+> **Vérification.** `npm install && npm run check` contrôle le typage, exécute les tests et construit l’extension Chrome. La [recette du backend réel](../docs/technique/api-extension-implementation.md) décrit les vérifications intégrées et les conditions de mise en service.
 
 ## Utilisation
 
@@ -25,17 +25,16 @@ Node.js 20.19 ou plus récent (hors production uniquement ; l'application Larave
 ```bash
 cd extension
 npm install
-npm run check        # tsc --noEmit + tests + build des deux navigateurs
+npm run check        # tsc --noEmit + tests + build Chrome
 ```
 
 | Commande | Effet |
 | --- | --- |
 | `npm test` | Tests Vitest (jsdom) |
 | `npm run typecheck` | Contrôle TypeScript strict |
-| `npm run build` | `dist/chrome` et `dist/firefox` |
-| `npm run build:chrome` / `build:firefox` | Un seul navigateur |
-| `npm run dev:chrome` / `dev:firefox` | Build + surveillance des sources |
-| `npm run package` | Build + `.zip` des deux navigateurs dans `dist/packages/` |
+| `npm run build` ou `npm run build:chrome` | Build dans `dist/chrome` |
+| `npm run dev:chrome` | Build et surveillance des sources |
+| `npm run package` ou `npm run package:chrome` | Build et archive `.zip` dans `dist/packages/` |
 | `npm run serve:test` | Sert la page de test sur `http://localhost:5173` |
 
 ## Build et chargement dans Chrome
@@ -48,25 +47,13 @@ npm run build:chrome          # → dist/chrome
 2. **Charger l'extension non empaquetée** → dossier `extension/dist/chrome`.
 3. Après chaque `npm run dev:chrome`, cliquer sur « Recharger » de l'extension.
 
-Package : `npm run package:chrome` produit `dist/packages/myab-translation-inspector-chrome-<version>.zip`, au format attendu par le Chrome Web Store. Chrome 110 ou plus récent (Manifest V3, service worker).
-
-## Build et chargement dans Firefox
-
-```bash
-npm run build:firefox         # → dist/firefox
-```
-
-1. `about:debugging#/runtime/this-firefox` → **Charger un module complémentaire temporaire…**
-2. Choisir `extension/dist/firefox/manifest.json`. (Ou : `npx web-ext run -s dist/firefox`.)
-
-`npm run package:firefox` produit `dist/packages/myab-translation-inspector-firefox-<version>.zip`. Pour une distribution non listée, soumettre ce ZIP à addons.mozilla.org avec l’archive des sources pour obtenir un `.xpi` signé. À partir de la version 0.2.4, le module exige Firefox 140 ou ultérieur pour utiliser l’écran de consentement intégré.
+`npm run package:chrome` produit `dist/packages/myab-translation-inspector-chrome-<version>.zip`, au format attendu par le Chrome Web Store. Chrome 110 ou plus récent (Manifest V3, service worker).
 
 ## Architecture
 
 ```
 extension/
 ├── manifest.chrome.json        service worker (Chrome)
-├── manifest.firefox.json       event page + gecko (Firefox)
 ├── src/
 │   ├── content/
 │   │   ├── inspector.ts        interception Alt+clic, Échap, dialogue avec le background
@@ -90,7 +77,7 @@ extension/
 └── config.example.json
 ```
 
-**Mutualisation.** Chrome et Firefox partagent 100 % de `src/`. Seuls diffèrent le manifeste (clé `background`, bloc `browser_specific_settings`) et la cible esbuild. `shared/browserApi.ts` prend `browser` s'il existe, sinon `chrome`, avec des signatures à base de promesses (valables pour les deux en MV3). Aucun framework : l'interface est un panneau et deux pages, du TypeScript/DOM suffit. Bundler : esbuild (un seul `build.mjs`, sans configuration).
+`shared/browserApi.ts` type les appels à l’API `chrome.*`. L’interface utilise TypeScript et les API du DOM. Le script `build.mjs` assemble l’extension avec esbuild.
 
 **Flux.**
 
@@ -114,7 +101,7 @@ Les iframes sont gérées : chaque frame détecte son clic et surligne son élé
 | Domaines MyAB autorisés | Un par ligne : `myab.example.test` ou `*.example.test`. Seuls ces domaines reçoivent le content script |
 | Langue de l'interface | Automatique, français, allemand, anglais |
 | Touche du clic | Alt (défaut), Alt+Maj ou Alt+Ctrl |
-| Raccourci d'activation | Affiché ; se modifie dans le navigateur (`chrome://extensions/shortcuts`, ou Firefox : Gérer les raccourcis) |
+| Raccourci d'activation | Affiché et modifiable dans `chrome://extensions/shortcuts` |
 | Nombre maximum de résultats | 1 à 20 |
 | Collecter le contexte | Désactivé par défaut : seuls texte, URL, titre et langue de la page partent |
 | URL de page transmise | Domaine seulement (défaut), sans paramètres, ou complète |
@@ -131,7 +118,7 @@ Le backend Laravel expose `POST /api/browser-extension/search` et `POST /api/bro
 
 Les recherches réelles envoient `contractVersion: 2` et `textTruncated`, avec la langue du texte inspecté, distincte de celle du panneau. Chaque résultat identifie une cellule par terme, type DEVCONF, tuple exact, attribut et langue. La valeur importée, la référence et la traduction validée sont affichées séparément. Les propositions pending sont comptées, sans sélection arbitraire d’une traduction en vigueur.
 
-Le badge de groupe est disponible à partir de la version **0.2.4** avec une API qui fournit `termGroupTitle`. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation. Le serveur accepte automatiquement les origines Chrome et Firefox : aucun identifiant d’installation ni utilisateur n’est à déclarer côté API.
+Le badge de groupe est disponible à partir de la version **0.2.4** avec une API qui fournit `termGroupTitle`. Une erreur 426 demande un client compatible : **Recharger** conserve le chemin de l’installation et ne remplace pas une ancienne copie extraite ailleurs. Dans ce cas, désactiver l’ancienne copie et charger le dossier `extension/dist/chrome` reconstruit, puis rouvrir les paramètres. Les paramètres et permissions sont propres à chaque identifiant d’extension ; renseigner la configuration dans la nouvelle installation. Le serveur accepte automatiquement les origines d’extension Chrome sans déclaration préalable.
 
 Le serveur calcule `matchState`, `exactCandidateCount`, `hasMore` et `candidateSetComplete` avant la limite d’affichage. Plusieurs exacts restent ambigus avec `maxResults: 1`. Le client respecte `exact: false` et annonce les aperçus tronqués. Le feedback est facultatif, signé et sans effet sur la validation ou les campagnes.
 
@@ -177,7 +164,7 @@ npm run serve:mock      # API factice seule, http://localhost:8787/api/browser-e
 npm run test:manual     # idem + page de test locale (5173)
 ```
 
-1. Chargez l'extension (`dist/chrome` ou `dist/firefox`) et ouvrez ses **Paramètres** :
+1. Chargez l'extension (`dist/chrome`) et ouvrez ses **Paramètres** :
    - **URL de l'API** : `http://localhost:8787/api/browser-extension` (HTTP accepté pour localhost uniquement) ;
    - **Mode API** : API de test ;
    - **Token** : `ok` ;
@@ -212,10 +199,8 @@ Le même faux serveur est testé automatiquement (`tests/mockApi.test.ts`) avec 
 
 ## Limites et points à vérifier
 
-- **Recette réelle sur API synthétique** : Chromium 151 et Firefox 153 ont vérifié les permissions locales, Alt+clic, les quatre scénarios, les ambiguïtés avec limite 1 et la révocation. Le passage sur une instance MyAB conserve les réglages de domaine et de DOM à vérifier. Les `.zip` ne sont pas versionnés : `npm run package` les génère dans `dist/packages/`.
-- **Firefox non signé** : une extension non signée ne se charge que temporairement (`about:debugging`, `web-ext run`) ; l'installation durable demande une signature AMO (« non listé »).
+- La recette sur API synthétique avec Chromium 151 a vérifié les permissions locales, Alt+clic, les quatre scénarios, les ambiguïtés avec limite 1 et la révocation. Le passage sur une instance MyAB conserve les réglages de domaine et de DOM à vérifier. `npm run package` génère l’archive dans `dist/packages/`, hors Git.
 - **Backend réel.** Les routes `/api/browser-extension/search` et `/feedback` nécessitent les migrations, une projection disponible et un jeton personnel. Le catalogue couvre les sept formats DEVCONF ; les textes MyAB absents de ces fichiers ne sont pas inventés comme correspondances.
-- **Firefox** : `optional_host_permissions` en MV3 et `data_collection_permissions` (catégorie `websiteContent`, à ajuster) sont déclarés pour Firefox 128+ ; à confirmer au chargement (avertissements dans `about:debugging`). Le Shadow DOM de l'overlay utilise `adoptedStyleSheets` avec repli sur `<style>`.
 - **Shadow DOM fermé** de MyAB : non inspectable (l'hôte est identifié).
 - **Onglets déjà ouverts** : à recharger après modification des domaines.
 - **Heuristique de texte** : l'élément « logique » est l'ancêtre inline jusqu'au premier bloc ou élément interactif ; plusieurs libellés indépendants dans une même cellule restent séparés. Le texte de l'élément le plus profond est toujours fourni dans `alternativeTexts`. Les réglages « éléments à ignorer » et les sélecteurs avancés permettent d'ajuster au DOM réel de MyAB.

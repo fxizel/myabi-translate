@@ -185,14 +185,14 @@ Les mesures sur les fichiers complets, l’espace réellement consommé chez l�
 
 ## Extension navigateur myABI Translation Inspector
 
-[Installer myABI Translation Inspector depuis le Chrome Web Store](https://chromewebstore.google.com/detail/kejepilmnmpmimbeghjodhkgedjipifn). Le [manuel utilisateur](docs/utilisateur/manuel-utilisateur.md#11-utiliser-lextension-dans-chrome-et-firefox) décrit l’installation et la configuration.
+[Installer myABI Translation Inspector depuis le Chrome Web Store](https://chromewebstore.google.com/detail/kejepilmnmpmimbeghjodhkgedjipifn). Le [manuel utilisateur](docs/utilisateur/manuel-utilisateur.md#11-utiliser-lextension-dans-chrome) décrit l’installation et la configuration.
 
-Le dossier [`extension/`](extension/README.md) contient une extension Chrome et Firefox (WebExtensions MV3, TypeScript). Alt+clic sur un texte de MyAB interroge la recherche réelle Laravel et affiche les cellules correspondantes : type, clé, attribut, langue, référence, valeur importée et traduction validée. Le verdict conserve les ambiguïtés même si un seul résultat est affiché. Les corrections passent par la fiche web ; un retour de correspondance ne valide aucune traduction.
+Le dossier [`extension/`](extension/README.md) contient l’extension Chrome (Manifest V3, TypeScript). Alt+clic sur un texte de MyAB interroge la recherche réelle Laravel et affiche les cellules correspondantes : type, clé, attribut, langue, référence, valeur importée et traduction validée. Le verdict conserve les ambiguïtés même si un seul résultat est affiché. Les corrections passent par la fiche web ; un retour de correspondance ne valide aucune traduction.
 
 - L’extension est indépendante de l’application Laravel et hors des livraisons Laravel et Docker. Node 20.19+ n’est requis que pour la développer : `cd extension && npm install && npm run check`.
 - Les routes `POST /api/browser-extension/search` et `/feedback` utilisent le [contrat v2](docs/technique/api-extension-navigateur.md), un jeton personnel créé dans le profil et une projection construite par `php artisan referentiel:extension-search-rebuild`. Voir la [mise en service et la recette](docs/technique/api-extension-implementation.md).
 - `npm run serve:mock` reste disponible dans le mode de test explicite ; aucune erreur de l’API réelle ne provoque de bascule vers lui.
-- Le [README de l’extension](extension/README.md) décrit le build, le chargement dans Chrome et Firefox, la configuration, le contrat de l’API, la sécurité et la page de test.
+- Le [README de l’extension](extension/README.md) décrit le build, le chargement dans Chrome, la configuration, le contrat de l’API, la sécurité et la page de test.
 
 ## Version de l’application
 

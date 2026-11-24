@@ -316,11 +316,11 @@ Figure 12 — Préférences du compte traducteur.
 
 **Modifier mon mot de passe** exige le mot de passe actuel et la confirmation du nouveau. Les autres sessions sont déconnectées. Le résumé quotidien dépend du service d’envoi configuré.
 
-## 11. Utiliser l’extension dans Chrome et Firefox
+## 11. Utiliser l’extension dans Chrome
 
 **myABI Translation Inspector** retrouve dans le référentiel un texte affiché dans MyAB. Elle ne modifie pas MyAB. L’ouverture d’une fiche conserve les droits et les langues autorisées de votre compte.
 
-Demandez au responsable les adresses de connexion et, si vous utilisez Firefox, le paquet de l’extension. La configuration et l’utilisation sont identiques dans Chrome et Firefox.
+Demandez au responsable les adresses de connexion.
 
 ### Installer dans Chrome
 
@@ -331,21 +331,6 @@ Objectif : rendre l’inspecteur disponible dans Chrome.
 3. Dans le menu **Extensions** de Chrome, épinglez **myABI Translation Inspector** dans la barre d’outils.
 
 Résultat : l’extension apparaît parmi les extensions installées.
-
-### Installer dans Firefox
-
-Objectif : rendre l’inspecteur disponible dans Firefox.
-
-Pour une installation durable, demandez au responsable un paquet `.xpi` signé par Mozilla. Le dossier Firefox non signé permet seulement un essai temporaire selon la procédure suivante.
-
-1. Décompressez le paquet Firefox fourni.
-2. Ouvrez `about:debugging#/runtime/this-firefox`.
-3. Cliquez sur **Charger un module complémentaire temporaire…**.
-4. Sélectionnez `manifest.json` dans le dossier Firefox.
-
-Résultat : l’extension reste installée jusqu’au redémarrage de Firefox.
-
-Mozilla précise les conditions de [l’installation temporaire](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/) et de [la signature des modules](https://support.mozilla.org/fr/kb/signature-modules-complementaires-firefox).
 
 ### Configurer l’accès au référentiel
 

@@ -1,6 +1,5 @@
 /**
- * Sous-ensemble WebExtensions réellement utilisé, avec des signatures à base de promesses.
- * Chrome (MV3) et Firefox (MV3) les fournissent via `chrome.*` / `browser.*` : un seul code.
+ * Sous-ensemble de l’API `chrome.*` (MV3) utilisé par l’extension, avec des signatures à base de promesses.
  * Les types sont volontairement locaux (pas de dépendance à @types/chrome).
  */
 export interface StorageArea {
@@ -88,8 +87,7 @@ export function isFromExtensionPage(sender: MessageSender, extensionBaseUrl: str
 }
 
 export function getApi(): ExtensionApi {
-    const scope = globalThis as unknown as { browser?: ExtensionApi; chrome?: ExtensionApi };
-    const api = scope.browser ?? scope.chrome;
+    const api = (globalThis as { chrome?: ExtensionApi }).chrome;
     if (!api) {
         throw new Error('WebExtension API unavailable');
     }

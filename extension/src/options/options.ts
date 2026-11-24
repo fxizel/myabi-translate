@@ -168,7 +168,7 @@ async function onSubmit(event: Event): Promise<void> {
         setStatus('', '');
         return;
     }
-    // La demande d'autorisation doit suivre immédiatement le geste de l'utilisateur (Firefox est strict).
+    // La demande d'autorisation doit suivre immédiatement le geste de l'utilisateur.
     const granted = await requestOrigins(requiredOriginPatterns(settings, domainsToMatchPatterns(settings.allowedDomains)));
     if (!granted) {
         setStatus(t(lang, 'optPermissionDenied'), 'error');

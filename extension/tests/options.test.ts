@@ -23,7 +23,7 @@ beforeEach(async () => {
         contains: vi.fn(async () => true),
         remove: vi.fn(async () => true),
     };
-    vi.stubGlobal('browser', api);
+    vi.stubGlobal('chrome', api);
     await import('../src/options/options');
     await vi.waitFor(() => expect(listen).toHaveBeenCalledWith('click', expect.any(Function)));
 });

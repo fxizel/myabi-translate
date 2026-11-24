@@ -27,7 +27,7 @@ beforeEach(async () => {
         tabs: { sendMessage: vi.fn(async () => undefined) },
         action: { setBadgeText: vi.fn(async () => undefined), setBadgeBackgroundColor: vi.fn(async () => undefined) },
     });
-    vi.stubGlobal('browser', api);
+    vi.stubGlobal('chrome', api);
     await import('../src/background/serviceWorker');
     onBackgroundMessage = vi.mocked(api.runtime.onMessage.addListener).mock.calls[0]![0];
     api.runtime.sendMessage = vi.fn(message => dispatch(message));

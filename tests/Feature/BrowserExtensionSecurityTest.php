@@ -280,13 +280,11 @@ class BrowserExtensionSecurityTest extends TestCase
         return [
             'Chrome first installation' => ['chrome-extension://'.str_repeat('a', 32)],
             'Chrome other installation' => ['chrome-extension://'.str_repeat('p', 32)],
-            'Firefox first profile' => ['moz-extension://01234567-89ab-4cde-8f01-23456789abcd'],
-            'Firefox other profile' => ['moz-extension://fedcba98-7654-4321-8765-abcdef012345'],
         ];
     }
 
     #[DataProvider('forbiddenOrigins')]
-    public function test_web_and_malformed_origins_are_refused_even_with_a_valid_token(string $origin): void
+    public function test_unsupported_origins_are_refused_even_with_a_valid_token(string $origin): void
     {
         $bearer = $this->token($this->user());
         $this->probe($bearer, ['Origin' => $origin])->assertForbidden()
@@ -302,7 +300,6 @@ class BrowserExtensionSecurityTest extends TestCase
     public static function forbiddenOrigins(): array
     {
         $chrome = 'chrome-extension://'.str_repeat('a', 32);
-        $firefox = 'moz-extension://01234567-89ab-4cde-8f01-23456789abcd';
 
         return [
             'web page' => ['https://foreign.example.org'],
@@ -322,11 +319,7 @@ class BrowserExtensionSecurityTest extends TestCase
             'Chrome fragment' => [$chrome.'#extension'],
             'Chrome suffix' => [$chrome.'.example.org'],
             'Chrome trailing newline' => [$chrome."\n"],
-            'missing Firefox UUID' => ['moz-extension://'],
-            'invalid Firefox UUID' => ['moz-extension://not-a-uuid'],
-            'Firefox path' => [$firefox.'/options.html'],
-            'Firefox suffix' => [$firefox.'.example.org'],
-            'Firefox port' => [$firefox.':443'],
+            'unsupported extension origin' => ['moz-extension://01234567-89ab-4cde-8f01-23456789abcd'],
         ];
     }
 
@@ -350,7 +343,7 @@ class BrowserExtensionSecurityTest extends TestCase
     public function test_quota_errors_remain_readable_to_an_extension_without_registration(): void
     {
         config(['browser-extension.limits.ip' => 1]);
-        $origin = 'moz-extension://01234567-89ab-4cde-8f01-23456789abcd';
+        $origin = 'chrome-extension://'.str_repeat('a', 32);
         $bearer = $this->token($this->user());
         $this->probe($bearer, ['Origin' => $origin])->assertOk();
         $this->probe($bearer, ['Origin' => $origin])->assertStatus(429)->assertJsonPath('error.code', 'rate_limited')
