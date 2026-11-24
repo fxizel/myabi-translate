@@ -9,6 +9,7 @@ import {
     normalizeSettings,
     saveSettings,
     saveToken,
+    TIMEOUT_RANGE_MS,
     tokenState,
 } from '../shared/settings';
 import { isRecord } from '../shared/text';
@@ -193,18 +194,34 @@ async function onTest(): Promise<void> {
         setStatus(t(lang, key), 'error');
         return;
     }
-    if (!(await requestOrigins([check.matchPattern]))) {
-        setStatus(t(lang, 'optPermissionDenied'), 'error');
-        return;
-    }
-    setStatus(t(lang, 'optTesting'));
-    const reply = await api.runtime.sendMessage({ type: 'testConnection', apiUrl: input.apiUrl, token: input.token, backendMode: input.backendMode });
-    if (isRecord(reply) && reply.ok === true) {
-        setStatus(t(lang, 'optTestOk', { count: Number(reply.count ?? 0) }), 'ok');
-    } else if (isRecord(reply) && isRecord(reply.error) && typeof reply.error.kind === 'string') {
-        setStatus(errorMessage(lang, reply.error as unknown as Parameters<typeof errorMessage>[1]), 'error');
-    } else {
-        setStatus(t(lang, 'errorInvalid'), 'error');
+    const button = $<HTMLButtonElement>('test');
+    button.disabled = true;
+    let deadline: number | undefined;
+    try {
+        if (!(await requestOrigins([check.matchPattern]))) {
+            setStatus(t(lang, 'optPermissionDenied'), 'error');
+            return;
+        }
+        setStatus(t(lang, 'optTesting'));
+        const reply = await Promise.race([
+            api.runtime.sendMessage({ type: 'testConnection', apiUrl: input.apiUrl, token: input.token, backendMode: input.backendMode }),
+            new Promise<void>((resolve) => {
+                // Laisser au background le temps d'appliquer le délai HTTP avant de conclure qu'il ne répond pas.
+                deadline = window.setTimeout(resolve, TIMEOUT_RANGE_MS.max + 5_000);
+            }),
+        ]);
+        if (isRecord(reply) && reply.ok === true) {
+            setStatus(t(lang, 'optTestOk', { count: Number(reply.count ?? 0) }), 'ok');
+        } else if (isRecord(reply) && isRecord(reply.error) && typeof reply.error.kind === 'string') {
+            setStatus(errorMessage(lang, reply.error as unknown as Parameters<typeof errorMessage>[1]), 'error');
+        } else {
+            setStatus(t(lang, 'optTestNoResponse'), 'error');
+        }
+    } catch {
+        setStatus(t(lang, 'optTestNoResponse'), 'error');
+    } finally {
+        window.clearTimeout(deadline);
+        button.disabled = false;
     }
 }
 
