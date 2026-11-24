@@ -308,12 +308,21 @@ class TranslationCampaignTest extends TestCase
         $term = $this->term();
         $campaign = $this->campaign('translation', [$term]);
         $this->service()->start($this->manager, $campaign);
-        $this->service()->propose($this->participant, $campaign->fresh(), $term, 'Proposed');
+        $proposal = $this->service()->propose($this->participant, $campaign->fresh(), $term, 'Proposed');
         self::assertSame('proposal_sent', $this->participation($campaign, $term)->status);
         self::assertSame('in_progress', $campaign->fresh()->status);
+        $generation = (int) DB::table('catalogue_state')->where('id', 1)->value('generation');
         $this->service()->removeDirectTerm($this->manager, $campaign->fresh(), $term);
+        $participation = $this->participation($campaign, $term);
+        self::assertFalse($participation->direct);
+        self::assertNotNull($participation->removed_at);
+        self::assertNull($participation->tracked_proposal_id);
+        self::assertSame('pending', $proposal->fresh()->status);
+        self::assertSame($proposal->id, $participation->events()->where('action', 'removed')->sole()->payload['previous_proposal_id']);
+        self::assertSame($generation + 1, (int) DB::table('catalogue_state')->where('id', 1)->value('generation'));
         self::assertSame(0, $campaign->participations()->where('active', true)->count());
         self::assertSame('in_progress', $campaign->fresh()->status);
+        self::assertSame(1, $campaign->fresh()->admission_report['removed']);
     }
 
     public function test_source_change_reexamines_confirmations_only_in_open_campaigns(): void
@@ -404,6 +413,39 @@ class TranslationCampaignTest extends TestCase
         self::assertNull($this->participation($campaign, $indirect)->tracked_proposal_id);
         self::assertSame(1, $indirect->proposals()->where('status', 'pending')->count());
         self::assertGreaterThan(0, $campaign->events()->where('campaign_participation_id', $this->participation($campaign, $indirect)->id)->count());
+    }
+
+    public function test_removing_direct_addition_keeps_group_participation_without_readmitting_other_terms(): void
+    {
+        $groups = app(GroupService::class);
+        $group = $groups->create($this->manager, ['title' => 'Synthetic subject']);
+        $direct = $this->term();
+        $other = $this->term();
+        $this->columns[$other->id] = ['it' => 'it_CH'];
+        $groups->assignTerms($this->manager, $group, [$direct->id, $other->id]);
+        $campaign = $this->service()->create($this->manager, [
+            'title' => 'Direct and grouped', 'language' => 'fr', 'objective' => 'translation',
+            'group_ids' => [$group->id], 'term_ids' => [$direct->id], 'assignee_ids' => [$this->participant->id],
+        ]);
+        $this->service()->start($this->manager, $campaign);
+        $proposal = $this->service()->propose($this->participant, $campaign->fresh(), $direct, 'Still pending');
+        $generation = (int) DB::table('catalogue_state')->where('id', 1)->value('generation');
+        $this->columns[$other->id]['fr'] = 'fr_CH';
+
+        $url = route('campaigns.show', $campaign);
+        $removeUrl = route('campaigns.remove', [$campaign, $direct]);
+        $this->withoutMiddleware(RequireTwoFactor::class)->actingAs($this->manager);
+        $this->from($url)->post($removeUrl)->assertRedirect($url);
+        $this->from($url)->post($removeUrl)->assertRedirect($url);
+
+        $participation = $this->participation($campaign, $direct);
+        self::assertTrue($participation->active);
+        self::assertFalse($participation->direct);
+        self::assertSame('proposal_sent', $participation->status);
+        self::assertSame($proposal->id, $participation->tracked_proposal_id);
+        self::assertSame(['admitted', 'direct_added', 'proposal_created', 'direct_removed'], $participation->events()->orderBy('id')->pluck('action')->all());
+        self::assertSame([$direct->id], $campaign->participations()->pluck('term_id')->all());
+        self::assertSame($generation, (int) DB::table('catalogue_state')->where('id', 1)->value('generation'));
     }
 
     public function test_completed_group_campaign_is_frozen_and_reexamination_pins_term_before_sync(): void

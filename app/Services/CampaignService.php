@@ -126,10 +126,25 @@ class CampaignService
         $this->write(function () use ($user, $campaign, $term) {
             $campaign = $this->locked($campaign);
             $this->mutable($campaign);
+            $term = Term::whereKey($term->id)->lockForUpdate()->firstOrFail();
             $p = $this->participation($campaign, $term, false);
+            if (! $p->direct) {
+                return;
+            }
+
             $p->update(['direct' => false]);
             $this->event($campaign, $p, 'direct_removed', $user);
-            $this->synchronizeLocked($campaign, $user);
+
+            $report = $this->report();
+            $belongs = $term->term_group_id !== null && $campaign->groups()->whereKey($term->term_group_id)->exists();
+            if ($belongs && ! $p->active) {
+                $this->admit($campaign, $term, false, $user, $report);
+            } elseif (! $belongs && $p->active) {
+                $this->deactivateParticipation($campaign, $p, $user);
+                $report['removed']++;
+            }
+            $this->complete($campaign);
+            $campaign->update(['admission_report' => $report]);
         });
     }
 
@@ -298,9 +313,7 @@ class CampaignService
                 }
                 $p = $campaign->participations()->where('term_id', $term->id)->lockForUpdate()->first();
                 if ($p?->active && ! $p->direct && ! $belongs) {
-                    $previous = $p->tracked_proposal_id;
-                    $this->updateParticipationScope($p, ['active' => false, 'removed_at' => now(), 'tracked_proposal_id' => null]);
-                    $this->event($campaign, $p, 'removed', $actor, null, ['previous_proposal_id' => $previous]);
+                    $this->deactivateParticipation($campaign, $p, $actor);
                     $report['removed']++;
                 }
                 $this->complete($campaign);
@@ -329,9 +342,7 @@ class CampaignService
         }
         foreach ($campaign->participations()->where('active', true)->where('direct', false)->with('term')->lockForUpdate()->get() as $p) {
             if (! $groupIds->contains($p->term->term_group_id)) {
-                $previous = $p->tracked_proposal_id;
-                $this->updateParticipationScope($p, ['active' => false, 'removed_at' => now(), 'tracked_proposal_id' => null]);
-                $this->event($campaign, $p, 'removed', $actor, null, ['previous_proposal_id' => $previous]);
+                $this->deactivateParticipation($campaign, $p, $actor);
                 $report['removed']++;
             }
         }
@@ -676,6 +687,13 @@ class CampaignService
         }
 
         return $q->firstOrFail();
+    }
+
+    private function deactivateParticipation(TranslationCampaign $campaign, CampaignParticipation $participation, ?User $actor): void
+    {
+        $previous = $participation->tracked_proposal_id;
+        $this->updateParticipationScope($participation, ['active' => false, 'removed_at' => now(), 'tracked_proposal_id' => null]);
+        $this->event($campaign, $participation, 'removed', $actor, null, ['previous_proposal_id' => $previous]);
     }
 
     private function complete(TranslationCampaign $campaign): void
