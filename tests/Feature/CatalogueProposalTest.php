@@ -11,6 +11,7 @@ use App\Models\Term;
 use App\Models\User;
 use App\Services\SourceRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CatalogueProposalTest extends TestCase
@@ -206,6 +207,138 @@ class CatalogueProposalTest extends TestCase
         self::assertSame(1, $page->query('//textarea[@data-restored="1"]')->length);
         self::assertSame('Revision value', $page->evaluate('string(//textarea[@id="new-proposal-0"])'));
         self::assertSame(3, $page->query('//input[@name="restored_revision_id"]')->length);
+    }
+
+    public function test_translator_can_arbitrate_without_validation_or_other_language_rights(): void
+    {
+        $term = $this->term('law')->fresh();
+        $foreign = $this->proposal($term, 'Cause Text', 'Italian candidate', 'it');
+        $proposal = $this->proposal($term, 'Cause Text', 'French candidate');
+        $translator = User::factory()->create(['roles' => ['translator' => ['fr']], 'locale' => 'fr']);
+        $url = '/proposals/'.$proposal->id.'/decide';
+        $generation = DB::table('catalogue_state')->where('id', 1)->value('generation');
+        $oldContext = $proposal->context_fingerprint;
+
+        $this->actingAs($translator)->get('/validation')->assertForbidden();
+        $this->get('/terms?language=fr')->assertOk()->assertSee('data-arbitration-id="'.$proposal->id.'"', false);
+        $this->get('/terms/'.$term->id.'?language=fr')->assertOk()->assertSee('value="arbitrate"', false)->assertDontSee('value="reject"', false);
+        $this->postJson('/proposals/'.$foreign->id.'/decide', ['decision' => 'arbitrate', 'lock_version' => 1])->assertForbidden();
+        $this->postJson($url, ['decision' => 'arbitrate', 'lock_version' => 0])->assertUnprocessable()->assertJsonValidationErrors('version');
+        $this->post($url, ['decision' => 'arbitrate', 'lock_version' => 1])->assertRedirect()->assertSessionHasNoErrors();
+
+        $proposal->refresh();
+        self::assertSame(Proposal::ARBITRATION, $proposal->status);
+        self::assertSame(2, $proposal->lock_version);
+        self::assertSame($this->actor->id, $proposal->author_id);
+        self::assertSame($this->actor->organization_id, $proposal->organization_id);
+        self::assertSame($oldContext, $proposal->context_fingerprint);
+        self::assertNull($proposal->decided_at);
+        self::assertSame('Primary validated', $term->fresh()->validated['Cause Text']['fr']);
+        self::assertSame($term->revision_no, $term->fresh()->revision_no);
+        self::assertSame((int) $generation + 1, (int) DB::table('catalogue_state')->where('id', 1)->value('generation'));
+
+        $this->postJson($url, ['decision' => 'arbitrate', 'lock_version' => 2])->assertUnprocessable();
+        $this->postJson($url, ['decision' => 'validate', 'lock_version' => 2])->assertForbidden();
+        $this->patchJson('/proposals/'.$proposal->id, ['value' => 'Unauthorised edit', 'lock_version' => 2])->assertForbidden();
+        $this->actingAs($this->actor)->postJson($url, ['decision' => 'validate', 'lock_version' => 2])
+            ->assertUnprocessable()->assertJsonValidationErrors('override');
+    }
+
+    public function test_direct_and_selected_arbitration_keep_creation_and_mixed_batch_atomic(): void
+    {
+        $translator = User::factory()->create(['roles' => ['translator' => ['fr']], 'locale' => 'fr']);
+        $term = $this->term('server')->fresh();
+        $otherTerm = $this->term('law');
+        $existing = $this->proposal($otherTerm, 'Cause Text', 'Existing candidate');
+        $draft = ['attribute' => 'label', 'language' => 'fr', 'value' => 'Draft candidate', 'lock_version' => $term->lock_version];
+        $directUrl = '/terms/'.$term->id.'/proposals';
+        $this->actingAs($translator)->postJson($directUrl, ['intent' => 'arbitrate', ...$draft, 'attribute' => 'Wrong attribute'])
+            ->assertUnprocessable()->assertJsonValidationErrors('value');
+        self::assertFalse($term->proposals()->exists());
+
+        $response = $this->postJson($directUrl, ['intent' => 'arbitrate', ...$draft])->assertCreated()->assertJsonPath('version', 2);
+        $direct = Proposal::findOrFail($response->json('id'));
+        self::assertSame(Proposal::ARBITRATION, $direct->status);
+        self::assertSame($translator->id, $direct->author_id);
+        $this->assertDatabaseHas('audit_events', ['action' => 'proposal.created', 'entity_id' => $direct->id]);
+        $this->assertDatabaseHas('audit_events', ['action' => 'proposal.arbitrate', 'entity_id' => $direct->id]);
+
+        $payload = ['intent' => 'arbitrate', 'confirmed' => 1, 'selection' => [$existing->id => 1],
+            'rows' => [$term->id => ['selected' => 1, ...$draft, 'value' => 'Distinct candidate', 'lock_version' => 0]]];
+        $this->postJson('/proposals/bulk-store', $payload)->assertUnprocessable()->assertJsonValidationErrors('version');
+        self::assertSame('pending', $existing->fresh()->status);
+        self::assertSame(1, $term->proposals()->count());
+
+        $payload['rows'][$term->id]['lock_version'] = $term->lock_version;
+        $this->post('/proposals/bulk-store', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        self::assertSame(Proposal::ARBITRATION, $existing->fresh()->status);
+        self::assertSame(2, $term->proposals()->where('status', Proposal::ARBITRATION)->count());
+    }
+
+    public function test_explicit_decisions_protect_arbitration_competitors_until_motivated_rejection(): void
+    {
+        $term = $this->term('law');
+        $winner = $this->proposal($term, 'Cause Text', 'Preferred candidate');
+        $protected = $this->proposal($term, 'Cause Text', 'Candidate in arbitration');
+        $ordinary = $this->proposal($term, 'Cause Text', 'Ordinary competitor');
+        $otherCell = $this->proposal($term, 'Short Justification', 'Another attribute');
+        $validator = User::factory()->create(['roles' => ['validator' => ['fr']], 'locale' => 'fr']);
+        app(SourceRecord::class)->shouldReceive('snapshot')->once()->andReturn(new Revision);
+        $this->actingAs($validator)->post('/proposals/bulk', ['decision' => 'arbitrate', 'selection' => [$protected->id => 1, $otherCell->id => 1], 'confirmed' => 1])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->postJson('/proposals/'.$winner->id.'/decide', ['decision' => 'validate', 'lock_version' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('decision');
+        $this->postJson('/proposals/bulk', ['decision' => 'validate', 'selection' => [$winner->id => 1, $protected->id => 2], 'confirmed' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('decision');
+        $this->postJson('/proposals/bulk', ['decision' => 'reject', 'selection' => [$protected->id => 2], 'confirmed' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('reason');
+        self::assertSame(Proposal::ARBITRATION, $protected->fresh()->status);
+        self::assertSame('pending', $ordinary->fresh()->status);
+
+        $this->post('/proposals/bulk', ['decision' => 'reject', 'selection' => [$protected->id => 2], 'reason' => 'Motif synthétique', 'confirmed' => 1])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/proposals/'.$winner->id.'/decide', ['decision' => 'arbitrate', 'lock_version' => 1])->assertRedirect();
+        $this->post('/proposals/bulk', ['decision' => 'validate', 'selection' => [$winner->id => 2], 'confirmed' => 1])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        self::assertSame('Motif synthétique', $protected->fresh()->rejection_reason);
+        self::assertSame('superseded', $ordinary->fresh()->rejection_reason);
+        self::assertSame(Proposal::ARBITRATION, $otherCell->fresh()->status);
+        self::assertSame('validated', $winner->fresh()->status);
+        self::assertSame('Preferred candidate', $term->fresh()->validated['Cause Text']['fr']);
+    }
+
+    public function test_arbitration_filter_matches_main_and_visible_secondary_badges_in_exact_cells(): void
+    {
+        $main = $this->term('law');
+        $main->update(['validated' => ['Cause Text' => ['fr' => '0']], 'review_needed' => ['Cause Text' => ['fr' => true]]]);
+        $arbitration = $this->proposal($main, 'Cause Text', 'Prioritised candidate');
+        $arbitration->update(['status' => Proposal::ARBITRATION]);
+        $this->proposal($main, 'Cause Text', 'Newer ordinary candidate')->update(['created_at' => now()]);
+        $secondary = $this->term('incident');
+        $secondary->update(['validated' => []]);
+        $this->proposal($secondary, 'TEXT', 'Primary pending');
+        $this->proposal($secondary, 'SHORTTEXT', 'Secondary in arbitration')->update(['status' => Proposal::ARBITRATION]);
+        $other = $this->term('server');
+        $this->proposal($other, 'Label', 'Different attribute')->update(['status' => Proposal::ARBITRATION]);
+        $this->proposal($other, 'label', 'Different language', 'FR')->update(['status' => Proposal::ARBITRATION]);
+        $obsolete = $this->term('monomot');
+        $obsolete->update(['obsolete' => true]);
+        $this->proposal($obsolete, 'label', 'Obsolete candidate')
+            ->update(['status' => Proposal::ARBITRATION]);
+
+        $response = $this->get('/terms?state=arbitration&language=fr')->assertOk();
+        $rows = $response->viewData('terms')->keyBy('id');
+        self::assertEqualsCanonicalizing([$main->id, $secondary->id], $rows->keys()->all());
+        self::assertSame(Proposal::ARBITRATION, $rows[$main->id]->current_state);
+        self::assertSame($arbitration->id, $rows[$main->id]->pending_id);
+        self::assertSame('0', $rows[$main->id]->current_value);
+        self::assertSame('pending', $rows[$secondary->id]->current_state);
+        $response->assertSee('match_proposal='.$arbitration->id.'#proposal-'.$arbitration->id, false)
+            ->assertSee('?language=fr#translation-1', false);
+        self::assertSame([$secondary->id], $this->get('/terms?state=pending&language=fr')->assertOk()->viewData('terms')->pluck('id')->all());
+        $this->get('/terms/'.$main->id.'?language=fr')->assertOk()->assertSee('badge-review', false)
+            ->assertSee('badge-arbitration', false)->assertSee('name="lock_version"', false);
     }
 
     private function term(string $type): Term

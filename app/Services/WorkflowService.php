@@ -7,6 +7,7 @@ use App\Models\Proposal;
 use App\Models\Revision;
 use App\Models\Term;
 use App\Models\User;
+use App\Services\CatalogueSearch\Projection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,16 +30,16 @@ class WorkflowService
         return $result['warning_codes'];
     }
 
-    public function propose(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null, ?UploadedFile $screenshot = null, string $screenshotAction = 'keep'): Proposal
+    public function propose(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null, ?UploadedFile $screenshot = null, string $screenshotAction = 'keep', bool $arbitrate = false): Proposal
     {
         abort_unless($user->canTranslate($language), 403);
         $prepared = app(ProposalScreenshots::class)->prepare($screenshot, $screenshotAction);
 
-        return $this->lock->run(fn () => DB::transaction(fn () => $this->proposeUnderOperationLock($user, $term, $attribute, $language, $value, $expected, $supersedesId, $revisionId, $prepared, $screenshotAction)), $screenshotAction !== 'keep' || $supersedesId !== null);
+        return $this->lock->run(fn () => DB::transaction(fn () => $this->proposeUnderOperationLock($user, $term, $attribute, $language, $value, $expected, $supersedesId, $revisionId, $prepared, $screenshotAction, $arbitrate)), $screenshotAction !== 'keep' || $supersedesId !== null);
     }
 
     /** Caller owns the transaction and holds the operation lock through its completion. */
-    public function proposeUnderOperationLock(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null, ?array $prepared = null, string $screenshotAction = 'keep'): Proposal
+    public function proposeUnderOperationLock(User $user, Term $term, string $attribute, string $language, string $value, ?int $expected = null, ?int $supersedesId = null, ?int $revisionId = null, ?array $prepared = null, string $screenshotAction = 'keep', bool $arbitrate = false): Proposal
     {
         $term = Term::whereKey($term->id)->lockForUpdate()->firstOrFail();
         abort_unless($user->canTranslate($language), 403);
@@ -58,9 +59,12 @@ class WorkflowService
         $screenshots = app(ProposalScreenshots::class);
         $image = $screenshots->change($rejected, $screenshotAction, $prepared, true);
         $proposal = Proposal::create([...$image, 'term_id' => $term->id, 'attribute' => $attribute, 'language' => $language, 'value' => $value, 'value_hash' => hash('sha256', $value),
-            'status' => 'pending', 'author_id' => $user->id, 'organization_id' => $user->organization_id, 'anomalies' => $warnings, 'edit_history' => [], 'claimed' => true, 'supersedes_id' => $supersedesId, 'restored_revision_id' => $revisionId]);
-        app(SearchText::class)->sync($term);
+            'status' => 'pending', 'lock_version' => 1, 'author_id' => $user->id, 'organization_id' => $user->organization_id, 'anomalies' => $warnings, 'edit_history' => [], 'claimed' => true, 'supersedes_id' => $supersedesId, 'restored_revision_id' => $revisionId]);
         $this->audit->record('proposal.created', $proposal, [], ['value' => $value, 'screenshot' => $screenshots->summary($image), 'screenshot_source_id' => $image['screenshot_path'] && $screenshotAction === 'keep' ? $supersedesId : null], $user);
+        if ($arbitrate) {
+            $this->markForArbitration($user, $proposal);
+        }
+        app(SearchText::class)->sync($term);
         $this->generation();
 
         return $proposal->fresh();
@@ -77,7 +81,7 @@ class WorkflowService
             $p = Proposal::whereKey($proposal->id)->lockForUpdate()->firstOrFail();
             abort_unless($user->canTranslate($p->language), 403);
             abort_unless($p->author_id === $user->id || ($p->import_id && ! $p->claimed), 403);
-            if ($p->status !== 'pending' || $p->lock_version !== $expected) {
+            if (! $p->isOpen() || $p->lock_version !== $expected) {
                 $this->stale();
             }
             $warnings = $this->checkValue($term, $p->attribute, $p->language, $value);
@@ -100,15 +104,36 @@ class WorkflowService
 
     public function decide(User $user, Proposal $proposal, string $decision, int $expected, ?string $reason = null, bool $override = false): void
     {
-        $this->lock->run(fn () => DB::transaction(fn () => $this->decideLocked($user, $proposal, $decision, $expected, $reason, $override)));
+        $this->lock->run(fn () => DB::transaction(function () use ($user, $proposal, $decision, $expected, $reason, $override) {
+            $changed = $this->decideLocked($user, $proposal, $decision, $expected, $reason, $override);
+            if ($changed !== null) {
+                app(Projection::class)->syncMany(collect([$changed]));
+                $this->generation();
+            }
+        }));
     }
 
-    private function decideLocked(User $user, Proposal $proposal, string $decision, int $expected, ?string $reason, bool $override): void
+    private function markForArbitration(User $user, Proposal $proposal): void
+    {
+        $proposal->update(['status' => Proposal::ARBITRATION, 'lock_version' => $proposal->lock_version + 1]);
+        $this->audit->record('proposal.arbitrate', $proposal, ['status' => 'pending'], ['status' => Proposal::ARBITRATION], $user);
+    }
+
+    private function decideLocked(User $user, Proposal $proposal, string $decision, int $expected, ?string $reason, bool $override, bool $general = false): ?Term
     {
         $term = Term::whereKey($proposal->term_id)->lockForUpdate()->firstOrFail();
         $p = Proposal::whereKey($proposal->id)->lockForUpdate()->firstOrFail();
+        if ($decision === 'arbitrate') {
+            abort_unless($user->canTranslate($p->language), 403);
+            if ($p->status !== 'pending' || $p->lock_version !== $expected) {
+                $this->stale();
+            }
+            $this->markForArbitration($user, $p);
+
+            return $term;
+        }
         abort_unless($user->canValidate($p->language), 403);
-        if ($p->status !== 'pending' || $p->lock_version !== $expected) {
+        if (! $p->isOpen() || ($general && $p->status !== 'pending') || $p->lock_version !== $expected) {
             $this->stale();
         }
         if (! in_array($decision, ['validate', 'reject'])) {
@@ -121,6 +146,15 @@ class WorkflowService
             $p->update(['status' => 'rejected', 'rejection_reason' => $reason, 'decided_by' => $user->id, 'decided_at' => now(), 'lock_version' => $p->lock_version + 1]);
             app(SearchText::class)->sync($term);
         } else {
+            $competitors = Proposal::where('term_id', $term->id)->where('attribute', $p->attribute)->inLanguage($p->language)
+                ->whereRaw('HEX(proposals.attribute) = ?', [strtoupper(bin2hex($p->attribute))])
+                ->whereKeyNot($p->id)->whereIn('status', Proposal::OPEN_STATUSES)->lockForUpdate()->get(['id', 'status']);
+            if ($competitors->contains('status', Proposal::ARBITRATION)) {
+                throw ValidationException::withMessages(['decision' => __('ui.arbitration_competitor')]);
+            }
+            if ($general && $competitors->isNotEmpty()) {
+                $this->stale();
+            }
             if ($p->author_id === $user->id) {
                 if (! $user->canManage() || ! $override) {
                     throw ValidationException::withMessages(['override' => __('ui.four_eyes_required')]);
@@ -137,9 +171,8 @@ class WorkflowService
             $term->update(['validated' => $values, 'review_needed' => $review, 'revision_no' => $term->revision_no + 1, 'lock_version' => $term->lock_version + 1, 'updated_by' => $user->id,
                 'search_text' => $term->label.' '.$term->source_text.' '.implode(' ', array_merge(...array_values($values)))]);
             $p->update(['status' => 'validated', 'decided_by' => $user->id, 'decided_at' => now(), 'lock_version' => $p->lock_version + 1]);
-            $superseded = Proposal::where('term_id', $term->id)->where('attribute', $p->attribute)->where('language', $p->language)->where('status', 'pending');
-            $supersededIds = (clone $superseded)->pluck('id');
-            $superseded->update(['status' => 'rejected', 'rejection_reason' => 'superseded', 'decided_by' => $user->id, 'decided_at' => now(), 'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now()]);
+            $supersededIds = $competitors->modelKeys();
+            Proposal::whereKey($supersededIds)->update(['status' => 'rejected', 'rejection_reason' => 'superseded', 'decided_by' => $user->id, 'decided_at' => now(), 'lock_version' => DB::raw('lock_version + 1'), 'updated_at' => now()]);
             foreach (Proposal::whereIn('id', $supersededIds)->get() as $other) {
                 app(CampaignService::class)->proposalDecided($other, $user);
             }
@@ -152,6 +185,8 @@ class WorkflowService
         }
         $this->audit->record('proposal.'.$decision, $p, [], ['value' => $p->value, 'reason' => $reason, 'manager' => $user->canManage()], $user);
         $this->generation();
+
+        return null;
     }
 
     public function bulk(User $user, array $selection, string $decision, ?string $reason, bool $override): void
@@ -160,15 +195,30 @@ class WorkflowService
     }
 
     /** Internal worker entry: caller must hold the operation lock until transaction commit. */
-    public function bulkUnderOperationLock(User $user, array $selection, string $decision, ?string $reason, bool $override): void
+    public function bulkUnderOperationLock(User $user, array $selection, string $decision, ?string $reason, bool $override, bool $general = false): void
     {
         if (count($selection) < 1 || count($selection) > 500) {
             abort(422);
         }
-        DB::transaction(function () use ($user, $selection, $decision, $reason, $override) {
-            ksort($selection);
-            foreach ($selection as $id => $version) {
-                $this->decideLocked($user, Proposal::findOrFail($id), $decision, (int) $version, $reason, $override);
+        DB::transaction(function () use ($user, $selection, $decision, $reason, $override, $general) {
+            $proposals = Proposal::whereKey(array_keys($selection))->orderBy('term_id')->orderBy('id')->get(['id', 'term_id', 'attribute', 'language']);
+            abort_unless($proposals->count() === count($selection), 404);
+            if ($decision === 'validate' && $proposals->uniqueStrict(fn ($p) => [$p->term_id, $p->attribute, $p->language])->count() !== $proposals->count()) {
+                throw ValidationException::withMessages(['decision' => __('ui.arbitration_one_per_cell')]);
+            }
+            if (! $general && $proposals->count() > 1) {
+                Term::whereKey($proposals->pluck('term_id')->unique()->all())->orderBy('id')->lockForUpdate()->get(['id']);
+            }
+            $changedTerms = collect();
+            foreach ($proposals as $proposal) {
+                $changed = $this->decideLocked($user, $proposal, $decision, (int) $selection[$proposal->id], $reason, $override, $general);
+                if ($changed !== null) {
+                    $changedTerms->put($changed->id, $changed);
+                }
+            }
+            if ($changedTerms->isNotEmpty()) {
+                app(Projection::class)->syncMany($changedTerms);
+                $this->generation();
             }
             $this->audit->record('proposal.bulk', 'proposal', [], ['count' => count($selection), 'decision' => $decision], $user);
         });

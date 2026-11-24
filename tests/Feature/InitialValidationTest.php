@@ -226,6 +226,36 @@ class InitialValidationTest extends TestCase
         $this->assertSame($first->id, $proposal->import_id);
     }
 
+    public function test_import_reuses_arbitration_and_initial_validation_excludes_it_and_its_competitors(): void
+    {
+        $first = $this->import(3);
+        [$protected, $competing, $eligible] = Proposal::where('language', 'fr')->orderBy('id')->get()->all();
+        $workflow = app(WorkflowService::class);
+        $alternative = $workflow->propose($this->manager, $competing->term, 'label', 'fr', 'Autre {name}');
+        foreach ([$protected, $alternative] as $proposal) {
+            $workflow->decide($this->manager, $proposal, 'arbitrate', $proposal->lock_version);
+        }
+        $second = $this->import(3);
+        self::assertSame(4, Proposal::where('language', 'fr')->count());
+        self::assertSame($first->id, $protected->fresh()->import_id);
+        self::assertTrue($protected->imports()->whereKey($second->id)->exists());
+
+        $service = app(InitialValidationService::class);
+        $analysis = $service->enqueuePreview($this->manager, $second, 'fr');
+        self::assertFalse($this->step($analysis, 1));
+        self::assertTrue($this->step($analysis, 1));
+        $preview = $service->reviewedPreview($this->manager, $analysis->fresh());
+        self::assertSame(2, $preview['counts']['total']);
+        self::assertSame(1, $preview['counts']['eligible']);
+        self::assertSame(1, $preview['counts']['reasons']['competing']);
+        $operation = $service->enqueue($this->manager, $second, $preview);
+        self::assertTrue($this->step($operation));
+        self::assertSame('validated', $eligible->fresh()->status);
+        self::assertSame('pending', $competing->fresh()->status);
+        self::assertSame(Proposal::ARBITRATION, $protected->fresh()->status);
+        self::assertSame(Proposal::ARBITRATION, $alternative->fresh()->status);
+    }
+
     public function test_heavy_operation_prevents_queueing_a_preview_until_the_lock_is_released(): void
     {
         $import = $this->import(1);

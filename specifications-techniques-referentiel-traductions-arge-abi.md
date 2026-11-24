@@ -118,6 +118,12 @@ La migration supprime la propriété des termes après consolidation contrôlée
 
 Les contrôles serveur couvrent droits, placeholders, caractères exportables, valeur examinée et principe des quatre yeux. Une validation enregistre valeur, révision et décision dans une transaction. Le verrouillage de la cellule et un numéro de modification évitent d’approuver une valeur devenue obsolète. Rejets motivés, confirmations et validations en masse suivent le document fonctionnel.
 
+`proposals.status` contient `pending`, `arbitration`, `validated` ou `rejected`. Les deux premiers statuts désignent les propositions ouvertes. Le passage à `arbitration` incrémente la version de la proposition et la génération du catalogue dans la transaction, avec un événement d’audit. La saisie directe produit également l’événement de création dans cette transaction. La colonne et les index existants couvrent le nouveau statut.
+
+Les instantanés et traitements généraux portent sur `pending`. La recherche de concurrentes compare exactement terme, attribut et langue et couvre les deux statuts ouverts, même hors filtre ou lot d’import. La décision sous verrou exige le rejet préalable et motivé de toute autre proposition `arbitration` de la cellule. Les lots explicites transmettent les identifiants et versions sélectionnés. La génération change dès l’arbitrage et rend périmés les traitements préparés sur l’ancien état.
+
+Le catalogue et l’index de recherche approximative chargent les deux statuts ouverts par lots. Le badge principal et les badges secondaires décrivent chacun leur cellule. L’arbitrage d’une participation de campagne utilise son propre statut `to_arbitrate` et ses règles de résolution.
+
 ### Publication et téléchargement
 
 La publication capture révisions, sources techniques par ligne et destinataires dans une transaction à lecture cohérente, afin que les validations simultanées ne produisent pas un mélange d’états. La génération en flux utilise ensuite ces références immuables, sous le verrou des traitements lourds. Elle conserve les CSV définitifs, leur ZIP et un manifeste : versions, sources, nombres de lignes et empreintes SHA-256.

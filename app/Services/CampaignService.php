@@ -488,7 +488,7 @@ class CampaignService
             return new Collection;
         }
 
-        return $term->proposals()->where('status', 'pending')->where('attribute', $attribute)->where('language', $language)->orderBy('id')->get()
+        return $term->proposals()->whereIn('status', Proposal::OPEN_STATUSES)->where('attribute', $attribute)->inLanguage($language)->orderBy('id')->get()
             ->filter(fn ($p) => $this->isRelevant($p, $term, $attrs))->values();
     }
 
@@ -499,7 +499,7 @@ class CampaignService
         }
 
         $proposals = Proposal::whereIn('term_id', $terms->modelKeys())
-            ->where('status', 'pending')->where('language', $language)
+            ->whereIn('status', Proposal::OPEN_STATUSES)->inLanguage($language)
             ->whereIn('attribute', $terms->map(fn (Term $term) => $this->primaryAttribute($term))->unique())
             ->orderBy('id')->get(['id', 'term_id', 'attribute', 'language', 'status', 'value', 'context_fingerprint', 'import_id'])
             ->groupBy('term_id');
@@ -512,7 +512,7 @@ class CampaignService
 
     public function isRelevant(Proposal $proposal, Term $term, ?array $attributes = null): bool
     {
-        if ($proposal->status !== 'pending' || $proposal->term_id !== $term->id || $proposal->attribute !== $this->primaryAttribute($term) || $term->obsolete) {
+        if (! $proposal->isOpen() || $proposal->term_id !== $term->id || $proposal->attribute !== $this->primaryAttribute($term) || $term->obsolete) {
             return false;
         }
         try {
@@ -562,7 +562,7 @@ class CampaignService
             if ($p->status === 'confirmed' && $p->confirmation_fingerprint !== $this->confirmationFingerprint($term, $p->attribute, $campaign->language)) {
                 $p->update($this->reset() + ['status' => 'to_process', 'reason' => 'La traduction examinée ou sa référence a changé.']);
                 $this->event($campaign, $p, 'automatic_reexamination', null, $p->reason);
-            } elseif ($p->trackedProposal !== null && $p->trackedProposal->status === 'pending' && ! $this->isRelevant($p->trackedProposal, $term)) {
+            } elseif ($p->trackedProposal !== null && $p->trackedProposal->isOpen() && ! $this->isRelevant($p->trackedProposal, $term)) {
                 $previous = $p->tracked_proposal_id;
                 $p->update($this->reset() + ['status' => 'to_process', 'reason' => 'La référence de la proposition a changé.']);
                 $this->event($campaign, $p, 'proposal_context_changed', null, $p->reason, ['previous_proposal_id' => $previous]);

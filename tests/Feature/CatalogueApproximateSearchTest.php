@@ -38,7 +38,9 @@ class CatalogueApproximateSearchTest extends TestCase
         $this->withoutMiddleware(RequireTwoFactor::class);
         $this->reader = User::factory()->create(['roles' => ['reader'], 'locale' => 'fr']);
         $this->actingAs($this->reader);
-        $this->mock(SourceRecord::class)->shouldReceive('attributes')->andReturnUsing(fn ($term) => $this->attributes[$term->id]);
+        $source = $this->mock(SourceRecord::class);
+        $source->shouldReceive('attributes')->andReturnUsing(fn ($term) => $this->attributes[$term->id]);
+        $source->shouldReceive('row')->andReturn([]);
     }
 
     public function test_typo_and_lexical_families_require_all_words_in_one_value(): void
@@ -73,6 +75,25 @@ class CatalogueApproximateSearchTest extends TestCase
         self::assertEqualsCanonicalizing([$reference->id, $current->id, $pending->id], $result->pluck('id')->all());
         self::assertSame(3, $result->total());
         self::assertEqualsCanonicalizing([$reference->id, $germanCurrent->id, $germanPending->id], $this->find('dosier', ['language' => 'de'])->assertOk()->viewData('terms')->pluck('id')->all());
+    }
+
+    public function test_arbitration_keeps_search_excerpt_and_direct_proposal_link_after_projection_update(): void
+    {
+        $term = $this->term([], type: 'incident');
+        $proposal = $this->proposal($term, 'Dossier fictif', attribute: 'SHORTTEXT')->fresh();
+        app(SearchText::class)->sync($term->fresh());
+        $this->rebuild();
+        $reviewer = User::factory()->create(['roles' => ['validator' => ['fr']]]);
+        app(WorkflowService::class)->decide($reviewer, $proposal, 'arbitrate', $proposal->lock_version);
+
+        $usual = $this->get('/terms?q=Dossier&state=arbitration&language=fr')->assertOk();
+        self::assertSame([$term->id], $usual->viewData('terms')->pluck('id')->all());
+        $response = $this->find('Dosier', ['state' => 'arbitration'])->assertOk();
+        $match = $response->viewData('searchInfo')['matches'][$term->id];
+        self::assertSame($proposal->id, $match['proposal_id']);
+        self::assertSame('SHORTTEXT', $match['attribute']);
+        $response->assertSee('match_proposal='.$proposal->id.'#proposal-'.$proposal->id, false);
+        $this->get('/terms/'.$term->id.'?language=fr&match_proposal='.$proposal->id)->assertOk()->assertSee('id="proposal-'.$proposal->id.'"', false);
     }
 
     public function test_secondary_and_non_default_proposal_get_an_excerpt_without_replacing_display(): void

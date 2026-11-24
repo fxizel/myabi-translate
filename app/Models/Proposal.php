@@ -3,12 +3,17 @@
 namespace App\Models;
 
 use App\Services\CampaignService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class Proposal extends Model
 {
+    public const ARBITRATION = 'arbitration';
+
+    public const OPEN_STATUSES = ['pending', self::ARBITRATION];
+
     protected $guarded = [];
 
     protected $hidden = ['screenshot_path'];
@@ -35,10 +40,23 @@ class Proposal extends Model
             'screenshot_bytes' => 'integer', 'screenshot_width' => 'integer', 'screenshot_height' => 'integer'];
     }
 
-    public static function pendingAttributesForTerms(array $termIds, string $language): Collection
+    public function isOpen(): bool
     {
-        return static::whereIn('term_id', $termIds)->where('language', $language)->where('status', 'pending')
-            ->distinct()->toBase()->get(['term_id', 'attribute'])->groupBy('term_id')->map->pluck('attribute');
+        return in_array($this->status, self::OPEN_STATUSES, true);
+    }
+
+    public function scopeInLanguage(Builder $query, string $language): Builder
+    {
+        return $query->where('proposals.language', $language)
+            ->whereRaw('HEX(proposals.language) = ?', [strtoupper(bin2hex($language))]);
+    }
+
+    public static function openAttributesForTerms(array $termIds, string $language): Collection
+    {
+        return static::whereIn('term_id', $termIds)->inLanguage($language)->whereIn('status', self::OPEN_STATUSES)
+            ->select('term_id', 'attribute', 'status')->groupBy('term_id', 'attribute', 'status')
+            ->groupByRaw('HEX(attribute)')->toBase()->get()->groupBy('term_id')
+            ->map(fn ($rows) => $rows->groupBy('attribute')->map(fn ($cell) => $cell->contains('status', self::ARBITRATION) ? self::ARBITRATION : 'pending'));
     }
 
     public function term()

@@ -185,8 +185,11 @@ class TranslationCampaignTest extends TestCase
         $single = $this->term();
         $pending = $this->pending($single);
         $competing = $this->term();
-        $this->pending($competing, 'First choice');
+        $firstChoice = $this->pending($competing, 'First choice');
         $this->pending($competing, 'Second choice');
+        foreach ([$pending, $firstChoice] as $proposal) {
+            app(WorkflowService::class)->decide($this->participant, $proposal, 'arbitrate', $proposal->lock_version);
+        }
         $campaign = $this->campaign('translation', [$single, $competing]);
         self::assertSame('proposal_sent', $this->participation($campaign, $single)->status);
         self::assertSame($pending->id, $this->participation($campaign, $single)->tracked_proposal_id);
@@ -242,6 +245,34 @@ class TranslationCampaignTest extends TestCase
         self::assertSame('pending', $proposal->fresh()->status);
     }
 
+    public function test_arbitration_keeps_tracking_and_correction_until_the_reference_changes(): void
+    {
+        $term = $this->term();
+        $campaign = $this->campaign('translation', [$term]);
+        $this->service()->start($this->manager, $campaign);
+        $proposal = $this->service()->propose($this->participant, $campaign->fresh(), $term, 'Candidate');
+        $participation = $this->participation($campaign, $term);
+        $events = $participation->events()->count();
+        $fingerprint = $proposal->context_fingerprint;
+        $workflow = app(WorkflowService::class);
+
+        $workflow->decide($this->participant, $proposal, 'arbitrate', $proposal->lock_version);
+        $proposal->refresh();
+        self::assertSame($fingerprint, $proposal->context_fingerprint);
+        $corrected = $workflow->edit($this->participant, $proposal, 'Corrected candidate', $proposal->lock_version);
+        self::assertSame(Proposal::ARBITRATION, $corrected->status);
+        self::assertSame('proposal_sent', $participation->fresh()->status);
+        self::assertSame($proposal->id, $participation->fresh()->tracked_proposal_id);
+        self::assertSame($events, $participation->events()->count());
+        self::assertSame([$proposal->id], $this->service()->pertinentPending($term, 'fr')->modelKeys());
+
+        $term->refresh()->update(['source_text' => 'Different reference', 'source_hash' => str_repeat('d', 64)]);
+        self::assertSame('to_process', $participation->fresh()->status);
+        self::assertNull($participation->fresh()->tracked_proposal_id);
+        self::assertSame($proposal->id, $participation->events()->where('action', 'proposal_context_changed')->sole()->payload['previous_proposal_id']);
+        self::assertSame(Proposal::ARBITRATION, $proposal->fresh()->status);
+    }
+
     public function test_rejection_updates_only_campaigns_that_still_track_the_proposal(): void
     {
         $term = $this->term('Correct current value');
@@ -288,6 +319,11 @@ class TranslationCampaignTest extends TestCase
         $second = $this->campaign('translation', [$term]);
         foreach ([$first, $second] as $campaign) {
             $this->service()->start($this->manager, $campaign);
+        }
+        app(WorkflowService::class)->decide($this->participant, $selected, 'arbitrate', $selected->lock_version);
+        foreach ([$first, $second] as $campaign) {
+            self::assertSame('proposal_sent', $this->participation($campaign, $term)->status);
+            self::assertSame($selected->id, $this->participation($campaign, $term)->tracked_proposal_id);
         }
         $competitor = $this->pending($term, 'Other choice');
         $third = $this->campaign('translation', [$term]);

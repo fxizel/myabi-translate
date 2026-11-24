@@ -12,7 +12,11 @@
             <td><a class="source-text" href="{{ route('terms.show', ['term'=>$term, 'language'=>$language]) }}">{{ $term->source_text ?: $term->label }}</a></td>
             <td><span class="key">{{ $term->label }}</span></td>
             <td>{{ \App\Http\Controllers\TermController::typeLabels()[$term->type] ?? $term->type }}</td>
-            <td>@include('partials.status', ['status'=>$term->current_state])</td>
+            <td>@include('partials.status', ['status'=>$term->current_state])
+                @foreach($term->secondary_arbitration as $index => $attribute)
+                    <div class="cell-caption"><a href="{{ route('terms.show', ['term' => $term, 'language' => $language]) }}#translation-{{ $index }}">{{ __('catalogue.attributes.'.$attribute) }}</a> @include('partials.status', ['status' => 'arbitration'])</div>
+                @endforeach
+            </td>
         </tr>
         @empty<tr><td colspan="4">{{ __('campaigns.no_terms') }}</td></tr>@endforelse
     </tbody>

@@ -94,6 +94,26 @@ class ProposalScreenshotTest extends TestCase
         $this->get($url)->assertRedirect('/login');
     }
 
+    public function test_arbitration_and_correction_keep_provenance_and_private_capture_history(): void
+    {
+        $proposal = $this->propose($this->upload());
+        $workflow = app(WorkflowService::class);
+        $peer = User::factory()->create(['roles' => ['translator' => ['fr']]]);
+        $before = $proposal->only(['author_id', 'organization_id', 'context_fingerprint', 'screenshot_path', 'screenshot_sha256']);
+        $workflow->decide($peer, $proposal, 'arbitrate', 1);
+        $proposal->refresh();
+
+        self::assertSame($before, $proposal->only(array_keys($before)));
+        self::assertSame(Proposal::ARBITRATION, $proposal->status);
+        $corrected = $workflow->edit($this->author, $proposal, 'Corrected candidate', 2, $this->upload(), 'replace');
+        self::assertSame(Proposal::ARBITRATION, $corrected->status);
+        self::assertSame('Synthetic proposal', $corrected->edit_history[0]['value']);
+        self::assertSame($this->author->id, $corrected->edit_history[0]['author_id']);
+        self::assertSame($before['screenshot_sha256'], $corrected->edit_history[0]['screenshot']['screenshot_sha256']);
+        self::assertNotSame($before['screenshot_path'], $corrected->screenshot_path);
+        self::assertSame([], $this->term->fresh()->validated);
+    }
+
     public function test_capture_consultation_keeps_mfa_and_session_revocation_protection(): void
     {
         $proposal = $this->propose($this->upload());

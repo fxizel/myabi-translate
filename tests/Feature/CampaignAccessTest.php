@@ -432,7 +432,12 @@ class CampaignAccessTest extends TestCase
             'attribute' => 'label', 'language' => 'fr', 'value' => 'Pending synthetic proposal',
             'lock_version' => $term->lock_version,
         ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->get('/terms?language=fr')->assertOk()->assertDontSee('name="term_ids[]"', false);
+        $proposal = $term->proposals()->sole();
+        $this->get('/terms?language=fr')->assertOk()
+            ->assertSee('name="term_ids[]"', false)
+            ->assertSee('data-proposal-eligible="0"', false)
+            ->assertSee('data-arbitration-id="'.$proposal->id.'"', false)
+            ->assertDontSee('data-catalogue-submit', false);
 
         $this->actingAs($this->user(['reader' => ['fr']]));
         $this->get('/terms?language=fr')->assertOk()

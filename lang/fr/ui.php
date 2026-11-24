@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'status_arbitration' => 'À arbitrer',
+    'arbitrate' => 'Arbitrer',
+    'arbitrate_selection' => 'Arbitrer la sélection',
+    'arbitration_bulk_confirm' => 'Placer :count propositions en arbitrage ?',
+    'arbitration_saved' => 'Arbitrage enregistré.',
+    'arbitration_competitor' => 'Rejetez d’abord avec un motif l’autre proposition à arbitrer pour cette cellule.',
+    'arbitration_one_per_cell' => 'Sélectionnez une seule proposition à valider par terme, attribut et langue.',
+    'arbitration_filtered_hint' => 'Les propositions à arbitrer exigent une sélection explicite. Elles sont exclues de cette action générale.',
     'upload_too_large_title' => 'Fichier trop volumineux',
     'upload_too_large_help' => 'L’envoi dépasse la limite du serveur et aucun import n’a été créé. Les imports acceptent des fichiers jusqu’à 100 Mio lorsque le serveur est configuré pour cette taille. Si votre fichier est plus petit, signalez cette erreur à l’administrateur pour vérifier la configuration du serveur. Vous devrez sélectionner à nouveau le fichier.',
     'upload_return' => 'Retour aux imports',

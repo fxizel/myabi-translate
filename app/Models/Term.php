@@ -86,15 +86,18 @@ class Term extends Model
         return app(SourceRecord::class)->attributes($this);
     }
 
-    public function state(string $attribute, string $language, bool $hasPendingProposal = false): string
+    public function state(string $attribute, string $language, bool $hasPendingProposal = false, bool $hasArbitration = false): string
     {
         if ($this->obsolete) {
             return 'obsolete';
         }
-        if (data_get($this->review_needed, "$attribute.$language")) {
+        if ($hasArbitration) {
+            return Proposal::ARBITRATION;
+        }
+        if (data_get($this->review_needed, [$attribute, $language])) {
             return 'review';
         }
-        if (data_get($this->validated, "$attribute.$language") === null) {
+        if (data_get($this->validated, [$attribute, $language]) === null) {
             return $hasPendingProposal ? 'pending' : 'missing';
         }
         if ($this->last_published_revision === $this->revision_no && $this->lastPublication?->status === 'published') {
@@ -112,20 +115,39 @@ class Term extends Model
             ? 'CAST(JSON_EXTRACT(terms.review_needed, ?) AS CHAR)'
             : 'JSON_TYPE(terms.review_needed, ?)';
 
-        return $query->where('terms.obsolete', false)->whereHas('proposals', function (Builder $proposals) use ($formatsByAttribute, $language, $review) {
-            // The catalogue groups proposals by exact attribute and language keys in PHP.
-            $proposals->where('proposals.status', 'pending')->where('proposals.language', $language)
-                ->whereRaw('HEX(proposals.language) = ?', [strtoupper(bin2hex($language))])
-                ->where(function (Builder $primary) use ($formatsByAttribute, $language, $review) {
-                    foreach ($formatsByAttribute as $attribute => $formats) {
-                        $path = '$.'.json_encode($attribute, JSON_THROW_ON_ERROR).'.'.json_encode($language, JSON_THROW_ON_ERROR);
-                        $primary->orWhere(fn (Builder $cell) => $cell->whereIn('terms.type', $formats->keys())
-                            ->whereRaw('HEX(proposals.attribute) = ?', [strtoupper(bin2hex($attribute))])
-                            ->whereNull("terms.validated->$attribute->$language")
-                            ->whereRaw("COALESCE($review, 'null') IN ('null', 'false')", [$path]));
-                    }
-                });
-        });
+        return $query->where('terms.obsolete', false)
+            ->whereDoesntHave('proposals', fn (Builder $proposals) => $this->arbitrationProposals($proposals, $language, primaryOnly: true))
+            ->whereHas('proposals', function (Builder $proposals) use ($formatsByAttribute, $language, $review) {
+                // The catalogue groups proposals by exact attribute and language keys in PHP.
+                $proposals->where('proposals.status', 'pending')->inLanguage($language)
+                    ->where(function (Builder $primary) use ($formatsByAttribute, $language, $review) {
+                        foreach ($formatsByAttribute as $attribute => $formats) {
+                            $path = '$.'.json_encode($attribute, JSON_THROW_ON_ERROR).'.'.json_encode($language, JSON_THROW_ON_ERROR);
+                            $primary->orWhere(fn (Builder $cell) => $cell->whereIn('terms.type', $formats->keys())
+                                ->whereRaw('HEX(proposals.attribute) = ?', [strtoupper(bin2hex($attribute))])
+                                ->whereNull("terms.validated->$attribute->$language")
+                                ->whereRaw("COALESCE($review, 'null') IN ('null', 'false')", [$path]));
+                        }
+                    });
+            });
+    }
+
+    public function scopeMatchingArbitrationBadge(Builder $query, string $language): Builder
+    {
+        return $query->where('terms.obsolete', false)
+            ->whereHas('proposals', fn (Builder $proposals) => $this->arbitrationProposals($proposals, $language));
+    }
+
+    private function arbitrationProposals(Builder $proposals, string $language, bool $primaryOnly = false): Builder
+    {
+        return $proposals->where('proposals.status', Proposal::ARBITRATION)->inLanguage($language)
+            ->where(function (Builder $cells) use ($primaryOnly) {
+                foreach (FormatRegistry::all() as $type => $format) {
+                    $attributes = $primaryOnly ? [$format->attributeNames[0]] : $format->attributeNames;
+                    $cells->orWhere(fn (Builder $cell) => $cell->where('terms.type', $type)
+                        ->whereIn($cell->getQuery()->raw('HEX(proposals.attribute)'), array_map(fn ($name) => strtoupper(bin2hex($name)), $attributes)));
+                }
+            });
     }
 
     public function scopeVisibleTo($query, User $user)

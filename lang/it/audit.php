@@ -39,6 +39,7 @@ return [
         'organization' => ['created' => 'Organizzazione creata', 'updated' => 'Organizzazione modificata'],
         'profile' => ['updated' => 'Profilo modificato', 'locale_changed' => 'Lingua dell’interfaccia modificata'],
         'proposal' => [
+            'arbitrate' => 'Proposta contrassegnata da decidere',
             'created' => 'Proposta creata',
             'edited' => 'Proposta corretta',
             'validate' => 'Proposta validata',

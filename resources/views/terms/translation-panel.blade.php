@@ -3,7 +3,7 @@
     $translationStatus = match (true) {
         (bool) data_get($term->review_needed, $attribute.'.'.$language) => 'review',
         $current !== null => 'validated',
-        $pendingAttributes->containsStrict($attribute) => 'pending',
+        $openAttributes->get($attribute) === 'pending' => 'pending',
         default => 'missing',
     };
     $restoredInput = $draftAttribute === $attribute;
@@ -16,6 +16,9 @@
     <hr class="divider">
     <div class="panel-label">{{ __('ui.current_value') }} @include('partials.status', ['status' => $translationStatus])</div>
     <p class="translation-text">{{ $current ?? __('ui.no_translation') }}</p>
+    @if($openAttributes->get($attribute) === 'arbitration')
+        <div class="panel-label section">{{ __('ui.proposal') }} @include('partials.status', ['status' => 'arbitration'])</div>
+    @endif
 
     @if($translationStatus === 'review' && auth()->user()->canValidate($language))
         <form action="{{ url('terms/'.$term->id.'/confirm') }}" method="post" class="section">

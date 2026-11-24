@@ -59,12 +59,14 @@ Badges et messages partagent quatre tonalités, plus une neutre.
 | Neutre | `#53677b` | `#f4f6f8` | `#dbe3eb` | par défaut |
 | Succès | `#32634d` | `#f0f7f3` | `#d6e5db` | approved, validated, published, applied, current, ready, completed |
 | En cours | `#2266a4` | `#eaf3fd` | `#cddff3` | pending, proposed, queued, analyzing, applying |
-| À réviser | `#825f20` | `#fff8e9` | `#eadcbd` | review, obsolete, analyzed |
+| Attention | `#825f20` | `#fff8e9` | `#eadcbd` | arbitration, review, obsolete, analyzed |
 | Échec | `#a12f2f` | `#fff4f3` | `#edc5c1` | rejected, failed, blocked |
 
 Messages (`.notice`) : filet gauche de 3 px. Information `#4785ba` sur `#f7fbff` (texte `#405c76`) ; succès `#4e9065` sur `#eff7f2` ; erreur `--error` sur `#fff4f3` (texte `#761b1b`) ; avertissement `#9a6500` sur `#fff8e6` (texte `#684500`).
 
 La couleur ne porte jamais seule l’information : chaque badge affiche un libellé, précédé d’un point de 4 px.
+
+Dans le catalogue, « Arbitrer » précède « Proposer » quand l’éditeur est disponible. Dans la fiche, « Arbitrer » précède « Rejeter » lorsque les deux actions sont autorisées. Le badge du catalogue suit la priorité Obsolète, À arbitrer, À réviser, Publiée, Validée, Proposée, À traduire. Un arbitrage secondaire porte un badge à côté du lien vers son attribut. Le filtre « À arbitrer » retrouve les deux emplacements.
 
 ## Typographie
 

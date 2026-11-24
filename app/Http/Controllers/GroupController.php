@@ -58,11 +58,15 @@ class GroupController extends Controller
         $language = $request->query('language');
         $language = in_array($language, ['de', 'fr', 'it', 'en'], true) ? $language : 'fr';
         $terms = $group->terms()->visibleTo($request->user())->with('lastPublication:id,status')->orderBy('label')->paginate(50)->withQueryString();
-        $pendingAttributes = Proposal::pendingAttributesForTerms($terms->getCollection()->modelKeys(), $language);
+        $openAttributes = Proposal::openAttributesForTerms($terms->getCollection()->modelKeys(), $language);
         foreach ($terms as $term) {
-            $attribute = FormatRegistry::get($term->type)->attributeNames[0];
-            $hasPendingProposal = $pendingAttributes->get($term->id)?->containsStrict($attribute) ?? false;
-            $term->current_state = $term->state($attribute, $language, $hasPendingProposal);
+            $attributes = FormatRegistry::get($term->type)->attributeNames;
+            $attribute = $attributes[0];
+            $states = $openAttributes->get($term->id, collect());
+            $status = $states->get($attribute);
+            $term->current_state = $term->state($attribute, $language, $status === 'pending', $status === Proposal::ARBITRATION);
+            $term->secondary_arbitration = $term->obsolete ? [] : array_filter(array_slice($attributes, 1, preserve_keys: true),
+                fn ($name) => $states->get($name) === Proposal::ARBITRATION);
         }
         $group->load(['campaigns' => fn ($query) => $query->visibleTo($request->user())->orderByDesc('id')]);
 

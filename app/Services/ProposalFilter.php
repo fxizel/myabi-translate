@@ -23,6 +23,7 @@ class ProposalFilter
             'organization_id' => 'nullable|integer',
             'import_id' => 'nullable|integer',
             'overdue' => 'nullable|boolean',
+            'state' => 'nullable|in:pending,arbitration',
             'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
             'campaign_id' => 'nullable|integer|exists:translation_campaigns,id',
         ])->validate();
@@ -37,9 +38,18 @@ class ProposalFilter
         return $filters;
     }
 
-    public function query(User $user, array $filters): Builder
+    public function query(User $user, array $filters, bool $general = false): Builder
     {
-        $query = Proposal::where('status', 'pending')->where('language', $filters['language']);
+        $status = $filters['state'] ?? null;
+        $query = Proposal::inLanguage($filters['language']);
+        if ($general) {
+            $query->where('status', 'pending');
+            if ($status === Proposal::ARBITRATION) {
+                $query->whereRaw('1 = 0');
+            }
+        } else {
+            $query->whereIn('status', $status === null ? Proposal::OPEN_STATUSES : [$status]);
+        }
         if (! $user->canManage()) {
             $query->whereIn('language', $user->roleLanguages('validator'));
         }

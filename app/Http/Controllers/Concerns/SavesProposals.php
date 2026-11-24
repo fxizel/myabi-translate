@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Models\Proposal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -20,11 +21,12 @@ trait SavesProposals
             Log::warning('Proposal submission failed.', ['error_type' => $error::class]);
             throw ValidationException::withMessages(['screenshot' => __('screenshots.save_failed')]);
         }
+        $message = __($created && $proposal->status === Proposal::ARBITRATION ? 'ui.arbitration_saved' : 'ui.proposal_saved');
         if ($request->expectsJson()) {
-            return response()->json(['id' => $proposal->id, 'version' => $proposal->lock_version, 'message' => __('ui.proposal_saved')], $created ? 201 : 200);
+            return response()->json(['id' => $proposal->id, 'version' => $proposal->lock_version, 'message' => $message], $created ? 201 : 200);
         }
 
-        return back()->with('status', __('ui.proposal_saved'));
+        return back()->with('status', $message);
     }
 
     private function screenshotRules(): array

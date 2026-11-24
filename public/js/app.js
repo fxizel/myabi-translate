@@ -4,6 +4,7 @@
     const isDraft = editor => editor.value !== editor.defaultValue || editor.dataset.restored === '1' || editor.form?.querySelector('[data-screenshot-editor]')?.dataset.dirty === '1';
     let submission = null;
     const proposalEligible = checkbox => checkbox.dataset.proposalEligible !== '0';
+    const arbitrationEligible = checkbox => proposalEligible(checkbox) || checkbox.dataset.arbitrationId !== undefined;
     const catalogueSubmission = event => event.submitter?.dataset.catalogueSubmit !== undefined;
     document.querySelectorAll('[data-auto-submit]').forEach(el => el.addEventListener('change', () => el.form.requestSubmit()));
     document.querySelectorAll('[data-import-source]').forEach(select => {
@@ -74,6 +75,7 @@
             form.querySelectorAll('[data-selected-count]').forEach(el => el.textContent = count);
             const proposalCount = selected().filter(proposalEligible).length;
             form.querySelectorAll('[data-bulk-submit]').forEach(el => el.disabled = proposalCount === 0);
+            form.querySelectorAll('[data-bulk-arbitrate]').forEach(el => el.disabled = !selected().some(arbitrationEligible));
             form.querySelectorAll('[data-catalogue-submit]').forEach(el => el.disabled = count === 0);
             all.indeterminate = count > 0 && count < allItems.length;
             all.checked = allItems.length > 0 && count === allItems.length;
@@ -86,18 +88,27 @@
         const bulkProposals = form.hasAttribute('data-bulk-proposals');
         if(bulkProposals) form.querySelectorAll('[data-copied-value]').forEach(el => el.remove());
         if(catalogueSubmission(event)) return;
-        const selected = [...form.elements].filter(el => el.matches('[data-select-item]:checked') && (!bulkProposals || proposalEligible(el)));
+        const arbitrate = event.submitter?.dataset.bulkArbitrate !== undefined;
+        const eligible = arbitrate ? arbitrationEligible : proposalEligible;
+        const selected = [...form.elements].filter(el => el.matches('[data-select-item]:checked') && (!bulkProposals || eligible(el)));
         if(bulkProposals && selected.length === 0) { event.preventDefault(); return; }
         const count = selected.length;
         const message = (event.submitter?.dataset.confirm || form.dataset.confirm || document.body.dataset.confirm).replace(':count', String(count));
         if(!window.confirm(message)) { event.preventDefault(); return; }
         if(bulkProposals) {
+            const copy = (name, value) => {
+                const input = document.createElement('input');
+                input.type = 'hidden'; input.name = name; input.value = value; input.dataset.copiedValue = '';
+                form.append(input);
+            };
             for(const checkbox of selected) {
+                if(arbitrate && checkbox.dataset.arbitrationId !== undefined) {
+                    copy(`selection[${checkbox.dataset.arbitrationId}]`, checkbox.dataset.arbitrationVersion);
+                    continue;
+                }
                 const sourceForm = checkbox.closest('tr').querySelector('form');
                 for(const key of ['selected','attribute','language','lock_version','value']) {
-                    const input = document.createElement('input');
-                    input.type = 'hidden'; input.name = `rows[${checkbox.dataset.termId}][${key}]`;
-                    input.value = key === 'selected' ? '1' : sourceForm.elements[key].value; input.dataset.copiedValue = ''; form.append(input);
+                    copy(`rows[${checkbox.dataset.termId}][${key}]`, key === 'selected' ? '1' : sourceForm.elements[key].value);
                 }
             }
         }
@@ -117,10 +128,16 @@
         // Read defaultPrevented again before unloading: a later listener may cancel submission.
         submission = {event, values};
     });
-    document.querySelectorAll('[data-rejection-reason]').forEach(select => select.addEventListener('change', () => {
+    document.querySelectorAll('[data-rejection-reason]').forEach(select => {
         const input = select.form.querySelector('[name="reason"]');
-        if(input) input.required = select.value === 'reject';
-    }));
+        if(!input) return;
+        const refresh = () => {
+            input.required = select.value === 'reject';
+            input.hidden = !input.required;
+        };
+        select.addEventListener('change', refresh);
+        refresh();
+    });
     document.querySelectorAll('[data-column-toggle]').forEach(input => {
         const table = document.getElementById(input.getAttribute('aria-controls'));
         if(!table) return;

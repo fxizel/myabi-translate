@@ -118,7 +118,7 @@ class CampaignController extends Controller
         $terms = $this->paginateTerms($request->user(), $participationQuery, $contextTerms, $treatment);
         $termIds = $terms->getCollection()->modelKeys();
         $participations = $participationQuery->whereIn('term_id', $termIds)->with('trackedProposal')->get()->keyBy('term_id');
-        $pendingAttributes = Proposal::pendingAttributesForTerms($termIds, $campaign->language);
+        $openAttributes = Proposal::openAttributesForTerms($termIds, $campaign->language);
 
         $canWorkCampaign = $service->canWork($request->user(), $campaign);
         $canReviewCampaign = $service->canReview($request->user(), $campaign);
@@ -137,7 +137,7 @@ class CampaignController extends Controller
         $historyProposals = Proposal::whereIn('id', $historyProposalIds)->whereIn('term_id', $campaign->participations()->select('term_id'))->get(['id', 'term_id', 'status'])->keyBy('id');
 
         return view('campaigns.show', [
-            ...compact('historyProposals', 'campaign', 'terms', 'termScope', 'participations', 'displayAttributes', 'pending', 'pendingAttributes', 'events', 'groupCoverage'),
+            ...compact('historyProposals', 'campaign', 'terms', 'termScope', 'participations', 'displayAttributes', 'pending', 'openAttributes', 'events', 'groupCoverage'),
             ...compact('canWorkCampaign', 'canReviewCampaign', 'canResolveArbitration'),
             'campaignService' => $service,
         ]);

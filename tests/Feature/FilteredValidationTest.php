@@ -381,6 +381,35 @@ class FilteredValidationTest extends TestCase
         self::assertSame(0, DB::table('audit_events')->where('action', 'proposal.validate')->count());
     }
 
+    public function test_arbitration_invalidates_queued_confirmation_and_blocks_competing_general_decisions(): void
+    {
+        $this->import(3);
+        [$competing, $protected, $eligible] = Proposal::where('language', 'fr')->orderBy('id')->get()->all();
+        $workflow = app(WorkflowService::class);
+        $alternative = $workflow->propose($this->manager, $competing->term, 'label', 'fr', 'Alternative {name}');
+        $queued = $this->enqueue($this->token());
+        foreach ([$alternative, $protected] as $proposal) {
+            $workflow->decide($this->manager, $proposal, 'arbitrate', $proposal->lock_version);
+        }
+        self::assertFalse($this->step($queued));
+        self::assertSame('failed', $queued->fresh()->status);
+        $list = $this->listing(['state' => Proposal::ARBITRATION]);
+        self::assertSame(2, $list->viewData('proposalTotal'));
+        self::assertSame(0, $list->viewData('filteredTotal'));
+        self::assertNull($list->viewData('filteredSnapshot'));
+
+        $operation = $this->enqueue($this->token());
+        self::assertSame(2, $operation->preview['total']);
+        self::assertFalse($this->step($operation, 1));
+        self::assertTrue($this->step($operation, 1));
+        self::assertSame(1, $operation->fresh()->counts['validated']);
+        self::assertSame(1, $operation->fresh()->counts['reasons']['competing']);
+        self::assertSame('pending', $competing->fresh()->status);
+        self::assertSame('validated', $eligible->fresh()->status);
+        self::assertSame(Proposal::ARBITRATION, $protected->fresh()->status);
+        self::assertSame(Proposal::ARBITRATION, $alternative->fresh()->status);
+    }
+
     public function test_changed_campaign_members_stop_queued_filtered_validation_before_any_decision(): void
     {
         $this->import(2);

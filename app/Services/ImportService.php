@@ -8,6 +8,7 @@ use App\Domain\Devconf\FormatRegistry;
 use App\Domain\Devconf\TranslationValidator;
 use App\Models\ImportBatch;
 use App\Models\MyabiVersion;
+use App\Models\Proposal;
 use App\Models\Term;
 use App\Models\User;
 use Carbon\Carbon;
@@ -270,7 +271,7 @@ class ImportService
             DB::table('terms')->insert(array_values($new));
             $known = $this->known($import, $rows->pluck('raw_identity_hash')->all());
         }
-        $existingProposals = DB::table('proposals')->whereIn('term_id', $known->flatten()->pluck('id'))->where('status', 'pending')->get();
+        $existingProposals = DB::table('proposals')->whereIn('term_id', $known->flatten()->pluck('id'))->whereIn('status', Proposal::OPEN_STATUSES)->get();
         $existingByTerm = $existingProposals->groupBy('term_id');
         $proposalKeys = [];
         foreach ($existingProposals as $p) {
@@ -384,7 +385,7 @@ class ImportService
         if ($revisions) {
             DB::table('revisions')->insert($revisions);
         }
-        $this->refreshPendingProposals($proposalAnomalies, $now);
+        $this->refreshOpenProposals($proposalAnomalies, $now);
         foreach (array_chunk($proposals, 300) as $chunk) {
             DB::table('proposals')->insert($chunk);
         }
@@ -404,7 +405,7 @@ class ImportService
         return $format->identityHash($row);
     }
 
-    private function refreshPendingProposals(array $anomalies, string $now): void
+    private function refreshOpenProposals(array $anomalies, string $now): void
     {
         foreach (array_chunk($anomalies, 300, true) as $chunk) {
             $cases = [];
@@ -415,8 +416,8 @@ class ImportService
                 $bindings[] = $value;
             }
             $sql = 'UPDATE proposals SET anomalies = CASE id '.implode(' ', $cases).' END, lock_version = lock_version + 1, updated_at = ?'
-                .' WHERE id IN ('.implode(',', array_fill(0, count($chunk), '?')).') AND status = ?';
-            DB::update($sql, [...$bindings, $now, ...array_keys($chunk), 'pending']);
+                .' WHERE id IN ('.implode(',', array_fill(0, count($chunk), '?')).') AND status IN (?, ?)';
+            DB::update($sql, [...$bindings, $now, ...array_keys($chunk), ...Proposal::OPEN_STATUSES]);
         }
     }
 

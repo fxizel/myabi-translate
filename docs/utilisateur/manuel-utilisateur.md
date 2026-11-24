@@ -63,7 +63,9 @@ Avec le filtre **À traduire**, si l’attribut principal a déjà une traductio
 
 ![Pour un terme « À traduire », l’action Proposer crée une contribution à l’état « Proposée ». Valider fait passer la traduction à « Validée », puis Publier la fait passer à « Publiée ». Un rejet motivé donne l’état « Rejetée ». Soumettre une nouvelle proposition crée une autre contribution à l’état « Proposée ». Si la référence change, la traduction passe à « À réviser » jusqu’à confirmation de la valeur ou validation d’une correction.](captures/schema-etat-traduction.png)
 
-Le badge passe de **À traduire** à **Proposée** lorsqu’une première proposition est en attente pour le champ et la langue affichés. Le filtre **Proposée** sélectionne uniquement les lignes qui portent ce badge. Le filtre **À traduire** inclut ces termes jusqu’à validation d’une valeur. Lorsqu’une valeur est déjà validée, le badge continue de décrire l’état de cette valeur. La section **Propositions** de la fiche montre le statut de chaque contribution. L’état **Obsolète** concerne le terme entier, quelle que soit la langue choisie.
+Le badge **Proposée** apparaît lorsqu’une proposition ordinaire est en attente sur le champ affiché et que sa valeur validée est absente. Le filtre **Proposée** retrouve les lignes portant ce badge. Le filtre **À traduire** inclut ces termes jusqu’à validation d’une valeur.
+
+Le badge **À arbitrer** signale une proposition qui demande une décision explicite sur ce champ, même si une valeur est déjà en vigueur. Le filtre **À arbitrer** retrouve aussi les arbitrages secondaires, signalés près des liens vers les champs concernés. La fiche montre toutes les propositions et leur statut. L’état **Obsolète** reste prioritaire pour le terme entier.
 
 ### Retrouver un libellé proche
 
@@ -140,6 +142,12 @@ Une proposition envoyée n’est pas encore une traduction validée. La valeur e
 
 Vous pouvez utiliser **Corriger la proposition** sur une contribution en attente qui vous appartient. Après un rejet, **Corriger ce rejet par une nouvelle proposition** conserve la décision précédente et prépare un nouvel envoi.
 
+### Demander un arbitrage sur une proposition
+
+Dans **Traductions**, saisissez une traduction et choisissez **Arbitrer** pour l’enregistrer directement au statut **À arbitrer**. Vous pouvez aussi cliquer sur **Arbitrer** pour une proposition affichée ou ouvrir la fiche et agir sur la proposition voulue. Pour plusieurs lignes du catalogue, cochez les lignes concernées et choisissez **Arbitrer la sélection**.
+
+L’action se fait sans motif. Vous pouvez corriger une proposition à arbitrer avec vos droits habituels. Elle conserve son statut jusqu’à une validation ou un rejet. La valeur en vigueur continue de s’afficher pendant l’arbitrage.
+
 ### Joindre une capture à une proposition
 
 Une capture permet de montrer le contexte du terme dans myABI. Elle est facultative, sans légende, et accompagne uniquement cette proposition, pour son attribut et sa langue.
@@ -176,6 +184,8 @@ Figure 6 — Travail envoyé et traductions confirmées sont deux indicateurs di
 
 Un avancement de 100 % ne signifie pas que toutes les traductions sont validées. La campagne devient **Terminé** lorsque tous ses termes actifs sont confirmés. **Demander un arbitrage** permet de signaler une difficulté avec un motif.
 
+L’arbitrage de **campagne** demande un motif et concerne la participation du terme. Lorsqu’une proposition suivie est mise en arbitrage depuis le catalogue ou sa fiche, la participation garde son état **Proposition envoyée** jusqu’à la décision ou à un changement de contexte.
+
 ## 6. Valider ou rejeter une proposition
 
 Objectif : décider quelles propositions deviennent les traductions en vigueur.
@@ -203,6 +213,8 @@ Pour examiner une proposition individuellement, cliquez sur **Ouvrir**. Dans **P
 Un Validateur ne peut pas valider sa propre proposition. Le Gestionnaire dispose d’une case **Dérogation du Gestionnaire** pour ce cas.
 
 **Valider toutes les propositions filtrées** traite l’ensemble des résultats, au-delà des lignes cochées. Examinez le périmètre annoncé et le bilan des exclusions.
+
+Dans la file **Validation**, choisissez le filtre **À arbitrer** pour retrouver ces propositions. Ouvrez-en une ou cochez les propositions que vous voulez traiter en lot. **Valider toutes les propositions filtrées** et la validation initiale d’un import excluent les propositions à arbitrer. Si une autre proposition de la même cellule est à arbitrer, rejetez-la avec un motif avant de valider la proposition retenue.
 
 ## 7. Organiser les groupes et les campagnes
 

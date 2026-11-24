@@ -20,11 +20,11 @@ class FilteredValidationService
 
     public function snapshot(User $user, array $filters, int $total, int $generation): ?string
     {
-        if ($total < 1 || ! $user->canValidate($filters['language'])) {
+        if ($total < 1 || ($filters['state'] ?? null) === Proposal::ARBITRATION || ! $user->canValidate($filters['language'])) {
             return null;
         }
         $this->authorize($user, $filters['language']);
-        $maximum = (int) $this->filter->query($user, $filters)->max('proposals.id');
+        $maximum = (int) $this->filter->query($user, $filters, general: true)->max('proposals.id');
         if ($this->generation() !== $generation) {
             return null;
         }
@@ -103,12 +103,14 @@ class FilteredValidationService
                 }
                 $operation->status = 'processing';
                 $operation->started_at ??= now();
-                $query = $this->filter->query($user, $operation->preview['filters'])
+                $query = $this->filter->query($user, $operation->preview['filters'], general: true)
                     ->where('proposals.id', '<=', $operation->max_proposal_id);
                 $proposals = (clone $query)->with('term.sourceImport')->select('proposals.*')
                     ->selectSub(fn ($query) => $query->from('proposals as concurrent')->selectRaw('COUNT(*)')
                         ->whereColumn('concurrent.term_id', 'proposals.term_id')->whereColumn('concurrent.attribute', 'proposals.attribute')
-                        ->whereColumn('concurrent.language', 'proposals.language')->where('concurrent.status', 'pending'), 'pending_cell_count')
+                        ->whereColumn('concurrent.language', 'proposals.language')
+                        ->whereRaw('HEX(concurrent.attribute) = HEX(proposals.attribute) AND HEX(concurrent.language) = HEX(proposals.language)')
+                        ->whereIn('concurrent.status', Proposal::OPEN_STATUSES), 'open_cell_count')
                     ->where('proposals.id', '>', $operation->cursor)->orderBy('proposals.id')->limit($batchSize)->get();
                 $selection = [];
                 $attributes = [];
@@ -125,7 +127,7 @@ class FilteredValidationService
                     }
                 }
                 if ($selection) {
-                    $this->workflow->bulkUnderOperationLock($user, $selection, 'validate', null, $operation->override);
+                    $this->workflow->bulkUnderOperationLock($user, $selection, 'validate', null, $operation->override, general: true);
                     $counts['validated'] += count($selection);
                 }
                 $operation->counts = $counts;
@@ -184,7 +186,7 @@ class FilteredValidationService
             return 'self';
         }
         // A competitor outside the filter still requires an explicit individual choice.
-        if ((int) $proposal->pending_cell_count > 1) {
+        if ((int) $proposal->open_cell_count > 1) {
             return 'competing';
         }
         $attributes = $attributesCache[$proposal->term_id] ??= $proposal->term->attributesForDisplay();

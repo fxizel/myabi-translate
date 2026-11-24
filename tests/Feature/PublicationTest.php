@@ -10,12 +10,14 @@ use App\Http\Middleware\RequireTwoFactor;
 use App\Models\ImportBatch;
 use App\Models\MyabiVersion;
 use App\Models\Organisation;
+use App\Models\Proposal;
 use App\Models\Publication;
 use App\Models\Revision;
 use App\Models\Term;
 use App\Models\User;
 use App\Services\OperationLock;
 use App\Services\PublicationService;
+use App\Services\WorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -248,6 +250,9 @@ class PublicationTest extends TestCase
     public function test_only_validated_cells_are_exported_and_later_changes_never_rebuild_a_publication(): void
     {
         [$source, $term] = $this->source('mric', validated: ['label' => ['fr' => 'Version validée {}']]);
+        $workflow = app(WorkflowService::class);
+        $replacement = $workflow->propose($this->manager, $term, 'label', 'fr', 'Remplacement fictif {}', arbitrate: true);
+        $missingCell = $workflow->propose($this->manager, $term, 'label', 'it', 'Proposta fittizia {}', arbitrate: true);
         $publication = $this->enqueue(['mric']);
         $this->build($publication);
         $publication->refresh();
@@ -267,6 +272,8 @@ class PublicationTest extends TestCase
         $term->update(['validated' => ['label' => ['fr' => 'Une autre valeur {}']], 'revision_no' => 2]);
         $this->build($publication);
         self::assertSame($before, file_get_contents($this->path($publication, $recipient['archive']['path'])));
+        self::assertSame(Proposal::ARBITRATION, $replacement->fresh()->status);
+        self::assertSame(Proposal::ARBITRATION, $missingCell->fresh()->status);
         self::assertSame('Version validée {}', Revision::where('term_id', $term->id)->first()->validated['label']['fr']);
         self::assertSame(1, $term->fresh()->last_published_revision);
         self::assertSame($publication->id, $term->fresh()->last_publication_id);

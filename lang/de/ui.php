@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'status_arbitration' => 'Zur Klärung',
+    'arbitrate' => 'Zur Klärung markieren',
+    'arbitrate_selection' => 'Auswahl zur Klärung markieren',
+    'arbitration_bulk_confirm' => ':count Vorschläge zur Klärung markieren?',
+    'arbitration_saved' => 'Zur Klärung markiert.',
+    'arbitration_competitor' => 'Lehnen Sie zuerst den anderen zur Klärung markierten Vorschlag für diese Zelle mit einer Begründung ab.',
+    'arbitration_one_per_cell' => 'Wählen Sie je Begriff, Attribut und Sprache nur einen Vorschlag zur Freigabe aus.',
+    'arbitration_filtered_hint' => 'Markieren Sie Vorschläge zur Klärung einzeln in der Auswahl. Die allgemeine Freigabe schliesst diese Vorschläge aus.',
     'upload_too_large_title' => 'Datei zu gross',
     'upload_too_large_help' => 'Die Übertragung überschreitet das Serverlimit. Es wurde kein Import erstellt. Importe unterstützen Dateien bis 100 MiB, wenn der Server dafür konfiguriert ist. Ist Ihre Datei kleiner, melden Sie diesen Fehler der Administration, damit die Serverkonfiguration geprüft wird. Wählen Sie die Datei danach erneut aus.',
     'upload_return' => 'Zurück zu den Importen',

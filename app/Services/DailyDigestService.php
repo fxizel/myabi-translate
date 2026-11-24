@@ -18,7 +18,7 @@ class DailyDigestService
         $until ??= now();
         $counts = [];
         if ($user->canValidate()) {
-            $pending = Proposal::where('status', 'pending');
+            $pending = Proposal::whereIn('status', Proposal::OPEN_STATUSES);
             if (! $user->canManage()) {
                 $pending->whereIn('language', $user->roleLanguages('validator'));
             }

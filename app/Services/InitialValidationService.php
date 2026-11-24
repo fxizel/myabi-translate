@@ -22,7 +22,7 @@ class InitialValidationService
         $generation = $this->generation();
         $maximum = (int) $this->importProposals($import->id)->where('language', $language)->max('id');
         $counts = ['total' => 0, 'eligible' => 0, 'excluded' => 0, 'reasons' => ['invalid' => 0, 'divergence' => 0, 'competing' => 0, 'self' => 0, 'obsolete' => 0]];
-        $this->query($import->id, $language, $maximum)->where('status', 'pending')->chunkById(300, function ($proposals) use (&$counts, $user, $override) {
+        $this->query($import->id, $language, $maximum)->chunkById(300, function ($proposals) use (&$counts, $user, $override) {
             $attributes = [];
             foreach ($proposals as $proposal) {
                 $counts['total']++;
@@ -139,16 +139,13 @@ class InitialValidationService
                 $counts = $operation->counts;
                 foreach ($proposals as $proposal) {
                     $operation->cursor = $proposal->id;
-                    if ($proposal->status !== 'pending') {
-                        continue;
-                    }
                     $counts['examined']++;
                     if ($this->exclusion($proposal, $user, $operation->override, $attributes) === null) {
                         $selection[$proposal->id] = $proposal->lock_version;
                     }
                 }
                 if ($selection) {
-                    $this->workflow->bulkUnderOperationLock($user, $selection, 'validate', null, $operation->override);
+                    $this->workflow->bulkUnderOperationLock($user, $selection, 'validate', null, $operation->override, general: true);
                     $counts['validated'] += count($selection);
                 }
                 $operation->counts = $counts;
@@ -220,9 +217,6 @@ class InitialValidationService
                 ->where('id', '>', $operation->cursor)->orderBy('id')->limit($batchSize)->get();
             foreach ($proposals as $proposal) {
                 $operation->cursor = $proposal->id;
-                if ($proposal->status !== 'pending') {
-                    continue;
-                }
                 $preview['counts']['total']++;
                 $reason = $this->exclusion($proposal, $user, $operation->override, $attributes);
                 if ($reason) {
@@ -262,8 +256,10 @@ class InitialValidationService
         return $this->importProposals($importId)->with('term.sourceImport')->select('proposals.*')
             ->selectSub(fn ($query) => $query->from('proposals as concurrent')->selectRaw('COUNT(*)')
                 ->whereColumn('concurrent.term_id', 'proposals.term_id')->whereColumn('concurrent.attribute', 'proposals.attribute')
-                ->whereColumn('concurrent.language', 'proposals.language')->where('concurrent.status', 'pending'), 'pending_cell_count')
-            ->where('language', $language)->where('id', '<=', $maximum);
+                ->whereColumn('concurrent.language', 'proposals.language')
+                ->whereRaw('HEX(concurrent.attribute) = HEX(proposals.attribute) AND HEX(concurrent.language) = HEX(proposals.language)')
+                ->whereIn('concurrent.status', Proposal::OPEN_STATUSES), 'open_cell_count')
+            ->inLanguage($language)->where('status', 'pending')->where('id', '<=', $maximum);
     }
 
     private function exclusion(Proposal $proposal, User $user, bool $override, array &$attributesCache): ?string
@@ -277,8 +273,8 @@ class InitialValidationService
         if ($proposal->author_id === $user->id && ! $override) {
             return 'self';
         }
-        // Count all pending candidates, including manual proposals and other imports.
-        if ((int) $proposal->pending_cell_count > 1) {
+        // Count all open competitors, including manual proposals and other imports.
+        if ((int) $proposal->open_cell_count > 1) {
             return 'competing';
         }
         $attributes = $attributesCache[$proposal->term_id] ??= $proposal->term->attributesForDisplay();

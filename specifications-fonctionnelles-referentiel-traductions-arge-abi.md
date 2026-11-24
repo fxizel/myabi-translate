@@ -116,7 +116,7 @@ Les termes ci-dessous ont un sens précis dans tout le document.
 | Valeur importée | Valeur d'un attribut telle qu'elle figure dans un fichier importé, qu'il provienne de LogObject (valeur éditeur) ou de l'instance d'une police (traduction locale). Elle est rattachée au lot d'import, donc à une version myABI et à une organisation source. |
 | Valeur éditeur | Valeur importée d'une livraison LogObject (colonnes Default, Caption ou langue déjà remplie). Une valeur importée traduite est créée comme proposition, jamais comme valeur validée. |
 | Révision | État figé et numéroté d'un terme (toutes ses traductions et attributs) à un instant donné. Toute modification validée crée une nouvelle révision ; les anciennes restent consultables. |
-| Statut | Position d'une proposition dans le workflow (Proposée, Validée, Rejetée). Les états calculés de la traduction en vigueur (À traduire, Validée, Publiée, À réviser, Obsolète) décrivent sa couverture et sa publication, indépendamment de ce workflow. |
+| Statut | Position d'une proposition dans le workflow (Proposée, À arbitrer, Validée, Rejetée). Les états calculés de la traduction en vigueur (À traduire, Validée, Publiée, À réviser, Obsolète) décrivent sa couverture et sa publication, indépendamment de ce workflow. |
 | Version myABI | Numéro de version du logiciel (ex. 2026.2) pour lequel un terme existe. Un terme peut apparaître, changer de valeur éditeur ou disparaître d'une version à l'autre. |
 | Catalogue | Ensemble courant des termes et traductions communes ; l'export inclut tous les termes connus du type, la publication sa sélection validée figée. |
 | Publication | Acte de figer un catalogue pour une version myABI. Une publication porte un numéro (ex. 2026.2-03) et une date. |
@@ -216,7 +216,7 @@ Chaque format définit les colonnes et leur ordre, la clé d'identité, les attr
 
 Un terme courant est identifié par son type et les composantes exactes de sa clé, sans organisation ni version. Casse, espaces et composantes vides autorisées restent significatifs. Une empreinte sert à retrouver des candidats ; l'égalité exacte doit ensuite être contrôlée. Plusieurs imports peuvent alimenter le même terme ; les doublons ambigus internes à un fichier restent bloquants.
 
-Une seule valeur validée courante existe par terme, attribut et langue. Deux organisations important la même identité réutilisent le même terme ; leurs valeurs divergentes deviennent des propositions concurrentes. Une proposition identique en attente est réutilisable en conservant tous ses liens d'import. Une validation autorisée choisit la valeur commune et supplante les autres propositions en attente de la même cellule.
+Une seule valeur validée courante existe par terme, attribut et langue. Deux organisations important la même identité réutilisent le même terme ; leurs valeurs divergentes deviennent des propositions concurrentes. Une proposition identique au statut Proposée ou À arbitrer est réutilisable en conservant tous ses liens d’import. Une validation autorisée choisit la valeur commune et supplante les autres propositions Proposée de la même cellule.
 
 L'organisation d'origine est enregistrée à la contribution et ne suit pas les changements d'organisation du compte. L'auteur courant et les imports associés sont présentés séparément. Une correction conserve valeurs et provenances précédentes ; elle ne prétend pas que les imports ont fourni la nouvelle valeur corrigée. Le filtre d'origine couvre l'organisation historique et tous les imports associés ; celui d'import couvre le lien principal et les liens supplémentaires, sans double comptage.
 
@@ -224,7 +224,7 @@ La consolidation conserve l'identifiant et les validations de la première fiche
 
 ## 6. Workflow de validation
 
-Le workflow s'applique à une proposition de traduction (un terme, un attribut, une langue, une valeur candidate) et comporte trois statuts : **Proposée, Validée, Rejetée**. L'action explicite « Proposer » contrôle la saisie, enregistre la proposition au statut Proposée et la rend immédiatement visible dans la file de validation. La saisie en cours, avant cette action, n'est pas une proposition enregistrée. La valeur en vigueur d'une traduction est toujours la dernière proposition validée ; une proposition en cours ne la remplace jamais avant validation.
+Le workflow s’applique à une proposition de traduction pour un terme, un attribut et une langue. **Proposer** contrôle et enregistre la saisie, puis rend la proposition visible dans la file de validation. **Arbitrer** peut faire passer une proposition **Proposée** à l’état **À arbitrer** ou enregistrer directement une saisie du catalogue dans cet état. Le Traducteur, le Validateur et le Gestionnaire peuvent arbitrer dans leurs langues autorisées. L’action se fait sans motif. Seule la validation remplace la valeur en vigueur.
 
 ```mermaid
 ---
@@ -232,14 +232,18 @@ title: Cycle de vie d'une proposition de traduction
 ---
 stateDiagram-v2
     accTitle: Cycle de vie d'une proposition de traduction
-    accDescr: Une proposition naît au statut Proposée par envoi explicite du Traducteur ou par import. Elle est validée ou rejetée. La correction d'un rejet crée une nouvelle proposition. La validation initiale en masse suit les mêmes statuts.
+    accDescr: Une proposition peut être validée ou rejetée directement ou après un arbitrage. Depuis le catalogue, Arbitrer peut créer une proposition et l’arbitrer dans la même opération.
     direction LR
     state "Proposée" as proposee
+    state "À arbitrer" as arbitrage
     state "Validée" as validee
     state "Rejetée" as rejetee
 
     [*] --> proposee : proposer ou importer une valeur traduite
+    proposee --> arbitrage : arbitrer sans motif
     proposee --> validee : valider, individuellement ou en lot
+    arbitrage --> validee : valider explicitement
+    arbitrage --> rejetee : rejeter explicitement avec motif
     proposee --> rejetee : rejeter avec motif ou proposition supplantée
     validee --> [*] : devient la valeur en vigueur
     rejetee --> [*] : décision conservée
@@ -319,15 +323,15 @@ stateDiagram-v2
 3. La validation se fait par langue. Un Validateur ne voit en attente que les propositions de ses langues.
 4. Le motif de rejet est obligatoire, choisi dans une liste (terme non conforme au glossaire, sens incorrect, orthographe, longueur, placeholder manquant, supplantée par une autre proposition, autre) et complété par un texte libre.
 5. Le Validateur décide directement depuis la file des propositions. Une décision ne porte que sur la valeur qu'il a examinée : si la proposition a été corrigée ou traitée entre-temps, la décision est refusée et la file est actualisée.
-6. Validation et rejet en lot sont possibles sur une sélection filtrée (par type, formulaire, workflow, groupe de codes). Depuis la file, « Valider toutes les propositions filtrées » traite aussi les propositions des autres pages ou pas encore chargées, pour la langue et les filtres actifs. Le nombre total est affiché avant confirmation. Le traitement reprend par lots en arrière-plan, sans limite globale de 500 propositions ; les anomalies bloquantes, les propositions personnelles sans dérogation explicite du Gestionnaire et les cellules avec plusieurs propositions concurrentes restent en attente et sont comptabilisées pour examen. Une modification du référentiel interrompt l’opération et exige une nouvelle confirmation ; les validations déjà enregistrées sont conservées.
+6. L’arbitrage, la validation et le rejet en lot portent sur des propositions sélectionnées explicitement. Une proposition À arbitrer doit être sélectionnée pour être validée ou rejetée en lot. Les validations générales portent uniquement sur les propositions Proposée. Depuis la file, « Valider toutes les propositions filtrées » traite aussi les propositions des autres pages ou pas encore chargées, pour la langue et les filtres actifs. Le nombre total est affiché avant confirmation. Le traitement reprend par lots en arrière-plan, sans limite globale de 500 propositions ; les anomalies bloquantes, les propositions personnelles sans dérogation explicite du Gestionnaire et les cellules avec plusieurs propositions concurrentes restent en attente et sont comptabilisées pour examen. Une modification du référentiel interrompt l’opération et exige une nouvelle confirmation ; les validations déjà enregistrées sont conservées.
 7. Les valeurs traduites importées arrivent au statut Proposée, jamais en Validée. Le Gestionnaire peut lancer une validation initiale en masse d'un import pour constituer l'état de départ ; l'opération est journalisée comme telle et respecte les contrôles bloquants.
-8. Une proposition encore Proposée est corrigeable par son auteur, via une action explicite qui applique les mêmes contrôles que « Proposer » et conserve l'historique des modifications. Une proposition d'import peut être reprise par un Traducteur autorisé pour sa langue ; le premier qui la corrige en devient le rédacteur, seul habilité à poursuivre cette correction. Son identité est enregistrée pour le principe des quatre yeux. Une proposition Validée ou Rejetée n'est plus modifiable.
-9. Quand une proposition est validée, les autres propositions Proposée sur le même terme, attribut et langue passent à Rejetée avec le motif « supplantée ». Deux propositions concurrentes ne peuvent pas être validées simultanément.
+8. Une proposition Proposée ou À arbitrer est corrigeable par son auteur et conserve son statut après correction, via une action explicite qui applique les mêmes contrôles que « Proposer » et conserve l'historique des modifications. Une proposition d'import peut être reprise par un Traducteur autorisé pour sa langue ; le premier qui la corrige en devient le rédacteur, seul habilité à poursuivre cette correction. Son identité est enregistrée pour le principe des quatre yeux. Une proposition Validée ou Rejetée n'est plus modifiable.
+9. Pour valider une proposition, le Validateur doit d’abord rejeter avec motif toute autre proposition À arbitrer sur la même cellule. La validation supplante les concurrentes au statut Proposée. Une seule proposition par terme, attribut et langue peut être retenue dans une décision groupée.
 10. Pour une traduction À réviser, le Validateur peut confirmer la valeur en vigueur sans nouvelle proposition ; la confirmation vaut validation (auteur, date et heure) sans changement de valeur ni nouvelle révision.
 11. Un contrôle automatique bloque l'envoi d'une proposition vide, contenant un caractère non représentable dans l'encodage d'export ou omettant un placeholder de la source (`{}`, `{field}`, `[Tatbestand]`). Les valeurs importées sont conservées même si elles présentent ces anomalies ; leurs propositions sont signalées dans le rapport et dans la file. Toute validation, y compris en masse, vérifie ces contrôles sur la référence actuelle et exige la correction des anomalies bloquantes.
 12. Lot 2 : un contrôle automatique signale (sans bloquer) un écart avec le glossaire terminologique et une traduction identique déjà validée pour la même source ailleurs (suggestion de réutilisation).
 13. Lot 2 : chaque proposition porte un fil de commentaires ; un commentaire peut mentionner un utilisateur.
-14. Une proposition au statut Proposée sans traitement depuis 30 jours remonte dans le tableau de bord des Validateurs de la langue.
+14. Une proposition ouverte sans traitement depuis 30 jours remonte dans le tableau de bord des Validateurs de la langue.
 
 **Notifications** : résumé quotidien par e-mail, désactivable par utilisateur ; aucun envoi immédiat. Validateur : propositions en attente dans ses langues. Traducteur : validations, rejets et mentions (lot 2). Gestionnaire : imports terminés et termes à réviser après import.
 
@@ -435,8 +439,8 @@ Chaque ligne est comparée à la révision courante du terme. Les colonnes de tr
 | Valeur de référence (de_CH, sinon Default) d'un attribut modifiée | Nouvelle révision d'origine import ; les traductions validées de cet attribut passent À réviser. |
 | Attribut technique modifié (Active, PHV, VALIDTODT, etc.) | Nouvelle révision d'origine import ; aucune action de workflow. |
 | Valeur traduite non vide présente dans le fichier, absente du Référentiel | Proposition au statut Proposée, auteur = compte import, organisation = source. |
-| Valeur traduite identique à une proposition d'import encore Proposée | Rien ; la proposition existante est aussi rattachée à ce lot. |
-| Valeur traduite différente d'une proposition d'import encore Proposée, sans valeur validée | Proposition supplémentaire au statut Proposée avec son organisation source ; les propositions concurrentes s'affichent côte à côte dans la vue de traduction. |
+| Valeur traduite identique à une proposition d’import ouverte | Rien ; la proposition existante est aussi rattachée à ce lot. |
+| Valeur traduite différente d’une proposition d’import ouverte, sans valeur validée | Proposition supplémentaire au statut Proposée avec son organisation source ; les propositions concurrentes s'affichent côte à côte dans la vue de traduction. |
 | Valeur traduite non vide différente de la valeur validée | Proposition au statut Proposée marquée « divergence avec l'instance de [organisation] » ; la valeur validée reste en vigueur. Une proposition d'import identique encore en attente est rattachée au lot sans duplication. |
 | Valeur traduite identique à la valeur validée | Rien. |
 | Terme connu absent du fichier | Aucune présence créée pour ce lot ; l'état du terme, ses présences antérieures, ses valeurs et son historique sont conservés. |
@@ -448,7 +452,7 @@ Chaque ligne est comparée à la révision courante du terme. Les colonnes de tr
 - Liste détaillée téléchargeable (CSV) avec numéro de ligne, clé, catégorie, message.
 - Le rapport est conservé avec le lot et consultable depuis l'historique des imports.
 
-**Validation initiale en masse** : pour constituer l'état de départ, le Gestionnaire peut, après un import, valider en une opération les propositions encore Proposée d'un lot pour une langue donnée. L'opération exclut les propositions marquées divergence ou présentant une anomalie bloquante ; l'aperçu et le rapport indiquent les exclusions. Pour un même terme, attribut et langue, une seule proposition peut être retenue, les concurrentes étant rejetées comme supplantées. Les contrôles et le principe des quatre yeux de la section 6 s'appliquent, avec dérogation journalisée du Gestionnaire le cas échéant. L'opération est journalisée comme validation en masse avec le lot comme origine.
+**Validation initiale en masse** : pour constituer l'état de départ, le Gestionnaire peut, après un import, valider en une opération les propositions encore Proposée d'un lot pour une langue donnée. L'opération exclut les propositions marquées divergence ou présentant une anomalie bloquante ; l'aperçu et le rapport indiquent les exclusions. Les cellules comportant plusieurs propositions ouvertes sont exclues de la validation initiale, y compris lorsque l’une des propositions est À arbitrer. Les contrôles et le principe des quatre yeux de la section 6 s'appliquent, avec dérogation journalisée du Gestionnaire le cas échéant. L'opération est journalisée comme validation en masse avec le lot comme origine.
 
 **Annulation** : l'analyse à blanc est la protection principale. Un lot appliqué ne s'annule pas en MVP ; l'annulation d'un lot sans validation postérieure sur les termes touchés est prévue en lot 2 (section 14).
 
@@ -566,7 +570,7 @@ L'interface est une application web en allemand, français et italien, conçue p
 | Recherche et liste des termes | Filtres : type, version, langue, état, formulaire, workflow ou groupe de codes, texte libre sur clé, référence et traductions. Tri, pagination serveur, colonnes configurables, sélection multiple pour les actions en lot. | Tous |
 | Fiche terme | Clé, type, présence par version et par lot ; grille attribut × langue avec valeur en vigueur, état et proposition en cours ; actions proposer, corriger une proposition en attente, valider, rejeter, confirmer ; chronologie ; révisions et comparaison ; en lot 2 : commentaires, concept lié, termes ayant la même référence ailleurs. | Tous, actions selon rôle |
 | Vue de traduction | Tableau : clé, référence de_CH, valeur en vigueur, saisie éditable en ligne, proposition en attente et statut. Filtre « à traduire seulement ». Navigation clavier, action explicite « Proposer », individuellement ou en lot, avec contrôles avant envoi ; correction des propositions encore en attente selon la section 6. | Traducteur, Validateur, Gestionnaire |
-| File de validation | Propositions au statut Proposée de mes langues ; référence, valeur en vigueur et proposition côte à côte, origine historique et imports associés (filtres sans double comptage), différences surlignées et anomalies bloquantes ; valider ou rejeter avec motif, individuellement ou en lot. | Validateur, Gestionnaire |
+| File de validation | Propositions aux statuts Proposée et À arbitrer dans mes langues ; référence, valeur en vigueur et proposition côte à côte, origine historique et imports associés (filtres sans double comptage), différences surlignées et anomalies bloquantes ; valider ou rejeter avec motif, individuellement ou en lot. | Validateur, Gestionnaire |
 | Imports | Liste des lots avec statut et rapport ; assistant en trois étapes (paramètres, analyse, application). | Gestionnaire |
 | Versions et publications | Versions avec statut ; couverture par type et langue ; publication ; liste des publications avec export. | Gestionnaire (lecture pour tous) |
 | Téléchargement d'une publication | Depuis la publication choisie, téléchargement complet pour l'organisation de l'utilisateur ; le Gestionnaire peut choisir l'organisation destinataire. | Tous selon droits |

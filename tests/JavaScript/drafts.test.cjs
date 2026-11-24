@@ -57,7 +57,11 @@ function fixture(rows, {bulk = false, confirmedForm = false} = {}) {
         if (bulkForm) {
             const checkbox = {
                 checked: !!row.selected,
-                dataset: {termId: String(index + 1), proposalEligible: row.eligible === false ? '0' : '1'},
+                dataset: {
+                    termId: String(index + 1),
+                    proposalEligible: row.eligible === false ? '0' : '1',
+                    ...row.arbitration,
+                },
                 matches: selector => selector === '[data-select-item]' || (selector === '[data-select-item]:checked' && checkbox.checked),
                 closest: () => ({querySelector: () => form}),
             };
@@ -269,4 +273,21 @@ test('a catalogue action removes copied proposal fields after a cancelled naviga
     assert.equal(copied.removed, true);
     assert.equal(page.warns(), true);
     assert.deepEqual(page.confirmations, ['Send 1?']);
+});
+
+test('catalogue arbitration copies only checked proposal versions and checked drafts', () => {
+    const page = fixture([
+        {selected: true, eligible: false, arbitration: {arbitrationId: '51', arbitrationVersion: '7'}},
+        {selected: true},
+        {selected: false, eligible: false, arbitration: {arbitrationId: '52', arbitrationVersion: '8'}},
+        {selected: true, eligible: false},
+    ], {bulk: true});
+    page.change(1, 'Draft for arbitration');
+    assert.equal(page.submit(page.bulkForm, undefined, {dataset: {bulkArbitrate: '', confirm: 'Arbitrate :count?'}}).defaultPrevented, false);
+    assert.deepEqual(page.confirmations, ['Arbitrate 2?']);
+    assert.equal(page.bulkForm.elements['selection[51]'].value, '7');
+    assert.equal(page.bulkForm.elements['rows[2][value]'].value, 'Draft for arbitration');
+    assert.equal(page.bulkForm.elements['selection[52]'], undefined);
+    assert.equal(page.bulkForm.elements['rows[4][value]'], undefined);
+    assert.equal(page.warns(), false);
 });

@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'status_arbitration' => 'Da decidere',
+    'arbitrate' => 'Segna da decidere',
+    'arbitrate_selection' => 'Segna la selezione da decidere',
+    'arbitration_bulk_confirm' => 'Segnare :count proposte da decidere?',
+    'arbitration_saved' => 'Arbitraggio registrato.',
+    'arbitration_competitor' => 'Rifiuta prima con una motivazione l’altra proposta da decidere per questa cella.',
+    'arbitration_one_per_cell' => 'Seleziona una sola proposta da convalidare per termine, attributo e lingua.',
+    'arbitration_filtered_hint' => 'Le proposte da decidere devono essere selezionate esplicitamente. Sono escluse da questa azione generale.',
     'upload_too_large_title' => 'File troppo grande',
     'upload_too_large_help' => 'L’invio supera il limite del server e non è stata creata alcuna importazione. Le importazioni accettano file fino a 100 MiB quando il server è configurato per questa dimensione. Se il file è più piccolo, segnali questo errore all’amministratore per verificare la configurazione del server. Dovrà selezionare nuovamente il file.',
     'upload_return' => 'Torna alle importazioni',

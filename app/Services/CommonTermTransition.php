@@ -6,6 +6,7 @@ use App\Domain\Devconf\CsvReader;
 use App\Domain\Devconf\FormatRegistry;
 use App\Domain\Devconf\TranslationValidator;
 use App\Models\ImportBatch;
+use App\Models\Proposal;
 use App\Models\Term;
 use App\Services\CatalogueSearch\Projection;
 use Illuminate\Database\QueryException;
@@ -164,7 +165,7 @@ class CommonTermTransition
                     continue;
                 }
                 $pending = DB::table('proposals')->where('term_id', $base->id)->where('attribute', $attribute)->where('language', $language)
-                    ->where('status', 'pending')->where('value_hash', hash('sha256', $value))->orderBy('id')->get()
+                    ->whereIn('status', Proposal::OPEN_STATUSES)->where('value_hash', hash('sha256', $value))->orderBy('id')->get()
                     ->first(fn ($proposal) => $proposal->value === $value);
                 $decision = DB::table('proposals')->where('legacy_term_id', $legacy->id)->where('attribute', $attribute)
                     ->where('language', $language)->where('status', 'validated')->orderByDesc('decided_at')->orderByDesc('id')->get()
@@ -234,7 +235,7 @@ class CommonTermTransition
     private function transitionContextFingerprints(): void
     {
         $campaigns = app(CampaignService::class);
-        $this->current()->whereIn('id', DB::table('proposals')->where('status', 'pending')->whereNotNull('context_fingerprint')->select('term_id'))
+        $this->current()->whereIn('id', DB::table('proposals')->whereIn('status', Proposal::OPEN_STATUSES)->whereNotNull('context_fingerprint')->select('term_id'))
             ->orderBy('id')->chunkById(300, function ($terms) use ($campaigns) {
                 foreach ($terms as $row) {
                     try {
@@ -246,7 +247,7 @@ class CommonTermTransition
                     }
                     $term = Term::findOrFail($row->id);
                     DB::transaction(function () use ($term, $source, $attributes, $campaigns) {
-                        foreach (DB::table('proposals')->where('term_id', $term->id)->where('status', 'pending')->whereNotNull('context_fingerprint')->get() as $proposal) {
+                        foreach (DB::table('proposals')->where('term_id', $term->id)->whereIn('status', Proposal::OPEN_STATUSES)->whereNotNull('context_fingerprint')->get() as $proposal) {
                             $lineageId = $proposal->legacy_term_id ?? $term->id;
                             $historical = DB::table('term_legacy_scopes')->where('term_id', $lineageId)->value('metadata');
                             if ($historical === null) {

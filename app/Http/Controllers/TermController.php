@@ -42,7 +42,7 @@ class TermController extends Controller
     public function dashboard(Request $request)
     {
         $query = Term::visibleTo($request->user());
-        $pending = Proposal::where('status', 'pending');
+        $pending = Proposal::whereIn('status', Proposal::OPEN_STATUSES);
         $review = TermState::where('review_languages', '>', 0)->whereIn('id', Term::select('id'));
         if (! $request->user()->canManage()) {
             $pending->whereIn('language', $request->user()->canValidateAny() ? $request->user()->roleLanguages('validator') : $request->user()->roleLanguages('translator'));
@@ -69,7 +69,7 @@ class TermController extends Controller
         }
         $data = $request->validate(['type' => 'nullable|in:'.implode(',', array_keys(FormatRegistry::all())), 'language' => 'nullable|in:de,fr,it,en', 'q' => 'nullable|string|max:250',
             'version_id' => 'nullable|integer|exists:myabi_versions,id', 'context' => 'nullable|string|max:255', 'per_page' => 'nullable|integer|min:10|max:100',
-            'state' => 'nullable|in:missing,pending,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
+            'state' => 'nullable|in:missing,pending,arbitration,validated,published,review,obsolete', 'sort' => 'nullable|in:key,updated,created', 'search_mode' => 'nullable|in:text,prefix,regex', 'group_id' => ['nullable', 'regex:/^(none|[1-9][0-9]*)$/'],
             'campaign_id' => 'nullable|integer|exists:translation_campaigns,id', 'approximate' => 'nullable|boolean']);
         $language = $data['language'] ?? 'fr';
         $state = $data['state'] ?? null;
@@ -82,7 +82,7 @@ class TermController extends Controller
         $probeText = $probeLimit > 0 && ! $approximate && $mode === 'text' && mb_strlen($literal) >= 3
             && DB::getDriverName() === 'mariadb'
             && ! $request->anyFilled(['context', 'group_id', 'campaign_id', 'type', 'version_id', 'state']);
-        if (($probeText || $state === 'pending') && DB::transactionLevel() === 0) {
+        if (($probeText || in_array($state, Proposal::OPEN_STATUSES, true) || ($mode === 'text' && $request->filled('q'))) && DB::transactionLevel() === 0) {
             return app(Search::class)->snapshot(fn () => $this->index($request));
         }
         $searchInfo = null;
@@ -137,6 +137,9 @@ class TermController extends Controller
         if ($state === 'pending') {
             $query->matchingPendingBadge($language);
         }
+        if ($state === Proposal::ARBITRATION) {
+            $query->matchingArbitrationBadge($language);
+        }
         if (in_array($state, ['missing', 'validated', 'review', 'published', 'obsolete'])) {
             $query->whereIn('id', TermState::matchingState($state, $language, $request->filled('version_id') ? (int) $data['version_id'] : null)->select('id'));
         }
@@ -180,24 +183,29 @@ class TermController extends Controller
         $rows = Term::visibleTo($request->user())->with('sourceImport', 'lastPublication', 'group')->whereIn('id', $ids)->get()->keyBy('id');
         $items = $ids->map(fn ($id) => $rows->get($id))->filter()->values();
         $terms = (new LengthAwarePaginator($items, $typeCounts->sum(), $perPage, $page, ['path' => $request->url()]))->withQueryString();
-        $proposals = Proposal::whereIn('term_id', $terms->pluck('id'))->where('language', $language)->where('status', 'pending')
-            ->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy(['term_id', 'attribute', 'language']);
+        $proposals = Proposal::whereIn('term_id', $terms->pluck('id'))->inLanguage($language)->whereIn('status', Proposal::OPEN_STATUSES)
+            ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [Proposal::ARBITRATION])->orderByDesc('created_at')->orderByDesc('id')->get()->groupBy(['term_id', 'attribute', 'language']);
         foreach ($terms as $term) {
             $attributes = FormatRegistry::get($term->type)->attributeNames;
             $attribute = $attributes[0];
             $pending = $proposals->get($term->id, collect())->get($attribute, collect())->get($language, collect());
             $term->display_attribute = $attribute;
-            $term->current_value = data_get($term->validated, "$attribute.$language");
-            $term->current_state = $term->state($attribute, $language, $pending->isNotEmpty());
+            $term->current_value = data_get($term->validated, [$attribute, $language]);
+            $term->current_state = $term->state($attribute, $language, $pending->isNotEmpty(), $pending->first()?->status === Proposal::ARBITRATION);
             if ($state === 'missing' && $term->current_value !== null) {
                 $term->missing_attributes = array_filter(array_slice($attributes, 1, preserve_keys: true),
                     fn ($name) => data_get($term->validated, [$name, $language]) === null);
             }
             $term->pending_value = $pending->first()?->value;
             $term->pending_id = $pending->first()?->id;
+            $term->pending_version = $pending->first()?->lock_version;
+            $term->pending_status = $pending->first()?->status;
             $term->pending_count = $pending->count();
-            $term->other_pending_attributes = $proposals->get($term->id, collect())->except($attribute)
-                ->map(fn ($languages) => $languages->get($language, collect())->count());
+            $otherCells = $proposals->get($term->id, collect())->only(array_slice($attributes, 1));
+            $term->other_pending_attributes = $otherCells->map(fn ($languages) => $languages->get($language, collect())->count());
+            $term->other_arbitrating_attributes = $term->obsolete ? collect() : $otherCells->filter(
+                fn ($languages) => $languages->get($language, collect())->first()?->status === Proposal::ARBITRATION
+            );
             if ($term->current_state === 'published' && $request->filled('version_id') && $term->lastPublication?->version_id != (int) $request->query('version_id')) {
                 $term->current_state = 'validated';
             }
@@ -249,7 +257,7 @@ class TermController extends Controller
         $term->load('group');
         $language = in_array($request->query('language'), ['de', 'fr', 'it', 'en']) ? $request->query('language') : 'fr';
         $attributes = $term->attributesForDisplay();
-        $pendingAttributes = $term->proposals()->where('language', $language)->where('status', 'pending')->distinct()->pluck('attribute');
+        $openAttributes = Proposal::openAttributesForTerms([$term->id], $language)->get($term->id, collect());
         $proposalPage = null;
         if ($request->filled('match_proposal')) {
             $request->validate(['match_proposal' => 'integer|min:1']);
@@ -282,6 +290,6 @@ class TermController extends Controller
 
         $groups = TermGroup::visibleTo($request->user())->orderBy('title')->get();
 
-        return view('terms.show', [...self::filters(), ...compact('term', 'attributes', 'pendingAttributes', 'proposals', 'revisions', 'presences', 'comparison', 'language', 'events', 'restoreRevision', 'groups', 'lineages', 'lineageId', 'historicalLineage'), 'sourceMetadata' => $source->row($term)]);
+        return view('terms.show', [...self::filters(), ...compact('term', 'attributes', 'openAttributes', 'proposals', 'revisions', 'presences', 'comparison', 'language', 'events', 'restoreRevision', 'groups', 'lineages', 'lineageId', 'historicalLineage'), 'sourceMetadata' => $source->row($term)]);
     }
 }

@@ -143,6 +143,8 @@ S’il existe plusieurs propositions pertinentes en attente pour le terme, la la
 
 Une même proposition peut être suivie par plusieurs campagnes de la même langue. Sa validation ou son rejet actualise le traitement dans chacune des campagnes qui la suivent encore. Cela ne duplique pas la proposition et ne fusionne pas les historiques de participation. L’arrêt du suivi à la suite d’une confirmation sans changement dans une campagne ne met pas fin au suivi dans les autres campagnes.
 
+Une proposition de traduction peut elle-même être **À arbitrer**. Ce statut s’applique à une cellule attribut/langue et se demande sans motif dans le catalogue ou la fiche. Si la campagne suit cette proposition, la participation reste **Proposition envoyée** tant que son contexte est pertinent. L’arbitrage de la participation est une action de campagne motivée et se résout selon les règles ci-dessous.
+
 ### 4.5. Résolution d’un arbitrage
 
 Un Validateur de la langue ou un Gestionnaire résout l’arbitrage par une décision motivée, conservée dans l’historique avec son auteur et sa date.

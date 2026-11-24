@@ -29,11 +29,47 @@
 @forelse($proposals as $proposal)
 <article class="section" id="proposal-{{ $proposal->id }}"><div class="panel-label"><span>{{ \Illuminate\Support\Facades\Lang::has('catalogue.attributes.'.$proposal->attribute) ? __('catalogue.attributes.'.$proposal->attribute) : $proposal->attribute }} · {{ $proposal->language }} · {{ $proposal->author?->name ?? __('ui.imports') }} · {{ $proposal->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i') }}</span>@include('partials.status',['status'=>$proposal->status])</div>@include('partials.proposal-provenance', ['proposal'=>$proposal])<p class="translation-text">{{ $proposal->value }}</p>@include('partials.proposal-screenshot', ['proposal' => $proposal])@if($proposal->rejection_reason)<p class="client-error">{{ __('ui.reason') }} : {{ $proposal->rejection_reason }}</p>@endif
 @if($proposal->anomalies)<div class="notice error section"><strong>{{ __('ui.blocking_anomalies') }}</strong><ul>@foreach($proposal->anomalies as $anomaly)<li>{{ \App\Domain\Devconf\TranslationValidator::displayMessage($anomaly) }}</li>@endforeach</ul></div>@endif
-@if($proposal->status==='pending')
+@if($proposal->isOpen())
     @if(auth()->user()->canTranslate($proposal->language) && ($proposal->author_id===auth()->id() || ($proposal->import_id && !$proposal->claimed)))
     @php($restoredCorrection = old('proposal_id')==$proposal->id && \Illuminate\Support\Arr::has(session()->getOldInput(), 'value'))
     <details class="section" @if($restoredCorrection) open @endif><summary>{{ __('ui.correct') }}</summary><form method="post" action="{{ url('proposals/'.$proposal->id) }}" class="section" enctype="multipart/form-data">@csrf @method('PATCH')<input type="hidden" name="proposal_id" value="{{ $proposal->id }}"><input type="hidden" name="term_id" value="{{ $term->id }}"><input type="hidden" name="attribute" value="{{ $proposal->attribute }}"><input type="hidden" name="language" value="{{ $proposal->language }}"><input type="hidden" name="lock_version" value="{{ $proposal->lock_version }}"><x-proposal-editor :id="'correct-proposal-'.$proposal->id" :label="__('ui.proposal')" :value="$restoredCorrection ? old('value', $proposal->value) : $proposal->value" :restored="$restoredCorrection" :source="data_get($attributes,$proposal->attribute.'.reference','')" /><x-proposal-screenshot :id="'edit-image-'.$proposal->id" :proposal="$proposal" /><div class="form-actions"><button class="button">{{ __('ui.correct') }}</button></div></form></details>@endif
-    @if(auth()->user()->canValidate($proposal->language))<form action="{{ url('proposals/'.$proposal->id.'/decide') }}" method="post" class="section">@csrf<input type="hidden" name="lock_version" value="{{ $proposal->lock_version }}"><div class="form-grid"><label class="field"><span>{{ __('ui.rejection_reason') }}</span><select class="input" name="reason_category"><option value="other">{{ __('ui.reject_other') }}</option>@foreach(['glossary','meaning','spelling','length','placeholder','superseded'] as $reason)<option value="{{ $reason }}">{{ __('ui.reject_'.$reason) }}</option>@endforeach</select></label><label class="field"><span>{{ __('ui.rejection_details') }}</span><input name="reason" class="input" maxlength="2000"></label></div><div class="form-actions">@if(($canManage ?? false) && $proposal->author_id===auth()->id())<label class="check-label"><input type="checkbox" name="override" value="1">{{ __('ui.manager_override') }}</label>@endif @if($proposal->author_id===auth()->id())<small class="muted">{{ __('ui.four_eyes') }}</small>@endif<button type="submit" class="button danger" name="decision" value="reject">{{ __('ui.reject') }}</button><button type="submit" class="button primary" name="decision" value="validate" @disabled($proposal->author_id===auth()->id() && !($canManage ?? false))>{{ __('ui.validate') }} ✓</button></div></form>@endif
+    @php($canArbitrateProposal = $proposal->status === 'pending' && auth()->user()->canTranslate($proposal->language))
+    @php($canDecideProposal = auth()->user()->canValidate($proposal->language))
+    @if($canArbitrateProposal || $canDecideProposal)
+        <form action="{{ route('proposals.decide', $proposal) }}" method="post" class="section">
+            @csrf
+            <input type="hidden" name="lock_version" value="{{ $proposal->lock_version }}">
+            @if($canDecideProposal)
+                <div class="form-grid">
+                    <label class="field">
+                        <span>{{ __('ui.rejection_reason') }}</span>
+                        <select class="input" name="reason_category">
+                            <option value="other">{{ __('ui.reject_other') }}</option>
+                            @foreach(['glossary', 'meaning', 'spelling', 'length', 'placeholder', 'superseded'] as $reason)
+                                <option value="{{ $reason }}">{{ __('ui.reject_'.$reason) }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="field"><span>{{ __('ui.rejection_details') }}</span><input name="reason" class="input" maxlength="2000"></label>
+                </div>
+            @endif
+            <div class="form-actions">
+                @if($canDecideProposal && ($canManage ?? false) && $proposal->author_id === auth()->id())
+                    <label class="check-label"><input type="checkbox" name="override" value="1">{{ __('ui.manager_override') }}</label>
+                @endif
+                @if($canDecideProposal && $proposal->author_id === auth()->id())
+                    <small class="muted">{{ __('ui.four_eyes') }}</small>
+                @endif
+                @if($canArbitrateProposal)
+                    <button type="submit" class="button" name="decision" value="arbitrate">{{ __('ui.arbitrate') }}</button>
+                @endif
+                @if($canDecideProposal)
+                    <button type="submit" class="button danger" name="decision" value="reject">{{ __('ui.reject') }}</button>
+                    <button type="submit" class="button primary" name="decision" value="validate" @disabled($proposal->author_id === auth()->id() && !($canManage ?? false))>{{ __('ui.validate') }} ✓</button>
+                @endif
+            </div>
+        </form>
+    @endif
 @endif
 @if($proposal->status==='rejected' && auth()->user()->canTranslate($proposal->language) && !$term->obsolete)
 @php($restoredRejection = old('supersedes_id')==$proposal->id && \Illuminate\Support\Arr::has(session()->getOldInput(), 'value'))
@@ -50,7 +86,7 @@
 @if($comparison ?? null)@include('terms.comparison')@endif
 <ol class="history">@forelse($revisions as $revision)<li><strong>r{{ $revision->number ?? $revision->revision_no }} · {{ $revision->origin ?? __('ui.revision') }}</strong><span>{{ $revision->author?->name ?? '—' }}</span><time>{{ $revision->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i:s') }}</time>@if(auth()->user()->canTranslate($language))<a class="button small section" href="{{ url()->current() }}?language={{ $language }}&lineage={{ $lineageId }}&restore_revision={{ $revision->number }}#translation-0">{{ __('ui.restore_revision') }}</a>@endif</li>@empty<li>{{ __('ui.no_history') }}</li>@endforelse</ol>@include('partials.pagination',['items'=>$revisions])</section>
 @if(isset($sourceMetadata))<section class="surface block section"><details><summary>{{ __('ui.original_trace') }} / {{ __('ui.technical_attributes') }}</summary><div class="table-wrap"><table class="mini-table"><tbody>@foreach($sourceMetadata as $column=>$value)<tr><th>{{ $column }}</th><td class="preserve">{{ $value }}</td></tr>@endforeach</tbody></table></div></details></section>@endif
-@if(isset($events))<section class="surface block section"><h2>{{ __('ui.history') }}</h2><ol class="history">@forelse($events as $event)<li><strong>@include('partials.event-label', ['value'=>$event->action])</strong><span>{{ $event->user?->name ?? $event->actor?->name ?? '—' }}</span><time>{{ $event->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i:s') }}</time></li>@empty<li>{{ __('ui.no_history') }}</li>@endforelse</ol></section>@endif
+@if(isset($events))<section class="surface block section"><h2>{{ __('ui.history') }}</h2><ol class="history">@forelse($events as $event)<li><strong>@include('partials.event-label', ['value' => $event->action, 'group' => 'events'])</strong><span>{{ $event->user?->name ?? $event->actor?->name ?? '—' }}</span><time>{{ $event->created_at?->copy()->timezone('Europe/Zurich')->format('d.m.Y H:i:s') }}</time></li>@empty<li>{{ __('ui.no_history') }}</li>@endforelse</ol></section>@endif
 @if($secondaryAttributes)
     <details class="surface block section" id="incident-secondary-attributes" @if(($restoreRevision ?? null) || in_array($draftAttribute, $secondaryAttributes, true)) open @endif>
         <summary>{{ __('catalogue.incident_secondary_attributes') }}</summary>

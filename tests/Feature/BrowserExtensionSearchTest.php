@@ -154,7 +154,7 @@ class BrowserExtensionSearchTest extends TestCase
     public function test_proposals_are_not_corpus_and_pending_is_counted_without_selection(): void
     {
         $term = $this->term('A', imported: 'Courante');
-        foreach (['pending', 'pending', 'rejected'] as $status) {
+        foreach (['pending', 'pending', 'rejected', Proposal::ARBITRATION] as $status) {
             Proposal::create(['term_id' => $term->id, 'attribute' => 'label', 'language' => 'fr', 'value' => 'Seulement proposition',
                 'value_hash' => hash('sha256', 'Seulement proposition'), 'status' => $status, 'author_id' => $this->reader->id, 'anomalies' => [], 'edit_history' => []]);
         }
@@ -162,6 +162,7 @@ class BrowserExtensionSearchTest extends TestCase
         self::assertSame('none', $this->search('Seulement proposition')['matchState']);
         $result = $this->search('Courante')['results'][0];
         self::assertSame(2, $result['pendingCount']);
+        self::assertSame('missing', $result['status']);
         self::assertSame('', $result['proposedTranslation']);
     }
 

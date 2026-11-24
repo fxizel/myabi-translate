@@ -3,6 +3,7 @@
 namespace App\Services\CatalogueSearch;
 
 use App\Domain\Devconf\FormatRegistry;
+use App\Models\Proposal;
 use App\Models\Term;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
@@ -209,7 +210,7 @@ class Search
         $query->fromRaw('('.$seeds->toSql().') AS seed_terms '.$join.' terms ON terms.id = seed_terms.term_id', $seeds->getBindings());
 
         return $query->where(function ($query) use ($reference, $current, $pattern, $language) {
-            $proposal = DB::table('proposals as cp')->selectRaw('1')->whereColumn('cp.term_id', 'terms.id')->where('cp.status', 'pending')->where('cp.language', $language)
+            $proposal = DB::table('proposals as cp')->selectRaw('1')->whereColumn('cp.term_id', 'terms.id')->whereIn('cp.status', Proposal::OPEN_STATUSES)->where('cp.language', $language)
                 ->whereRaw($this->like('cp.value'), [$pattern])->limit(1);
             $query->whereRaw($reference, [$pattern])->orWhereRaw($current, [$pattern])
                 ->orWhereRaw('('.$proposal->toSql().') IS NOT NULL', $proposal->getBindings());
@@ -431,7 +432,7 @@ class Search
             }
         }
         [, , $pattern] = $this->literalSql($literal, $language);
-        foreach (DB::table('proposals')->whereIn('term_id', $ids)->where('language', $language)->where('status', 'pending')->whereRaw($this->like('value'), [$pattern])->orderBy('id')->lazyById(200) as $proposal) {
+        foreach (DB::table('proposals')->whereIn('term_id', $ids)->where('language', $language)->whereIn('status', Proposal::OPEN_STATUSES)->whereRaw($this->like('value'), [$pattern])->orderBy('id')->lazyById(200) as $proposal) {
             if (! isset($matches[$proposal->term_id])) {
                 $ranges = $this->profile->literalRanges($proposal->value, $literal);
                 $matches[$proposal->term_id] = ['attribute' => $proposal->attribute, 'language' => $language, 'origin' => 'proposal', 'proposal_id' => $proposal->id,
@@ -467,7 +468,7 @@ class Search
     {
         $values = DB::table('catalogue_search_values')->whereIn('id', $rows->pluck('value_id'))->get()->keyBy('id');
         $terms = Term::whereIn('id', $rows->pluck('term_id'))->get()->keyBy('id');
-        $proposals = DB::table('proposals')->whereIn('id', $values->where('origin', 'proposal')->pluck('origin_id'))->where('status', 'pending')->get()->keyBy('id');
+        $proposals = DB::table('proposals')->whereIn('id', $values->where('origin', 'proposal')->pluck('origin_id'))->whereIn('status', Proposal::OPEN_STATUSES)->get()->keyBy('id');
         $matches = [];
         foreach ($rows as $row) {
             $value = $values[$row->value_id];

@@ -4,6 +4,7 @@ namespace App\Services\CatalogueSearch;
 
 use App\Domain\Devconf\FormatRegistry;
 use App\Models\ImportBatch;
+use App\Models\Proposal;
 use App\Models\Term;
 use App\Services\OperationLock;
 use App\Services\SourceRecord;
@@ -128,7 +129,7 @@ class Projection
             }
         }
         $byId = $terms->keyBy('id');
-        foreach (DB::table('proposals')->whereIn('term_id', $terms->pluck('id'))->where('status', 'pending')->orderBy('id')->lazyById(200) as $proposal) {
+        foreach (DB::table('proposals')->whereIn('term_id', $terms->pluck('id'))->whereIn('status', Proposal::OPEN_STATUSES)->orderBy('id')->lazyById(200) as $proposal) {
             $term = $byId[$proposal->term_id];
             if ($term->consolidated_into_id === null && in_array($proposal->attribute, FormatRegistry::get($term->type)->attributeNames, true)) {
                 $append($term, $proposal->attribute, $proposal->language, 'proposal', $proposal->id, $proposal->value);

@@ -7,6 +7,7 @@ use App\Models\Proposal;
 use App\Models\Term;
 use App\Models\TermGroup;
 use App\Models\TranslationCampaign;
+use App\Services\CatalogueSearch\Search;
 use App\Services\FilteredValidationService;
 use App\Services\OperationLock;
 use App\Services\ProposalFilter;
@@ -21,11 +22,14 @@ class ProposalController extends Controller
     public function index(Request $request, ProposalFilter $filter, FilteredValidationService $filteredValidation)
     {
         abort_unless($request->user()->canValidateAny(), 403);
+        if (DB::transactionLevel() === 0) {
+            return app(Search::class)->snapshot(fn () => $this->index($request, $filter, $filteredValidation));
+        }
         $filters = $filter->fromQuery($request->user(), $request->query());
         $language = $filters['language'];
         $generation = (int) DB::table('catalogue_state')->where('id', 1)->value('generation');
         $q = $filter->query($request->user(), $filters)
-            ->select(['id', 'term_id', 'attribute', 'language', 'value', 'lock_version', 'author_id', 'organization_id', 'import_id', 'edit_history', 'anomalies', 'created_at', 'screenshot_path'])
+            ->select(['id', 'term_id', 'attribute', 'language', 'value', 'status', 'lock_version', 'author_id', 'organization_id', 'import_id', 'edit_history', 'anomalies', 'created_at', 'screenshot_path'])
             ->with(['term:id,type,label,source_text,validated,source_import_id,source_offset,source_length', 'term.sourceImport:id,path', 'author:id,name', 'organization:id,name,code', 'import:id,organization_id', 'import.organization:id,name,code', 'imports:id,organization_id', 'imports.organization:id,name,code']);
         $showAll = $request->query('per_page') === 'all';
         $proposalTotal = $showAll ? (clone $q)->count() : null;
@@ -44,14 +48,19 @@ class ProposalController extends Controller
             ]);
         }
 
-        $filteredSnapshot = $filteredValidation->snapshot($request->user(), $filters, $proposalTotal, $generation);
+        $filteredTotal = match ($filters['state'] ?? null) {
+            Proposal::ARBITRATION => 0,
+            'pending' => $proposalTotal,
+            default => $filter->query($request->user(), $filters, general: true)->count(),
+        };
+        $filteredSnapshot = $filteredValidation->snapshot($request->user(), $filters, $filteredTotal, $generation);
         $filteredOperations = BulkOperation::where('type', 'filtered_validation')->where('user_id', $request->user()->id)
             ->latest('id')->limit(5)->get();
 
         $groups = TermGroup::visibleTo($request->user())->orderBy('title')->get();
         $filterCampaigns = TranslationCampaign::visibleTo($request->user())->orderBy('title')->get();
 
-        return view('validation.index', [...$viewData, ...compact('filteredSnapshot', 'filteredOperations', 'groups', 'filterCampaigns')]);
+        return view('validation.index', [...$viewData, ...compact('filteredTotal', 'filteredSnapshot', 'filteredOperations', 'groups', 'filterCampaigns')]);
     }
 
     public function validateFiltered(Request $request, FilteredValidationService $validation)
@@ -84,9 +93,9 @@ class ProposalController extends Controller
 
     public function store(Request $request, Term $term, WorkflowService $workflow)
     {
-        $d = $request->validate([...$this->screenshotRules(), 'attribute' => 'required|string|max:60', 'language' => 'required|in:de,fr,it,en', 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer', 'supersedes_id' => 'nullable|integer', 'restored_revision_id' => 'nullable|integer']);
+        $d = $request->validate([...$this->screenshotRules(), 'attribute' => 'required|string|max:60', 'language' => 'required|in:de,fr,it,en', 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer', 'supersedes_id' => 'nullable|integer', 'restored_revision_id' => 'nullable|integer', 'intent' => 'sometimes|in:arbitrate']);
 
-        return $this->saveProposal($request, fn () => $workflow->propose($request->user(), $term, $d['attribute'], $d['language'], $d['value'], (int) $d['lock_version'], isset($d['supersedes_id']) ? (int) $d['supersedes_id'] : null, isset($d['restored_revision_id']) ? (int) $d['restored_revision_id'] : null, $request->file('screenshot'), $d['screenshot_action'] ?? 'keep'), true);
+        return $this->saveProposal($request, fn () => $workflow->propose($request->user(), $term, $d['attribute'], $d['language'], $d['value'], (int) $d['lock_version'], isset($d['supersedes_id']) ? (int) $d['supersedes_id'] : null, isset($d['restored_revision_id']) ? (int) $d['restored_revision_id'] : null, $request->file('screenshot'), $d['screenshot_action'] ?? 'keep', arbitrate: ($d['intent'] ?? null) === 'arbitrate'), true);
     }
 
     public function update(Request $request, Proposal $proposal, WorkflowService $workflow)
@@ -98,16 +107,16 @@ class ProposalController extends Controller
 
     public function decide(Request $request, Proposal $proposal, WorkflowService $workflow)
     {
-        $d = $request->validate(['decision' => 'required|in:validate,reject', 'lock_version' => 'required|integer', 'reason' => 'required_if:decision,reject|nullable|string|max:4000', 'reason_category' => 'nullable|in:other,glossary,meaning,spelling,length,placeholder,superseded', 'override' => 'nullable|boolean']);
+        $d = $request->validate(['decision' => 'required|in:arbitrate,validate,reject', 'lock_version' => 'required|integer', 'reason' => 'required_if:decision,reject|nullable|string|max:4000', 'reason_category' => 'nullable|in:other,glossary,meaning,spelling,length,placeholder,superseded', 'override' => 'nullable|boolean']);
         $reason = trim(($request->input('reason_category') ? $request->input('reason_category').': ' : '').($d['reason'] ?? ''));
         $workflow->decide($request->user(), $proposal, $d['decision'], (int) $d['lock_version'], $reason, $request->boolean('override'));
 
-        return back()->with('status', __('ui.decision_saved'));
+        return back()->with('status', __($d['decision'] === 'arbitrate' ? 'ui.arbitration_saved' : 'ui.decision_saved'));
     }
 
     public function bulk(Request $request, WorkflowService $workflow)
     {
-        $d = $request->validate(['decision' => 'required|in:validate,reject', 'reason' => 'nullable|string|max:4000', 'selection' => 'nullable|array|max:500', 'selected' => 'nullable|array|max:500', 'versions' => 'nullable|array|max:500', 'confirmed' => 'accepted']);
+        $d = $request->validate(['decision' => 'required|in:arbitrate,validate,reject', 'reason' => 'nullable|string|max:4000', 'selection' => 'nullable|array|max:500', 'selection.*' => 'required|integer|min:1', 'selected' => 'nullable|array|max:500', 'selected.*' => 'required|integer|min:1', 'versions' => 'nullable|array|max:500', 'ids' => 'nullable|array|max:500', 'ids.*' => 'required|integer|min:1', 'lock_versions' => 'nullable|array|max:500', 'confirmed' => 'accepted']);
         $selection = [];
         foreach ($request->input('ids', []) as $id) {
             $selection[(int) $id] = (int) $request->input('lock_versions.'.$id, 0);
@@ -120,26 +129,32 @@ class ProposalController extends Controller
         }
         $workflow->bulk($request->user(), $selection, $d['decision'], $d['reason'] ?? null, $request->boolean('override'));
 
-        return back()->with('status', __('ui.decision_saved'));
+        return back()->with('status', __($d['decision'] === 'arbitrate' ? 'ui.arbitration_saved' : 'ui.decision_saved'));
     }
 
     public function bulkStore(Request $request, WorkflowService $workflow, OperationLock $lock)
     {
-        $request->validate(['rows' => 'required|array|max:100', 'confirmed' => 'accepted']);
-        $count = 0;
-        $lock->run(fn () => DB::transaction(function () use ($request, $workflow, &$count) {
-            foreach ($request->input('rows') as $id => $row) {
-                if (empty($row['selected'])) {
-                    continue;
-                }
-                validator($row, ['attribute' => 'required|string', 'language' => 'required|in:de,fr,it,en', 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer'])->validate();
-                $workflow->proposeUnderOperationLock($request->user(), Term::findOrFail($id), $row['attribute'], $row['language'], $row['value'], (int) $row['lock_version']);
-                $count++;
+        $data = $request->validate(['rows' => 'required_without:selection|array|max:100', 'rows.*' => 'array', 'selection' => 'nullable|array|max:100', 'selection.*' => 'required|integer|min:1', 'intent' => 'sometimes|in:arbitrate', 'confirmed' => 'accepted']);
+        $arbitrate = ($data['intent'] ?? null) === 'arbitrate';
+        $rows = array_filter($data['rows'] ?? [], fn ($row) => ! empty($row['selected']));
+        $selection = $arbitrate ? ($data['selection'] ?? []) : [];
+        abort_if(count($rows) + count($selection) === 0 || count($rows) + count($selection) > 100, 422);
+        $lock->run(fn () => DB::transaction(function () use ($request, $workflow, $rows, $selection, $arbitrate) {
+            if ($rows && count($rows) + count($selection) > 1) {
+                $termIds = Proposal::whereKey(array_keys($selection))->pluck('term_id')->merge(array_keys($rows));
+                Term::whereKey($termIds->all())->orderBy('id')->lockForUpdate()->get(['id']);
             }
-            abort_if($count === 0, 422);
+            if ($selection) {
+                $workflow->bulkUnderOperationLock($request->user(), $selection, 'arbitrate', null, false);
+            }
+            ksort($rows, SORT_NUMERIC);
+            foreach ($rows as $id => $row) {
+                validator($row, ['attribute' => 'required|string|max:60', 'language' => 'required|in:de,fr,it,en', 'value' => 'required|string|max:1000000', 'lock_version' => 'required|integer'])->validate();
+                $workflow->proposeUnderOperationLock($request->user(), Term::findOrFail($id), $row['attribute'], $row['language'], $row['value'], (int) $row['lock_version'], arbitrate: $arbitrate);
+            }
         }));
 
-        return back()->with('status', __('ui.proposal_saved'));
+        return back()->with('status', __($arbitrate ? 'ui.arbitration_saved' : 'ui.proposal_saved'));
     }
 
     public function confirm(Request $request, Term $term, WorkflowService $workflow)
