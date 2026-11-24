@@ -481,6 +481,24 @@ class CampaignService
             ->filter(fn ($p) => $this->isRelevant($p, $term, $attrs))->values();
     }
 
+    public function pertinentPendingForTerms(Collection $terms, string $language, array $displayAttributes): array
+    {
+        if ($terms->isEmpty()) {
+            return [];
+        }
+
+        $proposals = Proposal::whereIn('term_id', $terms->modelKeys())
+            ->where('status', 'pending')->where('language', $language)
+            ->whereIn('attribute', $terms->map(fn (Term $term) => $this->primaryAttribute($term))->unique())
+            ->orderBy('id')->get(['id', 'term_id', 'attribute', 'language', 'status', 'value', 'context_fingerprint', 'import_id'])
+            ->groupBy('term_id');
+
+        return $terms->mapWithKeys(fn (Term $term) => [
+            $term->id => $proposals->get($term->id, collect())
+                ->filter(fn (Proposal $proposal) => $this->isRelevant($proposal, $term, $displayAttributes[$term->id]))->values(),
+        ])->all();
+    }
+
     public function isRelevant(Proposal $proposal, Term $term, ?array $attributes = null): bool
     {
         if ($proposal->status !== 'pending' || $proposal->term_id !== $term->id || $proposal->attribute !== $this->primaryAttribute($term) || $term->obsolete) {

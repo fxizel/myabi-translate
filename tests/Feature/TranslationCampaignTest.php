@@ -125,7 +125,7 @@ class TranslationCampaignTest extends TestCase
 
     public function test_campaign_shows_the_whole_group_and_counts_reference_validations_separately(): void
     {
-        $alreadyValidated = collect(range(1, 13))->map(fn ($number) => $this->term($number === 1 ? '' : 'Existing translation '.$number));
+        $alreadyValidated = collect(range(1, 33))->map(fn ($number) => $this->term($number === 1 ? '' : 'Existing translation '.$number));
         $confirmed = $this->term();
         $pending = [$this->term(), $this->term()];
         $work = [$confirmed, ...$pending];
@@ -145,16 +145,21 @@ class TranslationCampaignTest extends TestCase
         $this->withoutMiddleware(RequireTwoFactor::class)->actingAs($this->participant);
         $url = route('campaigns.show', $campaign);
         $response = $this->get($url)->assertOk()
-            ->assertSeeText('14 sur 16 avec une traduction validée (FR)')
+            ->assertSeeText('34 sur 36 avec une traduction validée (FR)')
             ->assertSeeText('Consultation du groupe')
-            ->assertSeeText($alreadyValidated->last()->label)
             ->assertDontSee($url.'/terms/'.$alreadyValidated->first()->id.'/propose');
         $terms = $response->viewData('terms');
-        self::assertSame(16, $terms->total());
-        self::assertSame($orderedIds, $terms->getCollection()->modelKeys());
+        self::assertSame(36, $terms->total());
+        self::assertSame(array_slice($orderedIds, 0, 30), $terms->getCollection()->modelKeys());
         self::assertSame(['confirmed', 'proposal_sent', 'proposal_sent'], $response->viewData('participations')->pluck('status')->all());
+        self::assertSame([$proposals[1]->id], $response->viewData('pending')[$pending[0]->id]->pluck('id')->all());
+        self::assertSame([$proposals[2]->id], $response->viewData('pending')[$pending[1]->id]->pluck('id')->all());
         self::assertSame(3, $campaign->metrics()['total']);
         self::assertSame(33.3, $campaign->metrics()['confirmed_progress']);
+
+        $secondPage = $this->get($url.'?page=2')->assertOk()->assertSeeText($alreadyValidated->last()->label);
+        self::assertSame(array_slice($orderedIds, 30), $secondPage->viewData('terms')->getCollection()->modelKeys());
+        self::assertSame([], $secondPage->viewData('pending'));
 
         $active = $this->get($url.'?participation=active&treatment=')->assertOk()->assertDontSeeText('Consultation du groupe');
         self::assertSame(3, $active->viewData('terms')->total());
@@ -189,6 +194,10 @@ class TranslationCampaignTest extends TestCase
         self::assertSame('to_arbitrate', $arbitration->status);
         self::assertNull($arbitration->tracked_proposal_id);
         self::assertNotEmpty($arbitration->reason);
+
+        $this->withoutMiddleware(RequireTwoFactor::class)->actingAs($this->validator);
+        $prepared = $this->get(route('campaigns.show', $campaign))->assertOk();
+        self::assertSame([], $prepared->viewData('pending'));
     }
 
     public function test_returning_participation_never_automatically_tracks_an_old_pending_proposal(): void
@@ -445,6 +454,11 @@ class TranslationCampaignTest extends TestCase
         $this->service()->requestArbitration($this->participant, $campaign->fresh(), $term, 'Context insufficient');
         self::assertSame('to_arbitrate', $this->participation($campaign, $term)->status);
         $proposal = $this->pending($term);
+        $this->withoutMiddleware(RequireTwoFactor::class)->actingAs($this->validator);
+        $url = route('campaigns.show', $campaign);
+        $response = $this->get($url)->assertOk()->assertSee($url.'/terms/'.$term->id.'/resolve');
+        self::assertSame([$proposal->id], $response->viewData('pending')[$term->id]->pluck('id')->all());
+
         $this->service()->resolveArbitration($this->validator, $campaign->fresh(), $term, 'proposal_sent', 'Relevant choice', $proposal->id);
         self::assertSame('pending', $proposal->fresh()->status);
         self::assertSame([], $term->fresh()->validated);
