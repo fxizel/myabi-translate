@@ -6,6 +6,8 @@
 # externe choisi dans compose.caddy.yml. L'alias myabi-translate-web doit etre
 # unique sur ce reseau. Aucun port public supplementaire n'est necessaire.
 # HTTPS et les certificats restent geres par le Caddy existant.
+# Copier resources/views/errors/maintenance.html dans le montage en lecture
+# seule de Caddy, a l'emplacement /etc/caddy/myabi-maintenance/maintenance.html.
 #
 # Caddy conserve Host et definit X-Forwarded-For / Proto / Host par defaut :
 # https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#defaults
@@ -17,5 +19,35 @@
 # https://caddyserver.com/docs/command-line#caddy-reload
 
 myabi.example.org {
-	reverse_proxy myabi-translate-web:8080
+	@maintenance_browser {
+		header Accept *text/html*
+		not path /api /api/*
+	}
+
+	reverse_proxy myabi-translate-web:8080 {
+		# Nginx peut encore repondre si PHP-FPM est arrete.
+		@gateway_error status 502 504
+		handle_response @gateway_error {
+			route {
+				error @maintenance_browser 503
+				copy_response
+			}
+		}
+	}
+
+	# Egalement applicable quand Caddy ne peut plus joindre Nginx.
+	handle_errors 502 503 504 {
+		handle @maintenance_browser {
+			header {
+				Cache-Control no-store
+				Retry-After 60
+			}
+			rewrite * /maintenance.html
+			file_server {
+				root /etc/caddy/myabi-maintenance
+				status 503
+			}
+		}
+		respond "" {err.status_code}
+	}
 }

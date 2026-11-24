@@ -101,7 +101,17 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response()->json($body, $status, array_merge($headers, ['Cache-Control' => 'no-store', 'X-Request-ID' => $requestId]));
         });
-        $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
-        );
+        $isJson = fn (Request $request) => $request->is('api/*') || $request->expectsJson();
+        $exceptions->shouldRenderJsonWhen($isJson);
+        $exceptions->render(function (HttpExceptionInterface $error, Request $request) use ($isJson) {
+            if ($error->getStatusCode() === 503 && ! $isJson($request) && app()->isDownForMaintenance()) {
+                return response(
+                    file_get_contents(resource_path('views/errors/maintenance.html')),
+                    503,
+                    array_merge($error->getHeaders(), ['Cache-Control' => 'no-store']),
+                );
+            }
+
+            return null;
+        });
     })->create();

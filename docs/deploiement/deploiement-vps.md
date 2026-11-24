@@ -128,13 +128,11 @@ Comparer la résolution depuis le réseau des utilisateurs avec celle des serveu
 
 Caddy appartient déjà à son propre projet Docker. Le fichier `compose.caddy.yml` utilise son réseau déclaré **externe** : il doit exister avant le démarrage de myABI et ne sera pas créé ou supprimé par ce projet. Seul `myabi-web` y reçoit l'alias `myabi-translate-web`. `ports: !reset []` supprime la publication locale du profil de base. [Réseaux Compose](https://docs.docker.com/compose/how-tos/networking/), [fusion des configurations](https://docs.docker.com/reference/compose-file/merge/).
 
-Ajouter ou importer **le seul bloc de site** de `Caddyfile.docker.example` dans la configuration existante, en conservant ses autres domaines et options globales :
+Ajouter ou importer **le seul bloc du site myABI** dans la configuration existante de Caddy, en conservant les autres domaines et les options globales. [Modèle Caddy](../../deploy/docker/Caddyfile.docker.example)
 
-```caddyfile
-myabi.example.org {
-    reverse_proxy myabi-translate-web:8080
-}
-```
+Copier la page de maintenance autonome dans un montage en lecture seule du conteneur Caddy, à `/etc/caddy/myabi-maintenance/maintenance.html`. Utiliser le répertoire de configuration déjà monté si disponible, ou monter un répertoire dédié dans le projet Caddy. Conserver la page accessible à Caddy indépendamment du cycle de vie de la stack myABI. Recopier le fichier dans ce montage lors d’une mise à jour de son contenu. [Page de maintenance](../../resources/views/errors/maintenance.html)
+
+Les sauvegardes cohérentes activent déjà la maintenance Laravel. Les navigateurs reçoivent cette page avec le statut `503` pendant l’opération. Si le service web ou PHP-FPM s’arrête, Caddy prend le relais pour les requêtes de pages HTML, tant que le frontal reste en ligne. Les réponses applicatives, dont celles de l’API de l’extension, continuent de transiter par Caddy.
 
 Caddy continue de gérer HTTPS et le renouvellement avec ses volumes et sa configuration actuels. Il transmet les en-têtes de proxy automatiquement ; ne pas reprendre un `Host` ou une adresse client arbitraire depuis le navigateur. PHP reçoit `HTTPS=on` dans le web interne de cette application dédiée au frontal TLS. Nginx ne fait confiance aux en-têtes d'adresse que depuis `CADDY_TRUSTED_PROXY_CIDR`. [Reverse proxy Caddy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy), [HTTPS automatique](https://caddyserver.com/docs/automatic-https).
 
@@ -147,6 +145,8 @@ docker exec NOM_CADDY caddy reload --config CHEMIN_CADDYFILE --adapter caddyfile
 ```
 
 Le montage existant doit effectivement fournir le fichier modifié au conteneur. Si Caddy est administré par API ou `caddy-docker-proxy`, utiliser son mécanisme actuel plutôt que remplacer sa configuration par ce fragment. L'inventaire doit le confirmer. [Commandes Caddy](https://caddyserver.com/docs/command-line).
+
+En recette, demander `/login` avec `Accept: text/html` pendant la maintenance Laravel, puis avec le service web myABI arrêté. Dans les deux cas, vérifier le statut `503`, la directive `no-store` dans l’en-tête `Cache-Control` et le message affiché. Après le redémarrage du service et `artisan up`, vérifier que `/login` répond à nouveau avec le statut `200`.
 
 Pour remplacer une adresse provisoire, attendre que le certificat soit valide et que `/up` réponde sur le nouveau domaine. Régler ensuite `APP_URL` sur cette URL dans `secrets/app.env`. Si les anciennes adresses doivent rester accessibles, conserver leurs blocs Caddy et inscrire leurs hôtes dans `APP_HOST_ALIASES`, séparés par des virgules. Appliquer la [procédure de rechargement Docker](#recharger-la-configuration-docker).
 
